@@ -25,6 +25,11 @@ matrix = CutCell.make_row_matrix(E1,[1,2,3])
 expE1 = hcat(E1,2*E1,3*E1)
 @test allapprox(matrix,expE1)
 
+matrix = CutCell.interpolation_matrix([1.,2.,3.],2)
+testm = [1. 0. 2. 0. 3. 0.
+         0. 1. 0. 2. 0. 3.]
+@test allapprox(matrix,testm)
+
 basis = TensorProductBasis(2,1)
 cellmap = CutCell.CellMap([0.0,0.0],[3.,1.])
 grad = CutCell.transform_gradient(gradient(basis,0.,0.),cellmap)
@@ -44,3 +49,7 @@ cellmap = CutCell.CellMap([0.,0.],[1.,1.])
 quad = tensor_product_quadrature(2,2)
 bf = CutCell.bilinear_form(basis,quad,stiffness,cellmap)
 @test size(bf) == (8,8)
+
+rhsfunc(x) = [1.,1.]
+rhs = CutCell.linear_form(rhsfunc,basis,quad,cellmap)
+@test allapprox(rhs,0.25*ones(8))

@@ -16,6 +16,10 @@ function make_row_matrix(matrix, vals)
       return hcat([v * matrix for v in vals]...)
 end
 
+function interpolation_matrix(vals,ndofs)
+      return make_row_matrix(diagm(ones(ndofs)),vals)
+end
+
 function transform_gradient(gradf, cm::CellMap)
       return gradf / Diagonal(jacobian(cm))
 end
@@ -55,4 +59,17 @@ function bilinear_form(basis, quad, stiffness, cellmap)
             end
       end
       return matrix
+end
+
+function linear_form(rhsfunc, basis, quad, cellmap)
+      dim = dimension(basis)
+      nf = number_of_basis_functions(basis)
+      rhs = zeros(dim*nf)
+      detjac = determinant_jacobian(cellmap)
+      for (p,w) in quad
+            vals = rhsfunc(cellmap(p))
+            N = interpolation_matrix(basis(p),dim)
+            rhs .+= N'*vals*detjac*w
+      end
+      return rhs
 end

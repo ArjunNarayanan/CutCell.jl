@@ -85,6 +85,10 @@ function cell_maps(mesh)
     return [CellMap(element(mesh,i)...) for i = 1:ncells]
 end
 
+function cell_maps(mesh::Mesh)
+    return mesh.cellmaps
+end
+
 function cellmap(mesh::Mesh,i)
     return mesh.cellmaps[i]
 end
@@ -108,6 +112,14 @@ function nodal_coordinates(x0,widths,nelements,nfmside)
     ycoords = repeat(yrange,outer=nfmside[1])
     xcoords = repeat(xrange,inner=nfmside[2])
     return vcat(xcoords',ycoords')
+end
+
+function nodal_coordinates(mesh::Mesh)
+    return mesh.nodalcoordinates
+end
+
+function nodal_connectivity(mesh::Mesh)
+    return mesh.nodalconnectivity
 end
 
 function dimension(mesh::UniformMesh)
@@ -151,4 +163,32 @@ function cell_connectivity(mesh)
         connectivity[:,cellid] .= neighbors(mesh,cellid)
     end
     return connectivity
+end
+
+function bottom_boundary_node_ids(mesh)
+    nfmside = nodes_per_mesh_side(mesh)
+    return range(1,step=nfmside[2],length=nfmside[1])
+end
+
+function right_boundary_node_ids(mesh)
+    nfmside = nodes_per_mesh_side(mesh)
+    start = nfmside[2]*(nfmside[1]-1)+1
+    stop = nfmside[1]*nfmside[2]
+    return start:stop
+end
+
+function top_boundary_node_ids(mesh)
+    nfmside = nodes_per_mesh_side(mesh)
+    return range(nfmside[2],step=nfmside[2],length=nfmside[1])
+end
+
+function left_boundary_node_ids(mesh)
+    nfmside = nodes_per_mesh_side(mesh)
+    return 1:nfmside[2]
+end
+
+function number_of_degrees_of_freedom(mesh::Mesh)
+    dim = size(mesh.nodalcoordinates)[1]
+    numnodes = prod(mesh.nfmside)
+    return numnodes*dim
 end
