@@ -135,7 +135,7 @@ function linear_system(basis, quad, stiffness, femesh, bodyforcefunc)
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
 
-    cellmatrix = CutCell.bilinear_form_alternate(basis, quad, stiffness, cellmaps[1])
+    cellmatrix = CutCell.bilinear_form(basis, quad, stiffness, cellmaps[1])
     CutCell.assemble_bilinear_form!(sysmatrix, cellmatrix, nodalconnectivity, 2)
     CutCell.assemble_body_force_linear_form!(
         sysrhs,
@@ -240,7 +240,7 @@ numqp = 4
 
 x0 = [0.0, 0.0]
 widths = [1.0, 1.0]
-numelements = 1
+numelements = 5
 nelements = [numelements, numelements]
 mesh = UniformMesh(x0, widths, nelements)
 stiffness = plane_strain_voigt_hooke_matrix(lambda, mu)
@@ -261,7 +261,7 @@ matrix, rhs = linear_system(
     femesh,
     x -> quadratic_body_force(lambda, mu, alpha, x),
 )
-K = Array(matrix)
+# K = Array(matrix)
 
 apply_displacement_boundary_condition!(
     matrix,
@@ -273,6 +273,8 @@ apply_displacement_boundary_condition!(
 sol = matrix \ rhs
 nodalsolutions = reshape(sol, 2, :)
 exactsolution = hcat([quadratic_displacement(alpha,nodalcoordinates[:,i]) for i = 1:9]...)
+
+K2 = matrix
 
 err = mesh_error(
     nodalsolutions,

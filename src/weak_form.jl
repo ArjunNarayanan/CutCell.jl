@@ -44,23 +44,6 @@ function plane_strain_voigt_hooke_matrix(lambda, mu)
       ]
 end
 
-# function bilinear_form(basis, quad, stiffness, cellmap)
-#       dim = dimension(basis)
-#       nf = number_of_basis_functions(basis)
-#       ndofs = dim * nf
-#       matrix = zeros(ndofs, ndofs)
-#       vectosymmconverter = vector_to_symmetric_matrix_converter()
-#       detjac = determinant_jacobian(cellmap)
-#       for (p, w) in quad
-#             grad = transform_gradient(gradient(basis, p), cellmap)
-#             for k = 1:dim
-#                   NK = make_row_matrix(vectosymmconverter[k], grad[:, k])
-#                   matrix .+= NK' * stiffness * NK * detjac * w
-#             end
-#       end
-#       return matrix
-# end
-
 function bilinear_form(basis, quad, stiffness, cellmap)
       dim = dimension(basis)
       nf = number_of_basis_functions(basis)
