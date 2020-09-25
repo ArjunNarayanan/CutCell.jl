@@ -53,3 +53,19 @@ bf = CutCell.bilinear_form(basis,quad,stiffness,cellmap)
 rhsfunc(x) = [1.,1.]
 rhs = CutCell.linear_form(rhsfunc,basis,quad,cellmap)
 @test allapprox(rhs,0.25*ones(8))
+
+
+basis = TensorProductBasis(2,2)
+quad = tensor_product_quadrature(2,4)
+cellmap = CutCell.CellMap([-1,-1.],[1.,1.])
+M = CutCell.mass_matrix(basis,quad,cellmap,2)
+rhsfunc(x) = [x[1]^2+x[2]^2,2x[1]*x[2]]
+R = CutCell.linear_form(rhsfunc,basis,quad,cellmap)
+
+sol = reshape(M\R,2,:)
+coords = hcat([cellmap(basis.points[:,i]) for i = 1:9]...)
+exactsol = hcat([rhsfunc(coords[:,i]) for i = 1:9]...)
+@test allapprox(sol,exactsol,1e-10)
+
+bf1 = CutCell.bilinear_form(basis,quad,stiffness,cellmap)
+bf2 = CutCell.bilinear_form_alternate(basis,quad,stiffness,cellmap)

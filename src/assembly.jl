@@ -108,8 +108,8 @@ function apply_dirichlet_bc!(
     matrix::SparseMatrixCSC,
     rhs,
     index::Z,
-    value,
-) where {Z<:Integer}
+    value::R,
+) where {Z<:Integer,R<:Real}
 
     modifyrhs = matrix[:, index]
     for i in modifyrhs.nzind
@@ -142,8 +142,8 @@ function apply_dirichlet_bc!(
     matrix,
     rhs,
     nodeids::V,
-    bcvals,
-) where {V<:AbstractVector}
+    bcvals::M,
+) where {V<:AbstractVector,M<:AbstractMatrix}
 
     dofspernode, numnodes = size(bcvals)
     @assert length(nodeids) == numnodes
@@ -152,6 +152,20 @@ function apply_dirichlet_bc!(
             index = node_to_dof_id(nodeid, dof, dofspernode)
             apply_dirichlet_bc!(matrix, rhs, index, bcvals[dof, idx])
         end
+    end
+end
+
+function apply_dirichlet_bc!(
+    matrix,
+    rhs,
+    nodeid::Z,
+    bcvals::V,
+) where {Z<:Integer,V<:AbstractVector}
+
+    dofs = length(bcvals)
+    for dof = 1:dofs
+        index = node_to_dof_id(nodeid, dof, dofs)
+        apply_dirichlet_bc!(matrix, rhs, index, bcvals[dof])
     end
 end
 
