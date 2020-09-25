@@ -1,6 +1,7 @@
-using PyPlot
-using LinearAlgebra
-using SparseArrays
+# using PyPlot
+# using LinearAlgebra
+# using SparseArrays
+using CSV, DataFrames
 using CartesianMesh
 using PolynomialBasis
 using ImplicitDomainQuadrature
@@ -34,23 +35,6 @@ function boundary_nodeids(femesh)
     return unique!(vcat(bn, rn, tn, ln))
 end
 
-function cell_error_squared(
-    interpolater,
-    exactsolution,
-    cellmap,
-    quad,
-    detjac,
-    ndofs,
-)
-    err = zeros(ndofs)
-    for (p, w) in quad
-        numsol = interpolater(p)
-        exsol = exactsolution(cellmap(p))
-        err .+= (numsol - exsol) .^ 2 * detjac * w
-    end
-    return err
-end
-
 function add_cell_error_squared!(
     err,
     interpolater,
@@ -66,7 +50,7 @@ function add_cell_error_squared!(
     end
 end
 
-function mesh_error(
+function mesh_L2_error(
     nodalsolutions,
     exactsolution,
     nodalconnectivity,
@@ -95,23 +79,6 @@ function mesh_error(
     return sqrt.(err)
 end
 
-function integrate_on_cell(func, cellmap, quad, detjac)
-    val = 0.0
-    for (p, w) in quad
-        val += func(cellmap(p)) * detjac * w
-    end
-    return val
-end
-
-function integrate_on_mesh(func, cellmaps, quad)
-    val = 0.0
-    detjac = CutCell.determinant_jacobian(cellmaps[1])
-    for cellmap in cellmaps
-        val += integrate_on_cell(func, cellmap, quad, detjac)
-    end
-    return sqrt(val)
-end
-
 function apply_displacement_boundary_condition!(
     matrix,
     rhs,
@@ -121,10 +88,14 @@ function apply_displacement_boundary_condition!(
 
     boundarynodeids = boundary_nodeids(femesh)
     nodalcoordinates = CutCell.nodal_coordinates(femesh)
-    for (idx,nodeid) in enumerate(boundarynodeids)
-        disp = displacement_function(nodalcoordinates[:,nodeid])
-        CutCell.apply_dirichlet_bc!(matrix, rhs, nodeid, disp)
-    end
+    boundarynodecoordinates = nodalcoordinates[:, boundarynodeids]
+    boundarydisplacement = displacement_function(boundarynodecoordinates)
+    CutCell.apply_dirichlet_bc!(
+        matrix,
+        rhs,
+        boundarynodeids,
+        boundarydisplacement,
+    )
 end
 
 function linear_system(basis, quad, stiffness, femesh, bodyforcefunc)
@@ -153,23 +124,6 @@ function linear_system(basis, quad, stiffness, femesh, bodyforcefunc)
     return K, R
 end
 
-function relative_error(nodalsolutions, exactsolution, basis, errorquad, femesh)
-
-    nodalconnectivity = CutCell.nodal_connectivity(femesh)
-    cellmaps = CutCell.cell_maps(femesh)
-
-    err = mesh_error(
-        nodalsolutions,
-        exactsolution,
-        nodalconnectivity,
-        cellmaps,
-        basis,
-        errorquad,
-    )
-    normalizer =
-        integrate_on_mesh(x -> norm(exactsolution(x))^2, cellmaps, errorquad)
-    return err / normalizer
-end
 
 function error_for_num_elements(numelements, polyorder, numqp)
     x0 = [0.0, 0.0]
@@ -200,87 +154,88 @@ function error_for_num_elements(numelements, polyorder, numqp)
 
     sol = matrix \ rhs
     nodalsolutions = reshape(sol, 2, :)
-    rerror = relative_error(
+
+    nodalconnectivity = CutCell.nodal_connectivity(femesh)
+    cellmaps = CutCell.cell_maps(femesh)
+
+    err = mesh_L2_error(
         nodalsolutions,
         x -> displacement(alpha, x),
+        nodalconnectivity,
+        cellmaps,
         basis,
         errorquad,
+    )
+    return err
+end
+
+function error_for_num_elements(widths, nelements, polyorder, numqp)
+    x0 = [0.0, 0.0]
+    mesh = UniformMesh(x0, widths, nelements)
+    stiffness = plane_strain_voigt_hooke_matrix(lambda, mu)
+
+    basis = TensorProductBasis(2, polyorder)
+    quad = tensor_product_quadrature(2, numqp)
+    errorquad = tensor_product_quadrature(2, numqp + 2)
+
+    femesh = CutCell.Mesh(mesh, basis)
+
+    matrix, rhs = linear_system(
+        basis,
+        quad,
+        stiffness,
+        femesh,
+        x -> body_force(lambda, mu, alpha, x),
+    )
+    apply_displacement_boundary_condition!(
+        matrix,
+        rhs,
+        x -> displacement(alpha, x),
         femesh,
     )
-    return rerror
+
+    sol = matrix \ rhs
+    nodalsolutions = reshape(sol, 2, :)
+
+    nodalconnectivity = CutCell.nodal_connectivity(femesh)
+    cellmaps = CutCell.cell_maps(femesh)
+
+    err = mesh_L2_error(
+        nodalsolutions,
+        x -> displacement(alpha, x),
+        nodalconnectivity,
+        cellmaps,
+        basis,
+        errorquad,
+    )
+    return err
 end
 
-function shear_displacement(alpha, x::V) where {V<:AbstractVector}
-    return alpha * [x[2], 0.0]
+
+function required_quadrature_order(polyorder)
+    ceil(Int, 0.5 * (2polyorder + 1))
 end
 
-function shear_displacement(alpha, x::M) where {M<:AbstractMatrix}
-    ux = alpha * x[2, :]
-    uy = zeros(length(ux))
-    return vcat(ux', uy')
-end
-
-function shear_body_force(lambda, mu, alpha, x)
-    return [0.0, 0.0]
-end
-
-function quadratic_displacement(alpha,x)
-    return alpha*[x[1]^2+x[2]^2, 2x[1]*x[2]]
-end
-
-function quadratic_body_force(lambda,mu,alpha,x)
-    return -4alpha*[(lambda+2mu),0.0]
+function convergence(nelements, polyorder)
+    numqp = required_quadrature_order(polyorder)
+    err = zeros(length(nelements), 2)
+    for (idx, nelement) in enumerate(nelements)
+        err[idx, :] = error_for_num_elements(nelement, polyorder, numqp)
+    end
+    df = DataFrame(
+        NumElmts = nelements,
+        ErrorU1 = err[:, 1],
+        ErrorU2 = err[:, 2],
+    )
+    filename = "examples/convergence_polyorder_"*string(polyorder)*".csv"
+    CSV.write(filename,df)
 end
 
 const lambda = 1.0
 const mu = 2.0
 const alpha = 0.01
-polyorder = 2
-numqp = 4
 
-x0 = [0.0, 0.0]
-widths = [1.0, 1.0]
-numelements = 5
-nelements = [numelements, numelements]
-mesh = UniformMesh(x0, widths, nelements)
-stiffness = plane_strain_voigt_hooke_matrix(lambda, mu)
+# numelements = [2,4,8,16,32,64]
+# convergence(numelements,4)
 
-basis = TensorProductBasis(2, polyorder)
-quad = tensor_product_quadrature(2, numqp)
-errorquad = tensor_product_quadrature(2, numqp + 2)
-
-femesh = CutCell.Mesh(mesh, basis)
-nodalcoordinates = CutCell.nodal_coordinates(femesh)
-nodalconnectivity = CutCell.nodal_connectivity(femesh)
-cellmaps = CutCell.cell_maps(femesh)
-
-matrix, rhs = linear_system(
-    basis,
-    quad,
-    stiffness,
-    femesh,
-    x -> quadratic_body_force(lambda, mu, alpha, x),
-)
-# K = Array(matrix)
-
-apply_displacement_boundary_condition!(
-    matrix,
-    rhs,
-    x -> quadratic_displacement(alpha, x),
-    femesh,
-)
-
-sol = matrix \ rhs
-nodalsolutions = reshape(sol, 2, :)
-exactsolution = hcat([quadratic_displacement(alpha,nodalcoordinates[:,i]) for i = 1:9]...)
-
-K2 = matrix
-
-err = mesh_error(
-    nodalsolutions,
-    x -> quadratic_displacement(alpha, x),
-    nodalconnectivity,
-    cellmaps,
-    basis,
-    errorquad,
-)
+# err = error_for_num_elements([1.,1.],[2,2],2,2)

@@ -74,3 +74,9 @@ testnodeconn = vcat(43:46,50:53,57:60,64:67)
 @test allequal(CutCell.right_boundary_node_ids(femesh),64:70)
 @test allequal(CutCell.top_boundary_node_ids(femesh),7:7:70)
 @test allequal(CutCell.left_boundary_node_ids(femesh),1:7)
+
+mesh = CutCell.Mesh([0.,0.],[4.,3.],[4,3],9)
+isboundarycell = CutCell.is_boundary_cell(mesh)
+testboundarycell = ones(Int,12)
+testboundarycell[5] = testboundarycell[8] = 0
+@test allequal(isboundarycell,testboundarycell)

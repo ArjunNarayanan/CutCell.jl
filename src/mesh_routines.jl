@@ -62,6 +62,11 @@ function Mesh(mesh, nf::Int)
     )
 end
 
+function Mesh(x0,widths,nelements,nf)
+    mesh = UniformMesh(x0,widths,nelements)
+    return Mesh(mesh,nf)
+end
+
 function nodes_per_mesh_side(mesh::Mesh)
     return mesh.nfmside
 end
@@ -177,6 +182,10 @@ function cell_connectivity(mesh)
     return connectivity
 end
 
+function cell_connectivity(mesh::Mesh)
+    return mesh.cellconnectivity
+end
+
 function bottom_boundary_node_ids(mesh)
     nfmside = nodes_per_mesh_side(mesh)
     return range(1, step = nfmside[2], length = nfmside[1])
@@ -203,4 +212,15 @@ function number_of_degrees_of_freedom(mesh::Mesh)
     dim = size(mesh.nodalcoordinates)[1]
     numnodes = total_number_of_nodes(mesh)
     return numnodes * dim
+end
+
+function is_interior_cell(mesh)
+    cellconnectivity = cell_connectivity(mesh)
+    numcells = size(cellconnectivity)[2]
+    isinteriorcell = [all(cellconnectivity[:,i] .!= 0) for i = 1:numcells]
+    return isinteriorcell
+end
+
+function is_boundary_cell(mesh)
+    return .!is_interior_cell(mesh)
 end

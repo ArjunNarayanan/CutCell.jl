@@ -1,5 +1,4 @@
 using Test
-using SparseArrays
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -69,11 +68,10 @@ exactsol = hcat([rhsfunc(coords[:,i]) for i = 1:9]...)
 @test allapprox(sol,exactsol,1e-10)
 
 
-bf1 = CutCell.bilinear_form(basis,quad,stiffness,cellmap)
+K = CutCell.bilinear_form(basis,quad,stiffness,cellmap)
 bodyforce(x) = -4*(l+2m)*[1.,0.]
 R = CutCell.linear_form(bodyforce,basis,quad,cellmap)
 
-K = sparse(bf1)
 boundarynodeids = [1,4,7,8,9,6,3,2]
 bcvals = exactsol[:,boundarynodeids]
 CutCell.apply_dirichlet_bc!(K,R,boundarynodeids,bcvals)

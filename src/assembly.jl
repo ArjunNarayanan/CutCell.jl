@@ -45,20 +45,6 @@ function node_to_dof_id(nodeid, dof, dofspernode)
     return (nodeid - 1) * dofspernode + dof
 end
 
-# function element_dofs(nodeids, dofspernode)
-#     numnodes = length(nodeids)
-#     numdofs = numnodes * dofspernode
-#     edofs = zeros(Int, numdofs)
-#     count = 1
-#     for nodeid in nodeids
-#         for dof = 1:dofspernode
-#             edofs[count] = node_to_dof_id(nodeid, dof, dofspernode)
-#             count += 1
-#         end
-#     end
-#     return edofs
-# end
-
 function element_dofs(nodeids, dofspernode)
     numnodes = length(nodeids)
     extnodeids = repeat(nodeids, inner = dofspernode)
@@ -139,7 +125,17 @@ function apply_dirichlet_bc!(
     value::R,
 ) where {Z<:Integer,R<:Real}
 
-    
+    m,n = size(matrix)
+    modifyrhs = matrix[:,index]
+    for i = 1:m
+        if i == index
+            rhs[i] = modifyrhs[i]*value
+        else
+            rhs[i] -= modifyrhs[i]*value
+            matrix[i,index] = 0.0
+            matrix[index,i] = 0.0
+        end
+    end
 end
 
 function apply_dirichlet_bc!(
