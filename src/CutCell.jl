@@ -5,6 +5,7 @@ using SparseArrays
 using CartesianMesh
 using PolynomialBasis
 using ImplicitDomainQuadrature
+import ImplicitDomainQuadrature: extend
 
 include("mesh_routines.jl")
 include("weak_form.jl")

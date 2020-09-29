@@ -99,6 +99,42 @@ function assemble_body_force_linear_form!(
     end
 end
 
+function assemble_traction_force_linear_form!(
+    systemrhs,
+    tractionfunc,
+    basis,
+    facequads,
+    cellmaps,
+    nodalconnectivity,
+    cellconnectivity,
+    istractionboundary,
+)
+
+    dim = dimension(basis)
+    refmidpoints = reference_face_midpoints()
+    isboundarycell = is_boundary_cell(cellconnectivity)
+    cellids = findall(isboundarycell)
+    facedetjac = face_determinant_jacobian(cellmaps[1])
+    for cellid in cellids
+        cellmap = cellmaps[cellid]
+        for (faceid, nbrcellid) in enumerate(cellconnectivity[:, cellid])
+            if nbrcellid == 0
+                if istractionboundary(cellmap(refmidpoints[faceid]))
+                    rhs = linear_form(
+                        tractionfunc,
+                        basis,
+                        facequads[faceid],
+                        cellmap,
+                        facedetjac[faceid],
+                    )
+                    edofs = element_dofs(nodalconnectivity[:,cellid],dim)
+                    assemble!(systemrhs,edofs,rhs)
+                end
+            end
+        end
+    end
+end
+
 function apply_dirichlet_bc!(
     matrix::SparseMatrixCSC,
     rhs,
@@ -125,15 +161,15 @@ function apply_dirichlet_bc!(
     value::R,
 ) where {Z<:Integer,R<:Real}
 
-    m,n = size(matrix)
-    modifyrhs = matrix[:,index]
+    m, n = size(matrix)
+    modifyrhs = matrix[:, index]
     for i = 1:m
         if i == index
-            rhs[i] = modifyrhs[i]*value
+            rhs[i] = modifyrhs[i] * value
         else
-            rhs[i] -= modifyrhs[i]*value
-            matrix[i,index] = 0.0
-            matrix[index,i] = 0.0
+            rhs[i] -= modifyrhs[i] * value
+            matrix[i, index] = 0.0
+            matrix[index, i] = 0.0
         end
     end
 end
@@ -144,13 +180,28 @@ function apply_dirichlet_bc!(
     nodeids::V,
     dofs,
     values,
+    dofspernode,
 ) where {V<:AbstractVector}
 
     @assert length(nodeids) == length(dofs) == length(values)
     for (nodeid, dof, val) in zip(nodeids, dofs, values)
-        index = node_to_dof_id(nodeid, dof)
+        index = node_to_dof_id(nodeid, dof,dofspernode)
         apply_dirichlet_bc!(matrix, rhs, index, val)
     end
+end
+
+function apply_dirichlet_bc!(
+    matrix,
+    rhs,
+    nodeids::V,
+    dofs::Z,
+    value::R,
+    dofspernode,
+) where {V<:AbstractVector,Z<:Integer,R<:Real}
+    numnodes = length(nodeids)
+    vecdofs = repeat([dofs],numnodes)
+    vecvalues = repeat([value],numnodes)
+    apply_dirichlet_bc!(matrix,rhs,nodeids,vecdofs,vecvalues,dofspernode)
 end
 
 function apply_dirichlet_bc!(

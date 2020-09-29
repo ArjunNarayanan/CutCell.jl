@@ -20,8 +20,13 @@ function jacobian(C::CellMap)
     return C.jacobian
 end
 
-function determinant_jacobian(C::CellMap)
+function determinant_jacobian(C)
     return prod(jacobian(C))
+end
+
+function face_determinant_jacobian(C)
+    jac = jacobian(C)
+    return [jac[1],jac[2],jac[1],jac[2]]
 end
 
 function (C::CellMap)(x)
@@ -214,13 +219,40 @@ function number_of_degrees_of_freedom(mesh::Mesh)
     return numnodes * dim
 end
 
-function is_interior_cell(mesh)
-    cellconnectivity = cell_connectivity(mesh)
+function is_interior_cell(cellconnectivity)
     numcells = size(cellconnectivity)[2]
     isinteriorcell = [all(cellconnectivity[:,i] .!= 0) for i = 1:numcells]
     return isinteriorcell
 end
 
-function is_boundary_cell(mesh)
-    return .!is_interior_cell(mesh)
+function is_interior_cell(mesh::Mesh)
+    cellconnectivity = cell_connectivity(mesh)
+    return is_interior_cell(cellconnectivity)
+end
+
+function is_boundary_cell(x)
+    return .!is_interior_cell(x)
+end
+
+function reference_bottom_face_midpoint()
+    [0.,-1.]
+end
+
+function reference_right_face_midpoint()
+    [1.,0.]
+end
+
+function reference_top_face_midpoint()
+    [0.,1.]
+end
+
+function reference_left_face_midpoint()
+    [-1.,0.]
+end
+
+function reference_face_midpoints()
+    [reference_bottom_face_midpoint(),
+     reference_right_face_midpoint(),
+     reference_top_face_midpoint(),
+     reference_left_face_midpoint()]
 end

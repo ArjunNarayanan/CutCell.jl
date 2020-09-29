@@ -87,3 +87,60 @@ function linear_form(rhsfunc, basis, quad, cellmap)
       end
       return rhs
 end
+
+function linear_form(rhsfunc, basis, quad, cellmap, detjac)
+      dim = dimension(basis)
+      nf = number_of_basis_functions(basis)
+      rhs = zeros(dim*nf)
+      for (p,w) in quad
+            vals = rhsfunc(cellmap(p))
+            N = interpolation_matrix(basis(p),dim)
+            rhs .+= N'*vals*detjac*w
+      end
+      return rhs
+end
+
+function extend_to_bottom_face(points)
+      @assert size(points)[1] == 1
+      return extend([-1.0],1,points)
+end
+
+function extend_to_right_face(points)
+      @assert size(points)[1] == 1
+      return extend([1.0],2,points)
+end
+
+function extend_to_top_face(points)
+      @assert size(points)[1] == 1
+      return extend([1.0],1,points)
+end
+
+function extend_to_left_face(points)
+      @assert size(points)[1] == 1
+      return extend([-1.0],2,points)
+end
+
+function extend_to_face(points,faceid)
+      if faceid == 1
+            extend_to_bottom_face(points)
+      elseif faceid == 2
+            extend_to_right_face(points)
+      elseif faceid == 3
+            extend_to_top_face(points)
+      elseif faceid == 4
+            extend_to_left_face(points)
+      else
+            error("Expected faceid ∈ {1,2,3,4}, got faceid = $faceid")
+      end
+end
+
+function extend_to_face(quad::QuadratureRule,faceid)
+      extp = extend_to_face(quad.points,faceid)
+      return QuadratureRule(extp,quad.weights)
+end
+
+function face_quadrature_rules(numqp)
+      quad1d = tensor_product_quadrature(1,numqp)
+      facequads = [extend_to_face(quad1d,faceid) for faceid = 1:4]
+      return facequads
+end

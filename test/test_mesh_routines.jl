@@ -80,3 +80,20 @@ isboundarycell = CutCell.is_boundary_cell(mesh)
 testboundarycell = ones(Int,12)
 testboundarycell[5] = testboundarycell[8] = 0
 @test allequal(isboundarycell,testboundarycell)
+
+isboundarycell = CutCell.is_boundary_cell(mesh.cellconnectivity)
+@test allequal(isboundarycell,testboundarycell)
+
+@test allapprox(CutCell.reference_bottom_face_midpoint(),[0.,-1.])
+@test allapprox(CutCell.reference_right_face_midpoint(),[1.,0.])
+@test allapprox(CutCell.reference_top_face_midpoint(),[0.,1.])
+@test allapprox(CutCell.reference_left_face_midpoint(),[-1.,0.])
+
+refmidpoints = CutCell.reference_face_midpoints()
+cellmap = CutCell.CellMap([0.,0.],[1.,1.])
+spmidpoints = cellmap.(refmidpoints)
+@test length(spmidpoints) == 4
+@test allapprox(spmidpoints[1],[0.5,0.])
+@test allapprox(spmidpoints[2],[1.,0.5])
+@test allapprox(spmidpoints[3],[0.5,1.])
+@test allapprox(spmidpoints[4],[0.,0.5])
