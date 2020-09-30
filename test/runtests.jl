@@ -23,3 +23,7 @@ end
 @safetestset "Test Displacement + Traction BC Convergence" begin
     include("test_displacement_traction_convergence.jl")
 end
+
+@safetestset "Test Cut Mesh Algorithms" begin
+    include("test_cut_mesh.jl")
+end

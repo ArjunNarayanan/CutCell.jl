@@ -11,11 +11,11 @@ struct CutMeshCellQuadratures
     end
 end
 
-function Base.getindex(vquads::CutMeshCellQuadratures, s, col)
-    flag = (s == -1 || s == +1) && (1 <= col <= vquads.ncells)
-    flag || throw(BoundsError(vquads.celltoquad, [s, col]))
+function Base.getindex(vquads::CutMeshCellQuadratures, s, cellid)
+    flag = (s == -1 || s == +1) && (1 <= cellid <= vquads.ncells)
+    flag || throw(BoundsError(vquads.celltoquad, [s, cellid]))
     row = s == +1 ? 1 : 2
-    return vquads.quads[vquads.celltoquad[row, col]]
+    return vquads.quads[vquads.celltoquad[row, cellid]]
 end
 
 function uniform_cell_quadrature(vquads::CutMeshCellQuadratures)
@@ -104,21 +104,40 @@ struct CutMesh
     mesh::Mesh
     cellsign::Vector{Int}
     cutmeshnodeids::Matrix{Int}
-    function CutMesh(mesh::Mesh,cellsign::Vector{Int},cutmeshnodeids::Matrix{Int})
+    ncells::Int
+    numnodes::Int
+    function CutMesh(
+        mesh::Mesh,
+        cellsign::Vector{Int},
+        cutmeshnodeids::Matrix{Int},
+    )
         ncells = number_of_cells(mesh)
         numnodes = total_number_of_nodes(mesh)
         @assert length(cellsign) == ncells
-        @assert size(cutmeshnodeids) == (2,numnodes)
-        new(mesh,cellsign,cutmeshnodeids)
+        @assert size(cutmeshnodeids) == (2, numnodes)
+        totalnumnodes = maximum(cutmeshnodeids)
+        new(mesh, cellsign, cutmeshnodeids, ncells, totalnumnodes)
     end
+end
+
+function total_number_of_nodes(cutmesh::CutMesh)
+    return cutmesh.numnodes
+end
+
+function number_of_cells(cutmesh::CutMesh)
+    return cutmesh.ncells
 end
 
 function cell_sign(cutmesh::CutMesh)
     return cutmesh.cellsign
 end
 
-function cell_sign(cutmesh::CutMesh,cellid)
+function cell_sign(cutmesh::CutMesh, cellid)
     return cutmesh.cellsign[cellid]
+end
+
+function cell_map(cutmesh::CutMesh, cellid)
+    return cell_map(cutmesh.mesh, cellid)
 end
 
 function CutMesh(levelset::InterpolatingPolynomial, levelsetcoeffs, mesh)
@@ -138,11 +157,130 @@ function nodal_connectivity(cutmesh::CutMesh, s, cellid)
     @assert s == -1 || s == +1
     ncells = cutmesh.mesh.ncells
     @assert 1 <= cellid <= ncells
-    @assert cell_sign(cutmesh,cellid) == s || cell_sign(cutmesh,cellid) == 0
+    @assert cell_sign(cutmesh, cellid) == s || cell_sign(cutmesh, cellid) == 0
     row = s == +1 ? 1 : 2
 
     nc = nodal_connectivity(cutmesh.mesh)
     ids = nc[:, cellid]
     nodeids = cutmesh.cutmeshnodeids[row, ids]
     return nodeids
+end
+
+struct CutMeshBilinearForms
+    cellmatrices::Any
+    celltomatrix::Any
+    ncells::Any
+    function CutMeshBilinearForms(cellmatrices, celltomatrix)
+        nphase, ncells = size(celltomatrix)
+        @assert nphase == 2
+        @assert all(celltomatrix .>= 0)
+        @assert all(celltomatrix .<= length(cellmatrices))
+        new(cellmatrices, celltomatrix, ncells)
+    end
+end
+
+function Base.getindex(cbf::CutMeshBilinearForms, s, cellid)
+    flag = (s == -1 || s == +1) && (1 <= cellid <= cbf.ncells)
+    flag || throw(BoundsError(cbf.celltomatrix, [s, cellid]))
+    row = s == +1 ? 1 : 2
+    return cbf.cellmatrices[cbf.celltomatrix[row, cellid]]
+end
+
+function Base.getindex(cbf::CutMeshBilinearForms, s)
+    flag = (s == -1 || s == +1)
+    flag || error("Expected s ∈ {-1,1}, got s = $s")
+    idx = s == +1 ? 1 : 2
+    return cbf.cellmatrices[idx]
+end
+
+function CutMeshBilinearForms(
+    basis,
+    cutmeshquads,
+    stiffnesses,
+    cellsign,
+    cellmap,
+)
+    @assert length(stiffnesses) == 2
+    ncells = length(cellsign)
+
+    uniformquad = uniform_cell_quadrature(cutmeshquads)
+    uniformbf1 = bilinear_form(basis, uniformquad, stiffnesses[1], cellmap)
+    uniformbf2 = bilinear_form(basis, uniformquad, stiffnesses[2], cellmap)
+
+    cellmatrices = [uniformbf1, uniformbf2]
+    celltomatrix = zeros(Int, 2, ncells)
+
+    for cellid = 1:ncells
+        if cellsign[cellid] == +1
+            celltomatrix[1, cellid] = 1
+        elseif cellsign[cellid] == -1
+            celltomatrix[2, cellid] = 2
+        else
+            pquad = cutmeshquads[+1, cellid]
+            pbf = bilinear_form(basis, pquad, stiffnesses[1], cellmap)
+            push!(cellmatrices, pbf)
+            celltomatrix[1, cellid] = length(cellmatrices)
+
+            nquad = cutmeshquads[-1, cellid]
+            nbf = bilinear_form(basis, nquad, stiffnesses[2], cellmap)
+            push!(cellmatrices, nbf)
+            celltomatrix[2, cellid] = length(cellmatrices)
+        end
+    end
+    return CutMeshBilinearForms(cellmatrices, celltomatrix)
+end
+
+function assemble_bilinear_form!(
+    sysmatrix::SystemMatrix,
+    cutmeshbfs::CutMeshBilinearForms,
+    cutmesh::CutMesh,
+    dofspernode,
+)
+
+    ncells = number_of_cells(cutmesh)
+    cellsign = cell_sign(cutmesh)
+
+    uniformvals1 = vec(cutmeshbfs[+1])
+    uniformvals2 = vec(cutmeshbfs[-1])
+
+    for cellid = 1:ncells
+        s = cellsign[cellid]
+        if s == +1
+            nodeids = nodal_connectivity(cutmesh, +1, cellid)
+            assemble_cell_bilinear_form!(
+                sysmatrix,
+                nodeids,
+                dofspernode,
+                uniformvals1,
+            )
+        elseif s == -1
+            nodeids = nodal_connectivity(cutmesh, -1, cellid)
+            assemble_cell_bilinear_form!(
+                sysmatrix,
+                nodeids,
+                dofspernode,
+                uniformvals2,
+            )
+        elseif s == 0
+            nodeids1 = nodal_connectivity(cutmesh, +1, cellid)
+            vals1 = vec(cutmeshbfs[+1,cellid])
+            assemble_cell_bilinear_form!(
+                sysmatrix,
+                nodeids1,
+                dofspernode,
+                vals1
+            )
+
+            nodeids2 = nodal_connectivity(cutmesh,-1,cellid)
+            vals2 = vec(cutmeshbfs[-1,cellid])
+            assemble_cell_bilinear_form!(
+                sysmatrix,
+                nodeids2,
+                dofspernode,
+                vals2,
+            )
+        else
+            error("Expected s ∈ {+1,0,-1}, received s = $s")
+        end
+    end
 end

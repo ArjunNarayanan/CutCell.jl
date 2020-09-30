@@ -1,4 +1,5 @@
 using Test
+using LinearAlgebra
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -27,14 +28,6 @@ levelsetcoeffs = plane_distance_function(nodalcoordinates, normal, x0)
 cellsign = CutCell.cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
 @test allequal(cellsign, [0, 1, 1])
 
-cellquads = CutCell.CutMeshCellQuadratures(
-    cellsign,
-    levelset,
-    levelsetcoeffs,
-    nodalconnectivity,
-    numqp,
-)
-
 posactivenodeids = CutCell.active_node_ids(+1, cellsign, nodalconnectivity)
 @test allequal(posactivenodeids, 1:8)
 negactivenodeids = CutCell.active_node_ids(-1, cellsign, nodalconnectivity)
@@ -43,12 +36,39 @@ negactivenodeids = CutCell.active_node_ids(-1, cellsign, nodalconnectivity)
 totalnumnodes = CutCell.total_number_of_nodes(mesh)
 cutmeshnodeids =
     CutCell.cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
-testcutmeshnodeids = [1 2  3  4  5 6 7 8
-                      9 10 11 12 0 0 0 0]
-@test allequal(cutmeshnodeids,testcutmeshnodeids)
+testcutmeshnodeids = [
+    1 2 3 4 5 6 7 8
+    9 10 11 12 0 0 0 0
+]
+@test allequal(cutmeshnodeids, testcutmeshnodeids)
 
 
-cutmesh = CutCell.CutMesh(levelset,levelsetcoeffs,mesh)
+cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 
-@test allequal(CutCell.nodal_connectivity(cutmesh,+1,1),[1,2,3,4])
-@test allequal(CutCell.nodal_connectivity(cutmesh,-1,1),[9,10,11,12])
+@test allequal(CutCell.nodal_connectivity(cutmesh, +1, 1), [1, 2, 3, 4])
+@test allequal(CutCell.nodal_connectivity(cutmesh, -1, 1), [9, 10, 11, 12])
+
+cutmeshquads = CutCell.CutMeshCellQuadratures(
+    cellsign,
+    levelset,
+    levelsetcoeffs,
+    nodalconnectivity,
+    numqp,
+)
+lambda, mu = (1.0, 2.0)
+stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
+stiffnesses = [stiffness, stiffness]
+cellmap = CutCell.cell_map(cutmesh, 1)
+
+cutmeshbfs = CutCell.CutMeshBilinearForms(
+    basis,
+    cutmeshquads,
+    stiffnesses,
+    cellsign,
+    cellmap,
+)
+
+@test length(cutmeshbfs.cellmatrices) == 4
+testcelltomatrix = [3 1 1
+                    4 0 0]
+@test allequal(testcelltomatrix,cutmeshbfs.celltomatrix)

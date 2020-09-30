@@ -62,6 +62,18 @@ function element_dofs_to_operator_dofs(rowdofs, coldofs)
     return rows, cols
 end
 
+function assemble_cell_bilinear_form!(
+    sysmatrix::SystemMatrix,
+    nodeids,
+    dofspernode,
+    vals,
+)
+
+    edofs = element_dofs(nodeids,dofspernode)
+    rows,cols = element_dofs_to_operator_dofs(edofs,edofs)
+    assemble!(sysmatrix,rows,cols,vals)
+end
+
 function assemble_bilinear_form!(
     sysmatrix::SystemMatrix,
     cellmatrix,
@@ -73,9 +85,7 @@ function assemble_bilinear_form!(
     vals = vec(cellmatrix)
     for cellid = 1:ncells
         nodeids = nodalconnectivity[:, cellid]
-        edofs = element_dofs(nodeids, dofspernode)
-        rows, cols = element_dofs_to_operator_dofs(edofs, edofs)
-        assemble!(sysmatrix, rows, cols, vals)
+        assemble_cell_bilinear_form!(sysmatrix,nodeids,dofspernode,vals)
     end
 end
 

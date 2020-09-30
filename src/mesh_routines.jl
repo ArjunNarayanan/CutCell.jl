@@ -118,7 +118,7 @@ function cell_maps(mesh::Mesh)
     return mesh.cellmaps
 end
 
-function cellmap(mesh::Mesh, i)
+function cell_map(mesh::Mesh, i)
     return mesh.cellmaps[i]
 end
 
