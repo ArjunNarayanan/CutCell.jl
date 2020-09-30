@@ -22,6 +22,46 @@ function uniform_cell_quadrature(vquads::CutMeshCellQuadratures)
     return vquads.quads[1]
 end
 
+function face_quadrature_rules(levelset, signcondition, quad1d)
+    bq = QuadratureRule(quadrature(
+        [x -> levelset(extend(x, 2, -1.0))],
+        [signcondition],
+        -1.0,
+        +1.0,
+        quad1d,
+    ))
+    bq = extend_to_face(bq, 1)
+
+    rq = QuadratureRule(quadrature(
+        [x -> levelset(extend(x, 1, +1.0))],
+        [signcondition],
+        -1.0,
+        +1.0,
+        quad1d,
+    ))
+    rq = extend_to_face(rq, 2)
+
+    tq = QuadratureRule(quadrature(
+        [x -> levelset(extend(x, 2, +1.0))],
+        [signcondition],
+        -1.0,
+        +1.0,
+        quad1d,
+    ))
+    tq = extend_to_face(tq, 3)
+
+    lq = QuadratureRule(quadrature(
+        [x -> levelset(extend(x, 1, -1.0))],
+        [signcondition],
+        -1.0,
+        +1.0,
+        quad1d,
+    ))
+    lq = extend_to_face(lq, 4)
+
+    return bq, rq, tq, lq
+end
+
 function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
     ncells = size(nodalconnectivity)[2]
     cellsign = zeros(Int, ncells)
@@ -70,6 +110,19 @@ function CutMeshCellQuadratures(
         end
     end
     return CutMeshCellQuadratures(quads, celltoquad)
+end
+
+function CutMeshCellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+
+    cellsign = cell_sign(cutmesh)
+    nodalconnectivity = nodal_connectivity(cutmesh.mesh)
+    return CutMeshCellQuadratures(
+        cellsign,
+        levelset,
+        levelsetcoeffs,
+        nodalconnectivity,
+        numqp,
+    )
 end
 
 function active_node_ids(s, cellsign, nodalconnectivity)
@@ -230,6 +283,12 @@ function CutMeshBilinearForms(
     return CutMeshBilinearForms(cellmatrices, celltomatrix)
 end
 
+function CutMeshBilinearForms(basis,cutmeshquads,stiffnesses,cutmesh)
+    cellsign = cell_sign(cutmesh)
+    cellmap = cell_map(cutmesh,1)
+    return CutMeshBilinearForms(basis,cutmeshquads,stiffnesses,cellsign,cellmap)
+end
+
 function assemble_bilinear_form!(
     sysmatrix::SystemMatrix,
     cutmeshbfs::CutMeshBilinearForms,
@@ -263,16 +322,16 @@ function assemble_bilinear_form!(
             )
         elseif s == 0
             nodeids1 = nodal_connectivity(cutmesh, +1, cellid)
-            vals1 = vec(cutmeshbfs[+1,cellid])
+            vals1 = vec(cutmeshbfs[+1, cellid])
             assemble_cell_bilinear_form!(
                 sysmatrix,
                 nodeids1,
                 dofspernode,
-                vals1
+                vals1,
             )
 
-            nodeids2 = nodal_connectivity(cutmesh,-1,cellid)
-            vals2 = vec(cutmeshbfs[-1,cellid])
+            nodeids2 = nodal_connectivity(cutmesh, -1, cellid)
+            vals2 = vec(cutmeshbfs[-1, cellid])
             assemble_cell_bilinear_form!(
                 sysmatrix,
                 nodeids2,

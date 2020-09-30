@@ -55,6 +55,10 @@ cutmeshquads = CutCell.CutMeshCellQuadratures(
     nodalconnectivity,
     numqp,
 )
+
+update!(levelset,levelsetcoeffs[nodalconnectivity[:,1]])
+CutCell.face_quadrature_rules(levelset,+1,quad1d)
+
 lambda, mu = (1.0, 2.0)
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
 stiffnesses = [stiffness, stiffness]

@@ -153,7 +153,7 @@ end
 
 function extend_to_face(quad::QuadratureRule, faceid)
       extp = extend_to_face(quad.points, faceid)
-      return QuadratureRule(extp, quad.weights)
+      return QuadratureRule(extp, Array(quad.weights))
 end
 
 function face_quadrature_rules(numqp)
