@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 CartesianMesh = "c3f3b8a2-2e3b-4b62-84bb-76319e98af94"
 ImplicitDomainQuadrature = "215a9a07-c97b-423e-a99e-05c6f7357eae"
+IntervalArithmetic = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PolynomialBasis = "776a168a-1973-4f1d-bada-3c06b642fffd"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"

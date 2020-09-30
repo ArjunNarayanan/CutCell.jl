@@ -1,3 +1,7 @@
+function Base.length(quad::QuadratureRule{D,NQ}) where {D,NQ}
+      return NQ
+end
+
 function vector_to_symmetric_matrix_converter()
       E1 = [
             1.0 0.0
@@ -62,7 +66,7 @@ function bilinear_form(basis, quad, stiffness, cellmap)
       return matrix
 end
 
-function mass_matrix(basis,quad,cellmap,ndofs)
+function mass_matrix(basis,quad,cellmap::CellMap,ndofs)
       nf = number_of_basis_functions(basis)
       totaldofs = ndofs*nf
       matrix = zeros(totaldofs,totaldofs)
@@ -71,6 +75,19 @@ function mass_matrix(basis,quad,cellmap,ndofs)
             vals = basis(p)
             N = interpolation_matrix(vals,ndofs)
             matrix .+= N'*N*detjac*w
+      end
+      return matrix
+end
+
+function mass_matrix(basis,quad,scale::V,ndofs) where {V<:AbstractVector}
+      nf = number_of_basis_functions(basis)
+      totaldofs = ndofs*nf
+      matrix = zeros(totaldofs,totaldofs)
+      @assert length(scale) == length(quad)
+      for (idx,(p,w)) in enumerate(quad)
+            vals = basis(p)
+            N = interpolation_matrix(vals,ndofs)
+            matrix .+= N'*N*scale[idx]*w
       end
       return matrix
 end

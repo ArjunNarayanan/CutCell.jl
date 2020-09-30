@@ -20,6 +20,10 @@ function jacobian(C::CellMap)
     return C.jacobian
 end
 
+function inverse_jacobian(C::CellMap)
+    return 1.0 ./ jacobian(C)
+end
+
 function determinant_jacobian(C)
     return prod(jacobian(C))
 end
@@ -31,8 +35,8 @@ end
 
 function (C::CellMap)(x)
     dim = dimension(C)
-    @assert length(x) == dim
-    return C.yL + (jacobian(C) .* (x + ones(dim)))
+    # @assert length(x) == dim
+    return C.yL .+ (jacobian(C) .* (x .+ ones(dim)))
 end
 
 struct Mesh
