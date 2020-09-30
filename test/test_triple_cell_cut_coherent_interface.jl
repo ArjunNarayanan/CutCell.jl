@@ -42,3 +42,6 @@ cellquads = CutCell.CutMeshCellQuadratures(
     nodalconnectivity,
     numqp,
 )
+
+posactivenodeids = CutCell.active_node_ids(+1,cellsign,nodalconnectivity)
+negactivenodeids = CutCell.active_node_ids(-1,cellsign,nodalconnectivity)

@@ -71,6 +71,10 @@ function Mesh(mesh, nf::Int)
     )
 end
 
+function number_of_cells(mesh::Mesh)
+    return mesh.ncells
+end
+
 function Mesh(x0,widths,nelements,nf)
     mesh = UniformMesh(x0,widths,nelements)
     return Mesh(mesh,nf)
