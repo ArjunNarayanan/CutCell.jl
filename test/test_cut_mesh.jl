@@ -55,9 +55,23 @@ cutmeshquads = CutCell.CutMeshCellQuadratures(
     nodalconnectivity,
     numqp,
 )
+@test length(cutmeshquads.quads) == 3
+testcelltoquad = [2 1 1
+                  3 0 0]
+@test allequal(cutmeshquads.celltoquad,testcelltoquad)
 
-update!(levelset,levelsetcoeffs[nodalconnectivity[:,1]])
-CutCell.face_quadrature_rules(levelset,+1,quad1d)
+cutmeshinterfacequads = CutCell.CutMeshInterfaceQuadratures(
+    cellsign,
+    levelset,
+    levelsetcoeffs,
+    nodalconnectivity,
+    numqp,
+)
+@test length(cutmeshinterfacequads.quads) == 1
+@test allequal(cutmeshinterfacequads.celltoquad,[1,0,0])
+
+update!(levelset, levelsetcoeffs[nodalconnectivity[:, 1]])
+CutCell.face_quadrature_rules(levelset, +1, quad1d)
 
 lambda, mu = (1.0, 2.0)
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
@@ -73,6 +87,8 @@ cutmeshbfs = CutCell.CutMeshBilinearForms(
 )
 
 @test length(cutmeshbfs.cellmatrices) == 4
-testcelltomatrix = [3 1 1
-                    4 0 0]
-@test allequal(testcelltomatrix,cutmeshbfs.celltomatrix)
+testcelltomatrix = [
+    3 1 1
+    4 0 0
+]
+@test allequal(testcelltomatrix, cutmeshbfs.celltomatrix)

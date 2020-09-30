@@ -24,6 +24,7 @@ levelset = InterpolatingPolynomial(1, basis)
 nf = CutCell.number_of_basis_functions(basis)
 mesh = CutCell.Mesh([0.0, 0.0], [3.0, 1.0], [3, 1], nf)
 nodalcoordinates = CutCell.nodal_coordinates(mesh)
+nodalconnectivity = CutCell.nodal_connectivity(mesh)
 lambda, mu = (1.0, 2.0)
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
 stiffnesses = [stiffness, stiffness]
