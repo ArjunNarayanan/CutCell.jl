@@ -472,6 +472,7 @@ function coherent_constraint_on_cells(
     cutmeshinterfacequads,
     cellsign,
     cellmap,
+    penalty,
 )
 
     ncells = length(cellsign)
@@ -484,7 +485,7 @@ function coherent_constraint_on_cells(
             normals = interface_normals(cutmeshinterfacequads, cellid)
 
             scale = scale_area(cellmap, normals)
-            matrix = mass_matrix(basis, squad, scale, 2)
+            matrix = penalty * mass_matrix(basis, squad, scale, 2)
 
             push!(cellmatrices, matrix)
             celltomatrix[cellid] = length(cellmatrices)
@@ -493,7 +494,7 @@ function coherent_constraint_on_cells(
     return CutMeshInterfaceConstraints(cellmatrices, celltomatrix)
 end
 
-function coherent_constraint_on_cells(basis, interfacequads, cutmesh)
+function coherent_constraint_on_cells(basis, interfacequads, cutmesh, penalty)
     cellsign = cell_sign(cutmesh)
     cellmap = cell_map(cutmesh, 1)
     return coherent_constraint_on_cells(
@@ -501,6 +502,7 @@ function coherent_constraint_on_cells(basis, interfacequads, cutmesh)
         interfacequads,
         cellsign,
         cellmap,
+        penalty,
     )
 end
 
