@@ -1,10 +1,9 @@
-using Test
+using CSV, DataFrames
 using IntervalArithmetic
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
 using CutCell
-include("useful_routines.jl")
 
 function plane_distance_function(coords, normal, x0)
     return (coords .- x0)' * normal
@@ -155,8 +154,47 @@ function solve_two_cell_plane_interface(
     return err
 end
 
+function error_for_interface_positions(
+    interfaceposition,
+    interfaceangle,
+    polyorder,
+    numqp,
+    stiffnesses,
+    penalty,
+    exactsolution,
+)
+
+    normal = normal_from_angle(interfaceangle)
+    err = zeros(length(interfaceposition), 2)
+
+    for (idx, x0) in enumerate(interfaceposition)
+        err[idx, :] = solve_two_cell_plane_interface(
+            normal,
+            x0,
+            polyorder,
+            numqp,
+            stiffnesses,
+            penalty,
+            exactsolution,
+        )
+    end
+
+    filename =
+        "examples/interface/plane_theta-" *
+        string(interfaceangle) *
+        "-poly-" *
+        string(polyorder) *
+        ".csv"
+    df = DataFrame(
+        position = interfaceposition,
+        ErrorU1 = err[:, 1],
+        ErrorU2 = err[:, 2],
+    )
+    CSV.write(filename, df)
+end
+
 function normal_from_angle(theta)
-    return [cosd(theta),sind(theta)]
+    return [cosd(theta), sind(theta)]
 end
 
 
@@ -167,18 +205,17 @@ penalty = 1e3
 lambda, mu = (1.0, 2.0)
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
 stiffnesses = [stiffness, stiffness]
-normal = normal_from_angle(0.)
-x0 = [1e-10, 0.]
+e11 = 0.1/4.0
 
+interfaceangle = 0
+interfaceposition = range(1e-10, stop = 1 - 1e-10, length = 100)
 
-err = solve_two_cell_plane_interface(
-    normal,
-    x0,
+error_for_interface_positions(
+    interfaceposition,
+    interfaceangle,
     polyorder,
     numqp,
     stiffnesses,
     penalty,
-    x->exact_solution(lambda,mu,0.1/4.0,x)
+    x -> exact_solution(lambda, mu, e11, x),
 )
-
-println("Error = ", err)
