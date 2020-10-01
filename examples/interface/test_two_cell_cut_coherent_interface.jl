@@ -38,6 +38,32 @@ function add_cell_error_squared!(
     end
 end
 
+function add_exact_norm_squared(err,exactsolution,cellmap,quad,detjac)
+    for (p,w) in quad
+        err .+= (exactsolution(cellmap(p))) .^ 2 * detjac *w
+    end
+end
+
+function integrate_exact_norm(exactsolution,cutmesh,cellquads)
+    err = zeros(2)
+    cellsign = CutCell.cell_sign(cutmesh)
+    detjac = CutCell.determinant_jacobian(CutCell.cell_map(cutmesh,1))
+
+    for (cellid,s) in enumerate(cellsign)
+        cellmap = CutCell.cell_map(cutmesh,cellid)
+        if s == +1 || s == 0
+            quad = cellquads[+1,cellid]
+            add_exact_norm_squared(err,exactsolution,cellmap,quad,detjac)
+        elseif s == -1 || s == 0
+            quad = cellquads[-1,cellid]
+            add_exact_norm_squared(err,exactsolution,cellmap,quad,detjac)
+        else
+            error("Got unexpected cellsign = $s")
+        end
+    end
+    return sqrt.(err)
+end
+
 function mesh_L2_error(nodalsolutions, exactsolution, cutmesh, basis, cellquads)
 
     ndofs = size(nodalsolutions)[1]
@@ -151,7 +177,10 @@ function solve_two_cell_plane_interface(
         basis,
         errorcellquads,
     )
-    return err
+
+    normalizer = integrate_exact_norm(exactsolution,cutmesh,errorcellquads)
+
+    return err ./ normalizer
 end
 
 function error_for_interface_positions(
