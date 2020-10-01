@@ -75,7 +75,7 @@ end
 
 struct CutMeshInterfaceQuadratures
     quads::Any
-    normals
+    normals::Any
     celltoquad::Any
     ncells::Any
     function CutMeshInterfaceQuadratures(quads, normals, celltoquad)
@@ -91,31 +91,31 @@ function Base.getindex(iquads::CutMeshInterfaceQuadratures, cellid)
     1 <= cellid <= iquads.ncells ||
         throw(BoundsError(iquads.celltoquad, [cellid]))
     idx = iquads.celltoquad[cellid]
-    idx > 0 || throw(BoundsError(iquads.quads,[idx]))
+    idx > 0 || throw(BoundsError(iquads.quads, [idx]))
     return iquads.quads[idx]
 end
 
-function normals(iquads::CutMeshInterfaceQuadratures, cellid)
+function interface_normals(iquads::CutMeshInterfaceQuadratures, cellid)
     1 <= cellid <= iquads.ncells ||
         throw(BoundsError(iquads.celltoquad, [cellid]))
     idx = iquads.celltoquad[cellid]
-    idx > 0 || throw(BoundsError(iquads.normals,[idx]))
+    idx > 0 || throw(BoundsError(iquads.normals, [idx]))
     return iquads.normals[idx]
 end
 
-function levelset_normal(levelset,p::V,invjac) where {V<:AbstractVector}
-    g = vec(gradient(levelset,p))
+function levelset_normal(levelset, p::V, invjac) where {V<:AbstractVector}
+    g = vec(gradient(levelset, p))
     n = invjac .* g
-    return n/norm(n)
+    return n / norm(n)
 end
 
-function levelset_normal(levelset,points::M,invjac) where {M<:AbstractMatrix}
+function levelset_normal(levelset, points::M, invjac) where {M<:AbstractMatrix}
     npts = size(points)[2]
-    g = hcat([gradient(levelset,points[:,i]) for i = 1:npts]...)
-    normals = diagm(invjac)*g
-    for i in 1:npts
-        n = normals[:,i]
-        normals[:,i] = n/norm(n)
+    g = hcat([gradient(levelset, points[:, i])' for i = 1:npts]...)
+    normals = diagm(invjac) * g
+    for i = 1:npts
+        n = normals[:, i]
+        normals[:, i] = n / norm(n)
     end
     return normals
 end
@@ -132,28 +132,42 @@ function CutMeshInterfaceQuadratures(
     numcells = length(cellsign)
     @assert size(nodalconnectivity)[2] == numcells
 
-    box = IntervalBox(-1..1,2)
+    box = IntervalBox(-1..1, 2)
     invjac = inverse_jacobian(cellmap)
     quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numqp)
 
     quads = []
     normals = []
-    celltoquad = zeros(Int,numcells)
+    celltoquad = zeros(Int, numcells)
 
-    for cellid in 1:numcells
+    for cellid = 1:numcells
         if cellsign[cellid] == 0
-            nodeids = nodalconnectivity[:,cellid]
-            update!(levelset,levelsetcoeffs[nodeids])
+            nodeids = nodalconnectivity[:, cellid]
+            update!(levelset, levelsetcoeffs[nodeids])
 
-            squad = quadrature(levelset,1,true,box,quad1d)
-            push!(quads,squad)
-            n = levelset_normal(levelset,squad.points,invjac)
-            push!(normals,n)
+            squad = quadrature(levelset, 1, true, box, quad1d)
+            push!(quads, squad)
+            n = levelset_normal(levelset, squad.points, invjac)
+            push!(normals, n)
 
             celltoquad[cellid] = length(quads)
         end
     end
-    return CutMeshInterfaceQuadratures(quads,normals,celltoquad)
+    return CutMeshInterfaceQuadratures(quads, normals, celltoquad)
+end
+
+function CutMeshInterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    cellsign = cell_sign(cutmesh)
+    nodalconnectivity = nodal_connectivity(cutmesh.mesh)
+    cellmap = cell_map(cutmesh, 1)
+    return CutMeshInterfaceQuadratures(
+        cellsign,
+        levelset,
+        levelsetcoeffs,
+        nodalconnectivity,
+        numqp,
+        cellmap,
+    )
 end
 
 function face_quadrature_rules(levelset, signcondition, quad1d)
@@ -435,17 +449,85 @@ function assemble_bilinear_form!(
 end
 
 struct CutMeshInterfaceConstraints
-    cellmatrices
-    celltomatrix
-    ncells
-    function CutMeshInterfaceConstraints(cellmatrices,celltomatrix)
+    cellmatrices::Any
+    celltomatrix::Any
+    ncells::Any
+    function CutMeshInterfaceConstraints(cellmatrices, celltomatrix)
         ncells = length(celltomatrix)
         @assert all(celltomatrix .>= 0)
         @assert all(celltomatrix .<= length(cellmatrices))
-        new(cellmatrices,celltomatrix,ncells)
+        new(cellmatrices, celltomatrix, ncells)
     end
 end
 
-function CutMeshInterfaceConstraints(basis,cutmeshinterfacequads,cellsign,)
+function Base.getindex(ic::CutMeshInterfaceConstraints, cellid)
+    1 <= cellid <= ic.ncells || throw(BoundsError(ic.celltomatrix, [cellid]))
+    idx = ic.celltomatrix[cellid]
+    idx > 0 || throw(BoundsError(ic.cellmatrices, [idx]))
+    return ic.cellmatrices[idx]
+end
 
+function coherent_constraint_on_cells(
+    basis,
+    cutmeshinterfacequads,
+    cellsign,
+    cellmap,
+)
+
+    ncells = length(cellsign)
+    cellmatrices = []
+    celltomatrix = zeros(Int, ncells)
+
+    for cellid = 1:ncells
+        if cellsign[cellid] == 0
+            squad = cutmeshinterfacequads[cellid]
+            normals = interface_normals(cutmeshinterfacequads, cellid)
+
+            scale = scale_area(cellmap, normals)
+            matrix = mass_matrix(basis, squad, scale, 2)
+
+            push!(cellmatrices, matrix)
+            celltomatrix[cellid] = length(cellmatrices)
+        end
+    end
+    return CutMeshInterfaceConstraints(cellmatrices, celltomatrix)
+end
+
+function coherent_constraint_on_cells(basis, interfacequads, cutmesh)
+    cellsign = cell_sign(cutmesh)
+    cellmap = cell_map(cutmesh, 1)
+    return coherent_constraint_on_cells(
+        basis,
+        interfacequads,
+        cellsign,
+        cellmap,
+    )
+end
+
+function assemble_interface_constraints!(
+    sysmatrix::SystemMatrix,
+    interfaceconstraints,
+    cutmesh,
+    dofspernode,
+)
+
+    ncells = number_of_cells(cutmesh)
+    cellsign = cell_sign(cutmesh)
+
+    for cellid = 1:ncells
+        if cellsign[cellid] == 0
+            constraintmatrix = interfaceconstraints[cellid]
+
+            nodeids1 = nodal_connectivity(cutmesh, +1, cellid)
+            nodeids2 = nodal_connectivity(cutmesh, -1, cellid)
+
+            assemble_coherent_interface!(
+                sysmatrix,
+                constraintmatrix,
+                nodeids1,
+                nodeids2,
+                2,
+            )
+        end
+    end
 end

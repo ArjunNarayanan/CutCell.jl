@@ -66,17 +66,21 @@ function bilinear_form(basis, quad, stiffness, cellmap)
       return matrix
 end
 
-function mass_matrix(basis, quad, cellmap::CellMap, ndofs)
+function mass_matrix(basis, quad, detjac::R, ndofs) where {R<:Real}
       nf = number_of_basis_functions(basis)
       totaldofs = ndofs * nf
       matrix = zeros(totaldofs, totaldofs)
-      detjac = determinant_jacobian(cellmap)
       for (p, w) in quad
             vals = basis(p)
             N = interpolation_matrix(vals, ndofs)
             matrix .+= N' * N * detjac * w
       end
       return matrix
+end
+
+function mass_matrix(basis, quad, cellmap::CellMap, ndofs)
+      detjac = determinant_jacobian(cellmap)
+      return mass_matrix(basis,quad,detjac,ndofs)
 end
 
 function mass_matrix(basis, quad, scale::V, ndofs) where {V<:AbstractVector}

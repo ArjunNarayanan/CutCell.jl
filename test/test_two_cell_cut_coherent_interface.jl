@@ -36,10 +36,30 @@ levelsetcoeffs = plane_distance_function(nodalcoordinates, normal, x0)
 cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 cutmeshcellquads =
     CutCell.CutMeshCellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+interfacequads = CutCell.CutMeshInterfaceQuadratures(
+    levelset,
+    levelsetcoeffs,
+    cutmesh,
+    numqp,
+)
 cutmeshbf =
     CutCell.CutMeshBilinearForms(basis, cutmeshcellquads, stiffnesses, cutmesh)
+interfaceconstraints =
+    CutCell.coherent_constraint_on_cells(basis, interfacequads, cutmesh)
 
 sysmatrix = CutCell.SystemMatrix()
 sysrhs = CutCell.SystemRHS()
 
-CutCell.assemble_bilinear_form!(sysmatrix,cutmeshbf,cutmesh,2)
+CutCell.assemble_bilinear_form!(sysmatrix, cutmeshbf, cutmesh, 2)
+CutCell.assemble_interface_constraints!(sysmatrix,interfaceconstraints,cutmesh,2)
+
+globalndofs = 2*CutCell.total_number_of_nodes(cutmesh)
+matrix = CutCell.sparse(sysmatrix,globalndofs)
+rhs = CutCell.rhs(sysrhs,globalndofs)
+
+CutCell.apply_dirichlet_bc!(matrix,rhs,[7,7],[1,2],[0.,0.],2)
+CutCell.apply_dirichlet_bc!(matrix,rhs,[8],[1],[0.],2)
+CutCell.apply_dirichlet_bc!(matrix,rhs,[5,6],[1,1],[0.1,0.1],2)
+
+sol = matrix\rhs
+disp = reshape(sol,2,:)
