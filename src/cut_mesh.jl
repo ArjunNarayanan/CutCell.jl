@@ -1,8 +1,8 @@
-struct CutMeshCellQuadratures
+struct CellQuadratures
     quads::Any
     celltoquad::Any
     ncells::Any
-    function CutMeshCellQuadratures(quads, celltoquad)
+    function CellQuadratures(quads, celltoquad)
         nphase, ncells = size(celltoquad)
         @assert nphase == 2
         @assert all(celltoquad .>= 0)
@@ -11,18 +11,25 @@ struct CutMeshCellQuadratures
     end
 end
 
-function Base.getindex(vquads::CutMeshCellQuadratures, s, cellid)
-    flag = (s == -1 || s == +1) && (1 <= cellid <= vquads.ncells)
-    flag || throw(BoundsError(vquads.celltoquad, [s, cellid]))
+function Base.getindex(vquads::CellQuadratures, s, cellid)
+    (s == -1 || s == +1) || error("Use ±1 to index into rows (i.e. phase) of CellQuadratures")
     row = s == +1 ? 1 : 2
+    (1 <= cellid <= vquads.ncells) || throw(BoundsError(vquads.celltoquad, [row, cellid]))
     return vquads.quads[vquads.celltoquad[row, cellid]]
 end
 
-function uniform_cell_quadrature(vquads::CutMeshCellQuadratures)
+function Base.show(io::IO, cellquads::CellQuadratures)
+    ncells = cellquads.ncells
+    nuniquequads = length(cellquads.quads)
+    str = "CellQuadratures\n\tNum. Cells: $ncells\n\tNum. Unique Quadratures: $nuniquequads"
+    print(io,str)
+end
+
+function uniform_cell_quadrature(vquads::CellQuadratures)
     return vquads.quads[1]
 end
 
-function CutMeshCellQuadratures(
+function CellQuadratures(
     cellsign,
     levelset,
     levelsetcoeffs,
@@ -34,8 +41,7 @@ function CutMeshCellQuadratures(
 
     quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numqp)
     tpq = tensor_product_quadrature(2, numqp)
-    quads = Vector{QuadratureRule{2}}(undef, 0)
-    push!(quads, tpq)
+    quads = [tpq]
     celltoquad = zeros(Int, 2, numcells)
     box = IntervalBox(-1..1, 2)
 
@@ -48,23 +54,23 @@ function CutMeshCellQuadratures(
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
-            pquad = quadrature(levelset, +1, false, box, quad1d)
+            pquad = area_quadrature(levelset, +1, box, quad1d)
             push!(quads, pquad)
             celltoquad[1, cellid] = length(quads)
 
-            nquad = quadrature(levelset, -1, false, box, quad1d)
+            nquad = area_quadrature(levelset, -1, box, quad1d)
             push!(quads, nquad)
             celltoquad[2, cellid] = length(quads)
         end
     end
-    return CutMeshCellQuadratures(quads, celltoquad)
+    return CellQuadratures(quads, celltoquad)
 end
 
-function CutMeshCellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+function CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
     cellsign = cell_sign(cutmesh)
     nodalconnectivity = nodal_connectivity(cutmesh.mesh)
-    return CutMeshCellQuadratures(
+    return CellQuadratures(
         cellsign,
         levelset,
         levelsetcoeffs,
@@ -145,7 +151,7 @@ function CutMeshInterfaceQuadratures(
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
-            squad = quadrature(levelset, 1, true, box, quad1d)
+            squad = surface_quadrature(levelset, box, quad1d)
             push!(quads, squad)
             n = levelset_normal(levelset, squad.points, invjac)
             push!(normals, n)
@@ -171,7 +177,7 @@ function CutMeshInterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 end
 
 function face_quadrature_rules(levelset, signcondition, quad1d)
-    bq = QuadratureRule(quadrature(
+    bq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
         [x -> levelset(extend(x, 2, -1.0))],
         [signcondition],
         -1.0,
@@ -180,7 +186,7 @@ function face_quadrature_rules(levelset, signcondition, quad1d)
     ))
     bq = extend_to_face(bq, 1)
 
-    rq = QuadratureRule(quadrature(
+    rq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
         [x -> levelset(extend(x, 1, +1.0))],
         [signcondition],
         -1.0,
@@ -189,7 +195,7 @@ function face_quadrature_rules(levelset, signcondition, quad1d)
     ))
     rq = extend_to_face(rq, 2)
 
-    tq = QuadratureRule(quadrature(
+    tq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
         [x -> levelset(extend(x, 2, +1.0))],
         [signcondition],
         -1.0,
@@ -198,7 +204,7 @@ function face_quadrature_rules(levelset, signcondition, quad1d)
     ))
     tq = extend_to_face(tq, 3)
 
-    lq = QuadratureRule(quadrature(
+    lq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
         [x -> levelset(extend(x, 1, -1.0))],
         [signcondition],
         -1.0,

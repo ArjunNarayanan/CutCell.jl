@@ -48,7 +48,7 @@ cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 @test allequal(CutCell.nodal_connectivity(cutmesh, +1, 1), [1, 2, 3, 4])
 @test allequal(CutCell.nodal_connectivity(cutmesh, -1, 1), [9, 10, 11, 12])
 
-cutmeshquads = CutCell.CutMeshCellQuadratures(
+cutmeshquads = CutCell.CellQuadratures(
     cellsign,
     levelset,
     levelsetcoeffs,

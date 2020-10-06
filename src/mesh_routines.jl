@@ -12,6 +12,14 @@ struct CellMap
     end
 end
 
+function Base.show(io::IO,cellmap::CellMap)
+    dim = cellmap.dim
+    yL = cellmap.yL
+    yR = cellmap.yR
+    str = "CellMap\n\tLeft : $yL\n\tRight: $yR"
+    print(io,str)
+end
+
 function dimension(C::CellMap)
     return C.dim
 end
@@ -40,35 +48,50 @@ function (C::CellMap)(x)
 end
 
 struct Mesh
+    dim
     cellmaps::Any
     nodalcoordinates::Any
     nodalconnectivity::Any
     cellconnectivity::Any
     ncells::Any
     nfmside::Any
+    totalnodes
     nodesperelement::Any
 end
 
 function Mesh(mesh, nf::Int)
+    dim = dimension(mesh)
     cellmaps = cell_maps(mesh)
     x0 = reference_corner(mesh)
     nelements = elements_per_mesh_side(mesh)
     nfeside = nodes_per_element_side(nf)
     nfmside = nodes_per_mesh_side(nelements, nfeside)
+    totalnodes = prod(nfmside)
 
     nodalcoordinates = nodal_coordinates(x0, widths(mesh), nelements, nfmside)
     nodalconnectivity = nodal_connectivity(nfmside, nfeside, nf, nelements)
     cellconnectivity = cell_connectivity(mesh)
     ncells = number_of_elements(mesh)
     Mesh(
+        dim,
         cellmaps,
         nodalcoordinates,
         nodalconnectivity,
         cellconnectivity,
         ncells,
         nfmside,
+        totalnodes,
         nf,
     )
+end
+
+function Base.show(io::IO, mesh::Mesh)
+    ncells = number_of_cells(mesh)
+    numnodes = total_number_of_nodes(mesh)
+    dim = dimension(mesh)
+    nf = nodes_per_element(mesh)
+    str = "Mesh\n\tDimension : $dim\n\tNum. Cells: $ncells\n\tNum. Nodes: $numnodes\n\tNodes/Cell: $nf"
+    print(io,str)
 end
 
 function number_of_cells(mesh::Mesh)
@@ -85,7 +108,7 @@ function nodes_per_mesh_side(mesh::Mesh)
 end
 
 function total_number_of_nodes(mesh::Mesh)
-    return prod(mesh.nfmside)
+    return mesh.totalnodes
 end
 
 function nodes_per_element(mesh::Mesh)
@@ -149,6 +172,10 @@ end
 
 function nodal_connectivity(mesh::Mesh)
     return mesh.nodalconnectivity
+end
+
+function dimension(mesh::Mesh)
+    return mesh.dim
 end
 
 function dimension(mesh::UniformMesh)

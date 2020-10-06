@@ -127,7 +127,7 @@ function condition_number(normal, x0, polyorder, numqp, stiffnesses, penalty)
 
     cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
     cellquads =
-        CutCell.CutMeshCellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+        CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
     interfacequads = CutCell.CutMeshInterfaceQuadratures(
         levelset,
         levelsetcoeffs,
@@ -185,7 +185,7 @@ function solve_two_cell_plane_interface(
 
     cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
     cellquads =
-        CutCell.CutMeshCellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+        CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
     interfacequads = CutCell.CutMeshInterfaceQuadratures(
         levelset,
         levelsetcoeffs,
@@ -225,7 +225,7 @@ function solve_two_cell_plane_interface(
     sol = matrix \ rhs
     nodalsolutions = reshape(sol, 2, :)
 
-    errorcellquads = CutCell.CutMeshCellQuadratures(
+    errorcellquads = CutCell.CellQuadratures(
         levelset,
         levelsetcoeffs,
         cutmesh,

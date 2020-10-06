@@ -15,6 +15,12 @@ function SystemMatrix()
     SystemMatrix(rows, cols, vals)
 end
 
+function Base.show(io::IO, sysmatrix::SystemMatrix)
+    numvals = length(sysmatrix.rows)
+    str = "SystemMatrix with $numvals entries"
+    print(io,str)
+end
+
 function assemble!(matrix::SystemMatrix, rows, cols, vals)
     @assert length(rows) == length(cols) == length(vals)
     append!(matrix.rows, rows)
@@ -33,6 +39,12 @@ end
 
 function SystemRHS()
     SystemRHS(Int[], zeros(0))
+end
+
+function Base.show(io::IO,sysrhs::SystemRHS)
+    numvals = length(sysrhs.rows)
+    str = "SystemRHS with $numvals entries"
+    print(io,str)
 end
 
 function assemble!(systemrhs::SystemRHS, rows, vals)
