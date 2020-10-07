@@ -15,6 +15,7 @@ include("interface_conditions.jl")
 include("cut_mesh.jl")
 include("cell_quadratures.jl")
 include("interface_quadratures.jl")
+include("face_quadratures.jl")
 
 export plane_strain_voigt_hooke_matrix
 

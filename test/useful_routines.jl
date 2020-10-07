@@ -1,4 +1,4 @@
-import Base.==
+import Base.==, Base.≈
 
 function allapprox(v1, v2)
     return all(v1 .≈ v2)
@@ -19,6 +19,10 @@ end
 
 function ==(c1::CutCell.CellMap, c2::CutCell.CellMap)
     return isequal(c1, c2)
+end
+
+function ≈(q1::QuadratureRule,q2::QuadratureRule)
+    flag = allapprox(q1.points,q2.points) && allapprox(q1.weights,q2.weights)
 end
 
 function plane_distance_function(coords, normal, x0)
