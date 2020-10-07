@@ -15,7 +15,7 @@ struct CutMesh
         @assert length(cellsign) == ncells
         @assert size(cutmeshnodeids) == (2, nummeshnodes)
         numnodes = maximum(cutmeshnodeids)
-        nelmts = number_of_elements(cellsign)
+        nelmts = count_elements(cellsign)
         new(mesh, cellsign, cutmeshnodeids, ncells, numnodes, nelmts)
     end
 end
@@ -123,7 +123,7 @@ function cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
     return cutmeshnodeids
 end
 
-function number_of_elements(cellsign)
+function count_elements(cellsign)
     nelmts = 0
     for s in cellsign
         if s == +1 || s == -1

@@ -1,7 +1,3 @@
-function Base.length(quad::QuadratureRule{D,NQ}) where {D,NQ}
-      return NQ
-end
-
 function vector_to_symmetric_matrix_converter()
       E1 = [
             1.0 0.0
@@ -24,8 +20,8 @@ function interpolation_matrix(vals, ndofs)
       return make_row_matrix(diagm(ones(ndofs)), vals)
 end
 
-function transform_gradient(gradf, cm::CellMap)
-      return gradf / Diagonal(jacobian(cm))
+function transform_gradient(gradf, jacobian)
+      return gradf / Diagonal(jacobian)
 end
 
 function dimension(basis::TensorProductBasis{dim}) where {dim}
@@ -48,15 +44,15 @@ function plane_strain_voigt_hooke_matrix(lambda, mu)
       ]
 end
 
-function bilinear_form(basis, quad, stiffness, cellmap)
+function bilinear_form(basis, quad, stiffness, jacobian)
       dim = dimension(basis)
       nf = number_of_basis_functions(basis)
       ndofs = dim * nf
       matrix = zeros(ndofs, ndofs)
       vectosymmconverter = vector_to_symmetric_matrix_converter()
-      detjac = determinant_jacobian(cellmap)
+      detjac = prod(jacobian)
       for (p, w) in quad
-            grad = transform_gradient(gradient(basis, p), cellmap)
+            grad = transform_gradient(gradient(basis, p), jacobian)
             NK = zeros(3, 2nf)
             for k = 1:dim
                   NK .+= make_row_matrix(vectosymmconverter[k], grad[:, k])
@@ -64,6 +60,10 @@ function bilinear_form(basis, quad, stiffness, cellmap)
             matrix .+= NK' * stiffness * NK * detjac * w
       end
       return matrix
+end
+
+function bilinear_form(basis,quad,stiffness,cellmap::CellMap)
+      return bilinear_form(basis,quad,stiffness,jacobian(cellmap))
 end
 
 function mass_matrix(basis, quad, detjac::R, ndofs) where {R<:Real}

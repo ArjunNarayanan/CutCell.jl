@@ -169,7 +169,7 @@ function error_for_num_elements(numelements, polyorder, numqp)
 
     basis = TensorProductBasis(2, polyorder)
     quad = tensor_product_quadrature(2, numqp)
-    facequads = CutCell.face_quadrature_rules(numqp)
+    facequads = CutCell.face_quadratures(numqp)
     errorquad = tensor_product_quadrature(2, numqp + 2)
 
     femesh = CutCell.Mesh(mesh, basis)

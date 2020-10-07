@@ -82,20 +82,3 @@ function interface_normals(iquads::InterfaceQuadratures, cellid)
     idx = iquads.celltoquad[cellid]
     return iquads.normals[idx]
 end
-
-function levelset_normal(levelset, p::V, invjac) where {V<:AbstractVector}
-    g = vec(gradient(levelset, p))
-    n = invjac .* g
-    return n / norm(n)
-end
-
-function levelset_normal(levelset, points::M, invjac) where {M<:AbstractMatrix}
-    npts = size(points)[2]
-    g = hcat([gradient(levelset, points[:, i])' for i = 1:npts]...)
-    normals = diagm(invjac) * g
-    for i = 1:npts
-        n = normals[:, i]
-        normals[:, i] = n / norm(n)
-    end
-    return normals
-end

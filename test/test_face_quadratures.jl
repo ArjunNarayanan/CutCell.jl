@@ -37,6 +37,45 @@ lp = CutCell.extend_to_face(p,4)
 testlp = vcat(-ones(3)',p)
 @test allapprox(testlp,lp)
 
+points = [1.0 2.0 3.0]
+bp = vcat(points,-ones(3)')
+rp = vcat(ones(3)',points)
+tp = vcat(points,ones(3)')
+lp = vcat(-ones(3)',points)
+
+@test allapprox(CutCell.extend_to_face(points,1),bp)
+@test allapprox(CutCell.extend_to_face(points,2),rp)
+@test allapprox(CutCell.extend_to_face(points,3),tp)
+@test allapprox(CutCell.extend_to_face(points,4),lp)
+
+quad1d = tensor_product_quadrature(1,4)
+points = quad1d.points
+bp = vcat(points,-ones(4)')
+rp = vcat(ones(4)',points)
+tp = vcat(points,ones(4)')
+lp = vcat(-ones(4)',points)
+bq = CutCell.extend_to_face(quad1d,1)
+rq = CutCell.extend_to_face(quad1d,2)
+tq = CutCell.extend_to_face(quad1d,3)
+lq = CutCell.extend_to_face(quad1d,4)
+@test allapprox(bq.points,bp)
+@test allapprox(rq.points,rp)
+@test allapprox(tq.points,tp)
+@test allapprox(lq.points,lp)
+@test allapprox(bq.weights,quad1d.weights)
+@test allapprox(rq.weights,quad1d.weights)
+@test allapprox(tq.weights,quad1d.weights)
+@test allapprox(lq.weights,quad1d.weights)
+
+facequads = CutCell.face_quadratures(4)
+@test allapprox(facequads[1].points,bp)
+@test allapprox(facequads[2].points,rp)
+@test allapprox(facequads[3].points,tp)
+@test allapprox(facequads[4].points,lp)
+@test allapprox(facequads[1].weights,quad1d.weights)
+@test allapprox(facequads[2].weights,quad1d.weights)
+@test allapprox(facequads[3].weights,quad1d.weights)
+@test allapprox(facequads[4].weights,quad1d.weights)
 
 polyorder = 1
 numqp = 2

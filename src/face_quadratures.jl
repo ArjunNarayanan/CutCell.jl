@@ -80,52 +80,6 @@ function Base.show(io::IO, facequads::FaceQuadratures)
     print(io, str)
 end
 
-function reference_bottom_face_midpoint()
-    [0.0, -1.0]
-end
-
-function reference_right_face_midpoint()
-    [1.0, 0.0]
-end
-
-function reference_top_face_midpoint()
-    [0.0, 1.0]
-end
-
-function reference_left_face_midpoint()
-    [-1.0, 0.0]
-end
-
-function reference_face(faceid)
-    if faceid == 1
-        return (2, -1.0)
-    elseif faceid == 2
-        return (1, +1.0)
-    elseif faceid == 3
-        return (2, +1.0)
-    elseif faceid == 4
-        return (1, -1.0)
-    else
-        error("Expected faceid ∈ {1,2,3,4}, got faceid = $faceid")
-    end
-end
-
-function reference_face_midpoints()
-    [
-        reference_bottom_face_midpoint(),
-        reference_right_face_midpoint(),
-        reference_top_face_midpoint(),
-        reference_left_face_midpoint(),
-    ]
-end
-
-function extend_to_face(points, faceid)
-    dir, coordval = reference_face(faceid)
-    @assert dir == 1 || dir == 2
-    flipdir = dir == 1 ? 2 : 1
-    return extend([coordval], flipdir, points)
-end
-
 function extend_to_face(quad::QuadratureRule, faceid)
     extp = extend_to_face(quad.points, faceid)
     return QuadratureRule(extp, quad.weights)

@@ -1,3 +1,4 @@
+using ImplicitDomainQuadrature
 import Base.==, Base.≈
 
 function allapprox(v1, v2)

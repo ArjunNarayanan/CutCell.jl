@@ -1,8 +1,8 @@
-struct CutMeshBilinearForms
+struct BilinearForms
     cellmatrices::Any
     celltomatrix::Any
     ncells::Any
-    function CutMeshBilinearForms(cellmatrices, celltomatrix)
+    function BilinearForms(cellmatrices, celltomatrix)
         nphase, ncells = size(celltomatrix)
         @assert nphase == 2
         @assert all(celltomatrix .>= 0)
@@ -11,23 +11,9 @@ struct CutMeshBilinearForms
     end
 end
 
-function Base.getindex(cbf::CutMeshBilinearForms, s, cellid)
-    flag = (s == -1 || s == +1) && (1 <= cellid <= cbf.ncells)
-    flag || throw(BoundsError(cbf.celltomatrix, [s, cellid]))
-    row = s == +1 ? 1 : 2
-    return cbf.cellmatrices[cbf.celltomatrix[row, cellid]]
-end
-
-function Base.getindex(cbf::CutMeshBilinearForms, s)
-    flag = (s == -1 || s == +1)
-    flag || error("Expected s ∈ {-1,1}, got s = $s")
-    idx = s == +1 ? 1 : 2
-    return cbf.cellmatrices[idx]
-end
-
-function CutMeshBilinearForms(
+function BilinearForms(
     basis,
-    cutmeshquads,
+    cellquads,
     stiffnesses,
     cellsign,
     cellmap,
@@ -35,7 +21,7 @@ function CutMeshBilinearForms(
     @assert length(stiffnesses) == 2
     ncells = length(cellsign)
 
-    uniformquad = uniform_cell_quadrature(cutmeshquads)
+    uniformquad = uniform_cell_quadrature(cellquads)
     uniformbf1 = bilinear_form(basis, uniformquad, stiffnesses[1], cellmap)
     uniformbf2 = bilinear_form(basis, uniformquad, stiffnesses[2], cellmap)
 
@@ -48,35 +34,56 @@ function CutMeshBilinearForms(
         elseif cellsign[cellid] == -1
             celltomatrix[2, cellid] = 2
         else
-            pquad = cutmeshquads[+1, cellid]
+            pquad = cellquads[+1, cellid]
             pbf = bilinear_form(basis, pquad, stiffnesses[1], cellmap)
             push!(cellmatrices, pbf)
             celltomatrix[1, cellid] = length(cellmatrices)
 
-            nquad = cutmeshquads[-1, cellid]
+            nquad = cellquads[-1, cellid]
             nbf = bilinear_form(basis, nquad, stiffnesses[2], cellmap)
             push!(cellmatrices, nbf)
             celltomatrix[2, cellid] = length(cellmatrices)
         end
     end
-    return CutMeshBilinearForms(cellmatrices, celltomatrix)
+    return BilinearForms(cellmatrices, celltomatrix)
 end
 
-function CutMeshBilinearForms(basis, cutmeshquads, stiffnesses, cutmesh)
+function BilinearForms(basis, cellquads, stiffnesses, cutmesh)
     cellsign = cell_sign(cutmesh)
     cellmap = cell_map(cutmesh, 1)
-    return CutMeshBilinearForms(
+    return BilinearForms(
         basis,
-        cutmeshquads,
+        cellquads,
         stiffnesses,
         cellsign,
         cellmap,
     )
 end
 
+function Base.getindex(cbf::BilinearForms, s, cellid)
+    (s == -1 || s == +1) ||
+        error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
+    row = s == +1 ? 1 : 2
+    return cbf.cellmatrices[cbf.celltomatrix[row, cellid]]
+end
+
+function Base.getindex(cbf::BilinearForms, s)
+    (s == -1 || s == +1) ||
+        error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
+    idx = s == +1 ? 1 : 2
+    return cbf.cellmatrices[idx]
+end
+
+function Base.show(io::IO, bf::BilinearForms)
+    ncells = bf.ncells
+    nuniquematrices = length(bf.cellmatrices)
+    str = "BilinearForms\n\tNum. Cells: $ncells\n\tNum. Unique Cell Matrices: $nuniquematrices"
+    print(io,str)
+end
+
 function assemble_bilinear_form!(
     sysmatrix::SystemMatrix,
-    cutmeshbfs::CutMeshBilinearForms,
+    cutmeshbfs::BilinearForms,
     cutmesh::CutMesh,
     dofspernode,
 )
@@ -124,93 +131,7 @@ function assemble_bilinear_form!(
                 vals2,
             )
         else
-            error("Expected s ∈ {+1,0,-1}, received s = $s")
-        end
-    end
-end
-
-struct CutMeshInterfaceConstraints
-    cellmatrices::Any
-    celltomatrix::Any
-    ncells::Any
-    function CutMeshInterfaceConstraints(cellmatrices, celltomatrix)
-        ncells = length(celltomatrix)
-        @assert all(celltomatrix .>= 0)
-        @assert all(celltomatrix .<= length(cellmatrices))
-        new(cellmatrices, celltomatrix, ncells)
-    end
-end
-
-function Base.getindex(ic::CutMeshInterfaceConstraints, cellid)
-    1 <= cellid <= ic.ncells || throw(BoundsError(ic.celltomatrix, [cellid]))
-    idx = ic.celltomatrix[cellid]
-    idx > 0 || throw(BoundsError(ic.cellmatrices, [idx]))
-    return ic.cellmatrices[idx]
-end
-
-function coherent_constraint_on_cells(
-    basis,
-    cutmeshinterfacequads,
-    cellsign,
-    cellmap,
-    penalty,
-)
-
-    ncells = length(cellsign)
-    cellmatrices = []
-    celltomatrix = zeros(Int, ncells)
-
-    for cellid = 1:ncells
-        if cellsign[cellid] == 0
-            squad = cutmeshinterfacequads[cellid]
-            normals = interface_normals(cutmeshinterfacequads, cellid)
-
-            scale = scale_area(cellmap, normals)
-            matrix = penalty * mass_matrix(basis, squad, scale, 2)
-
-            push!(cellmatrices, matrix)
-            celltomatrix[cellid] = length(cellmatrices)
-        end
-    end
-    return CutMeshInterfaceConstraints(cellmatrices, celltomatrix)
-end
-
-function coherent_constraint_on_cells(basis, interfacequads, cutmesh, penalty)
-    cellsign = cell_sign(cutmesh)
-    cellmap = cell_map(cutmesh, 1)
-    return coherent_constraint_on_cells(
-        basis,
-        interfacequads,
-        cellsign,
-        cellmap,
-        penalty,
-    )
-end
-
-function assemble_interface_constraints!(
-    sysmatrix::SystemMatrix,
-    interfaceconstraints,
-    cutmesh,
-    dofspernode,
-)
-
-    ncells = number_of_cells(cutmesh)
-    cellsign = cell_sign(cutmesh)
-
-    for cellid = 1:ncells
-        if cellsign[cellid] == 0
-            constraintmatrix = interfaceconstraints[cellid]
-
-            nodeids1 = nodal_connectivity(cutmesh, +1, cellid)
-            nodeids2 = nodal_connectivity(cutmesh, -1, cellid)
-
-            assemble_coherent_interface!(
-                sysmatrix,
-                constraintmatrix,
-                nodeids1,
-                nodeids2,
-                2,
-            )
+            error("Expected cellsign ∈ {+1,0,-1}, got cellsign = $s")
         end
     end
 end

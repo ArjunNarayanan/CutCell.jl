@@ -26,7 +26,7 @@ numqp = 2
 basis = TensorProductBasis(2, polyorder)
 nf = CutCell.number_of_basis_functions(basis)
 vquad = tensor_product_quadrature(2, numqp)
-facequads = CutCell.face_quadrature_rules(numqp)
+facequads = CutCell.face_quadratures(numqp)
 
 mesh = CutCell.Mesh([0.0, 0.0], [1.0, 1.0], [1, 1], nf)
 cellmaps = CutCell.cell_maps(mesh)
@@ -49,7 +49,7 @@ CutCell.assemble_traction_force_linear_form!(
     istractionboundary,
 )
 
-globalndofs = CutCell.total_number_of_nodes(mesh)*2
+globalndofs = CutCell.number_of_nodes(mesh)*2
 matrix = CutCell.sparse(sysmatrix,globalndofs)
 rhs = CutCell.rhs(sysrhs,globalndofs)
 
@@ -86,7 +86,7 @@ numqp = 3
 basis = TensorProductBasis(2, polyorder)
 nf = CutCell.number_of_basis_functions(basis)
 vquad = tensor_product_quadrature(2, numqp)
-facequads = CutCell.face_quadrature_rules(numqp)
+facequads = CutCell.face_quadratures(numqp)
 
 mesh = CutCell.Mesh([0.0, 0.0], [1.0, 1.0], [2, 2], nf)
 cellmaps = CutCell.cell_maps(mesh)
@@ -109,7 +109,7 @@ CutCell.assemble_traction_force_linear_form!(
     istractionboundary,
 )
 
-globalndofs = CutCell.total_number_of_nodes(mesh)*2
+globalndofs = CutCell.number_of_nodes(mesh)*2
 matrix = CutCell.sparse(sysmatrix,globalndofs)
 rhs = CutCell.rhs(sysrhs,globalndofs)
 

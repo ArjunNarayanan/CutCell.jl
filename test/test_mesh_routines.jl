@@ -68,7 +68,7 @@ testnodeconn = vcat(43:46,50:53,57:60,64:67)
 @test allequal(testnodeconn,femesh.nodalconnectivity[:,5])
 @test CutCell.nodes_per_element(femesh) == 16
 @test CutCell.nodes_per_mesh_side(femesh) == [10,7]
-@test CutCell.total_number_of_nodes(femesh) == 70
+@test CutCell.number_of_nodes(femesh) == 70
 
 @test allequal(CutCell.bottom_boundary_node_ids(femesh),1:7:64)
 @test allequal(CutCell.right_boundary_node_ids(femesh),64:70)

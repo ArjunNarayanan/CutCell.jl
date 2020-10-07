@@ -1,52 +1,3 @@
-struct CellMap
-    yL::Any
-    yR::Any
-    jacobian::Any
-    dim::Any
-    function CellMap(yL, yR)
-        dim = length(yL)
-        @assert length(yR) == dim
-        @assert all(yR .>= yL)
-        jacobian = 0.5 * (yR - yL)
-        new(yL, yR, jacobian, dim)
-    end
-end
-
-function Base.show(io::IO, cellmap::CellMap)
-    dim = cellmap.dim
-    yL = cellmap.yL
-    yR = cellmap.yR
-    str = "CellMap\n\tLeft : $yL\n\tRight: $yR"
-    print(io, str)
-end
-
-function dimension(C::CellMap)
-    return C.dim
-end
-
-function jacobian(C::CellMap)
-    return C.jacobian
-end
-
-function inverse_jacobian(C::CellMap)
-    return 1.0 ./ jacobian(C)
-end
-
-function determinant_jacobian(C)
-    return prod(jacobian(C))
-end
-
-function face_determinant_jacobian(C)
-    jac = jacobian(C)
-    return [jac[1], jac[2], jac[1], jac[2]]
-end
-
-function (C::CellMap)(x)
-    dim = dimension(C)
-    # @assert length(x) == dim
-    return C.yL .+ (jacobian(C) .* (x .+ ones(dim)))
-end
-
 struct Mesh
     dim::Any
     cellmaps::Any
@@ -85,6 +36,21 @@ function Mesh(mesh, nf::Int)
     )
 end
 
+function Mesh(mesh, basis)
+    nf = number_of_basis_functions(basis)
+    return Mesh(mesh, nf)
+end
+
+function Mesh(x0, widths, nelements, nf::Int)
+    mesh = UniformMesh(x0, widths, nelements)
+    return Mesh(mesh, nf)
+end
+
+function Mesh(x0,widths,nelements,basis)
+    nf = number_of_basis_functions(basis)
+    return Mesh(x0,widths,nelements,nf)
+end
+
 function Base.show(io::IO, mesh::Mesh)
     ncells = number_of_cells(mesh)
     numnodes = number_of_nodes(mesh)
@@ -96,11 +62,6 @@ end
 
 function number_of_cells(mesh::Mesh)
     return mesh.ncells
-end
-
-function Mesh(x0, widths, nelements, nf)
-    mesh = UniformMesh(x0, widths, nelements)
-    return Mesh(mesh, nf)
 end
 
 function nodes_per_mesh_side(mesh::Mesh)
@@ -121,11 +82,6 @@ end
 
 function widths(mesh::UniformMesh)
     return mesh.widths
-end
-
-function Mesh(mesh, basis)
-    nf = number_of_basis_functions(basis)
-    return Mesh(mesh, nf)
 end
 
 function elements_per_mesh_side(mesh::UniformMesh)
