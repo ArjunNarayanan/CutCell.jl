@@ -121,7 +121,14 @@ function linear_system(basis, quad, stiffness, femesh, bodyforcefunc)
     return K, R
 end
 
-function error_for_num_elements(numelements, polyorder, numqp)
+function error_for_num_elements(
+    numelements,
+    polyorder,
+    numqp,
+    lambda,
+    mu,
+    alpha,
+)
     x0 = [0.0, 0.0]
     widths = [1.0, 1.0]
     nelements = [numelements, numelements]
@@ -169,46 +176,53 @@ function required_quadrature_order(polyorder)
     ceil(Int, 0.5 * (2polyorder + 1))
 end
 
-function convergence(nelements, polyorder)
+function convergence(nelements, polyorder, lambda, mu, alpha)
     numqp = required_quadrature_order(polyorder)
     err = zeros(length(nelements), 2)
     for (idx, nelement) in enumerate(nelements)
-        err[idx, :] = error_for_num_elements(nelement, polyorder, numqp)
+        err[idx, :] = error_for_num_elements(
+            nelement,
+            polyorder,
+            numqp,
+            lambda,
+            mu,
+            alpha,
+        )
     end
     dx = 1.0 ./ nelements
-    u1err = err[:,1]
-    u2err = err[:,2]
+    u1err = err[:, 1]
+    u2err = err[:, 2]
 
-    u1rate = sum(diff(log.(u1err)) ./ diff(log.(dx)))/(length(nelements)-1)
-    u2rate = sum(diff(log.(u2err)) ./ diff(log.(dx)))/(length(nelements)-1)
+    u1rate = sum(diff(log.(u1err)) ./ diff(log.(dx))) / (length(nelements) - 1)
+    u2rate = sum(diff(log.(u2err)) ./ diff(log.(dx))) / (length(nelements) - 1)
 
-    return round(u1rate,digits=3),round(u2rate,digits=3)
+    return round(u1rate, digits = 3), round(u2rate, digits = 3)
 end
 
-const lambda = 1.0
-const mu = 2.0
-const alpha = 0.01
+lambda = 1.0
+mu = 2.0
+alpha = 0.01
 
-numelements = [2,4,8,16,32,64]
-u1rate, u2rate = convergence(numelements,1)
+numelements = [2, 4, 8, 16, 32, 64]
+u1rate, u2rate = convergence(numelements, 1, lambda, mu, alpha)
 println("Convergence of linear elements : ", u1rate, "    ", u2rate)
-@test isapprox(u1rate,2.0,atol=0.05)
-@test isapprox(u2rate,2.0,atol=0.05)
+@test isapprox(u1rate, 2.0, atol = 0.05)
+@test isapprox(u2rate, 2.0, atol = 0.05)
 
 
-u1rate, u2rate = convergence(numelements,2)
+u1rate, u2rate = convergence(numelements, 2, lambda, mu, alpha)
 println("Convergence of quadratic elements : ", u1rate, "    ", u2rate)
-@test isapprox(u1rate,3.0,atol=0.05)
-@test isapprox(u2rate,3.0,atol=0.05)
+@test isapprox(u1rate, 3.0, atol = 0.05)
+@test isapprox(u2rate, 3.0, atol = 0.05)
 
 
-u1rate, u2rate = convergence(numelements,3)
+u1rate, u2rate = convergence(numelements, 3, lambda, mu, alpha)
 println("Convergence of cubic elements : ", u1rate, "    ", u2rate)
-@test isapprox(u1rate,4.0,atol=0.05)
-@test isapprox(u2rate,4.0,atol=0.05)
+@test isapprox(u1rate, 4.0, atol = 0.05)
+@test isapprox(u2rate, 4.0, atol = 0.05)
 
 
-u1rate, u2rate = convergence(numelements,4)
+u1rate, u2rate = convergence(numelements, 4, lambda, mu, alpha)
 println("Convergence of quartic elements : ", u1rate, "    ", u2rate)
-@test isapprox(u1rate,5.0,atol=0.05)
-@test isapprox(u2rate,5.0,atol=0.05)
+@test isapprox(u1rate, 5.0, atol = 0.05)
+@test isapprox(u2rate, 5.0, atol = 0.05)

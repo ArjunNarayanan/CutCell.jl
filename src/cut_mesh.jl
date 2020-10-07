@@ -1,219 +1,81 @@
-struct CellQuadratures
-    quads::Any
-    celltoquad::Any
-    ncells::Any
-    function CellQuadratures(quads, celltoquad)
-        nphase, ncells = size(celltoquad)
-        @assert nphase == 2
-        @assert all(celltoquad .>= 0)
-        @assert all(celltoquad .<= length(quads))
-        new(quads, celltoquad, ncells)
+struct CutMesh
+    mesh::Mesh
+    cellsign::Vector{Int}
+    cutmeshnodeids::Matrix{Int}
+    ncells::Int
+    numnodes::Int
+    nelmts::Int
+    function CutMesh(
+        mesh::Mesh,
+        cellsign::Vector{Int},
+        cutmeshnodeids::Matrix{Int},
+    )
+        ncells = number_of_cells(mesh)
+        nummeshnodes = number_of_nodes(mesh)
+        @assert length(cellsign) == ncells
+        @assert size(cutmeshnodeids) == (2, nummeshnodes)
+        numnodes = maximum(cutmeshnodeids)
+        nelmts = number_of_elements(cellsign)
+        new(mesh, cellsign, cutmeshnodeids, ncells, numnodes, nelmts)
     end
 end
 
-function Base.getindex(vquads::CellQuadratures, s, cellid)
-    (s == -1 || s == +1) || error("Use ±1 to index into rows (i.e. phase) of CellQuadratures")
-    row = s == +1 ? 1 : 2
-    (1 <= cellid <= vquads.ncells) || throw(BoundsError(vquads.celltoquad, [row, cellid]))
-    return vquads.quads[vquads.celltoquad[row, cellid]]
+function CutMesh(levelset::InterpolatingPolynomial, levelsetcoeffs, mesh)
+    nodalconnectivity = nodal_connectivity(mesh)
+    cellsign = cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
+
+    posactivenodeids = active_node_ids(+1, cellsign, nodalconnectivity)
+    negactivenodeids = active_node_ids(-1, cellsign, nodalconnectivity)
+
+    totalnumnodes = number_of_nodes(mesh)
+    cutmeshnodeids =
+        cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
+    return CutMesh(mesh, cellsign, cutmeshnodeids)
 end
 
-function Base.show(io::IO, cellquads::CellQuadratures)
-    ncells = cellquads.ncells
-    nuniquequads = length(cellquads.quads)
-    str = "CellQuadratures\n\tNum. Cells: $ncells\n\tNum. Unique Quadratures: $nuniquequads"
+function Base.show(io::IO, cutmesh::CutMesh)
+    ncells = number_of_cells(cutmesh)
+    nnodes = number_of_nodes(cutmesh)
+    nelmts = number_of_elements(cutmesh)
+    str = "CutMesh\n\tNum. Cells: $ncells\n\tNum. Elements: $nelmts\n\tNum. Nodes: $nnodes"
     print(io,str)
 end
 
-function uniform_cell_quadrature(vquads::CellQuadratures)
-    return vquads.quads[1]
+function nodal_connectivity(cutmesh::CutMesh, s, cellid)
+    @assert s == -1 || s == +1
+    ncells = cutmesh.mesh.ncells
+    @assert 1 <= cellid <= ncells
+    @assert cell_sign(cutmesh, cellid) == s || cell_sign(cutmesh, cellid) == 0
+    row = s == +1 ? 1 : 2
+
+    nc = nodal_connectivity(cutmesh.mesh)
+    ids = nc[:, cellid]
+    nodeids = cutmesh.cutmeshnodeids[row, ids]
+    return nodeids
 end
 
-function CellQuadratures(
-    cellsign,
-    levelset,
-    levelsetcoeffs,
-    nodalconnectivity,
-    numqp,
-)
-    numcells = length(cellsign)
-    @assert size(nodalconnectivity)[2] == numcells
-
-    quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numqp)
-    tpq = tensor_product_quadrature(2, numqp)
-    quads = [tpq]
-    celltoquad = zeros(Int, 2, numcells)
-    box = IntervalBox(-1..1, 2)
-
-    for cellid = 1:numcells
-        if cellsign[cellid] == +1
-            celltoquad[1, cellid] = 1
-        elseif cellsign[cellid] == -1
-            celltoquad[2, cellid] = 1
-        elseif cellsign[cellid] == 0
-            nodeids = nodalconnectivity[:, cellid]
-            update!(levelset, levelsetcoeffs[nodeids])
-
-            pquad = area_quadrature(levelset, +1, box, quad1d)
-            push!(quads, pquad)
-            celltoquad[1, cellid] = length(quads)
-
-            nquad = area_quadrature(levelset, -1, box, quad1d)
-            push!(quads, nquad)
-            celltoquad[2, cellid] = length(quads)
-        end
-    end
-    return CellQuadratures(quads, celltoquad)
+function number_of_nodes(cutmesh::CutMesh)
+    return cutmesh.numnodes
 end
 
-function CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-
-    cellsign = cell_sign(cutmesh)
-    nodalconnectivity = nodal_connectivity(cutmesh.mesh)
-    return CellQuadratures(
-        cellsign,
-        levelset,
-        levelsetcoeffs,
-        nodalconnectivity,
-        numqp,
-    )
+function number_of_cells(cutmesh::CutMesh)
+    return cutmesh.ncells
 end
 
-struct CutMeshInterfaceQuadratures
-    quads::Any
-    normals::Any
-    celltoquad::Any
-    ncells::Any
-    function CutMeshInterfaceQuadratures(quads, normals, celltoquad)
-        ncells = length(celltoquad)
-        @assert all(celltoquad .>= 0)
-        @assert all(celltoquad .<= length(quads))
-        @assert length(quads) == length(normals)
-        new(quads, normals, celltoquad, ncells)
-    end
+function number_of_elements(cutmesh::CutMesh)
+    return cutmesh.nelmts
 end
 
-function Base.getindex(iquads::CutMeshInterfaceQuadratures, cellid)
-    1 <= cellid <= iquads.ncells ||
-        throw(BoundsError(iquads.celltoquad, [cellid]))
-    idx = iquads.celltoquad[cellid]
-    idx > 0 || throw(BoundsError(iquads.quads, [idx]))
-    return iquads.quads[idx]
+function cell_sign(cutmesh::CutMesh)
+    return cutmesh.cellsign
 end
 
-function interface_normals(iquads::CutMeshInterfaceQuadratures, cellid)
-    1 <= cellid <= iquads.ncells ||
-        throw(BoundsError(iquads.celltoquad, [cellid]))
-    idx = iquads.celltoquad[cellid]
-    idx > 0 || throw(BoundsError(iquads.normals, [idx]))
-    return iquads.normals[idx]
+function cell_sign(cutmesh::CutMesh, cellid)
+    return cutmesh.cellsign[cellid]
 end
 
-function levelset_normal(levelset, p::V, invjac) where {V<:AbstractVector}
-    g = vec(gradient(levelset, p))
-    n = invjac .* g
-    return n / norm(n)
-end
-
-function levelset_normal(levelset, points::M, invjac) where {M<:AbstractMatrix}
-    npts = size(points)[2]
-    g = hcat([gradient(levelset, points[:, i])' for i = 1:npts]...)
-    normals = diagm(invjac) * g
-    for i = 1:npts
-        n = normals[:, i]
-        normals[:, i] = n / norm(n)
-    end
-    return normals
-end
-
-function CutMeshInterfaceQuadratures(
-    cellsign,
-    levelset,
-    levelsetcoeffs,
-    nodalconnectivity,
-    numqp,
-    cellmap,
-)
-
-    numcells = length(cellsign)
-    @assert size(nodalconnectivity)[2] == numcells
-
-    box = IntervalBox(-1..1, 2)
-    invjac = inverse_jacobian(cellmap)
-    quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numqp)
-
-    quads = []
-    normals = []
-    celltoquad = zeros(Int, numcells)
-
-    for cellid = 1:numcells
-        if cellsign[cellid] == 0
-            nodeids = nodalconnectivity[:, cellid]
-            update!(levelset, levelsetcoeffs[nodeids])
-
-            squad = surface_quadrature(levelset, box, quad1d)
-            push!(quads, squad)
-            n = levelset_normal(levelset, squad.points, invjac)
-            push!(normals, n)
-
-            celltoquad[cellid] = length(quads)
-        end
-    end
-    return CutMeshInterfaceQuadratures(quads, normals, celltoquad)
-end
-
-function CutMeshInterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-    cellsign = cell_sign(cutmesh)
-    nodalconnectivity = nodal_connectivity(cutmesh.mesh)
-    cellmap = cell_map(cutmesh, 1)
-    return CutMeshInterfaceQuadratures(
-        cellsign,
-        levelset,
-        levelsetcoeffs,
-        nodalconnectivity,
-        numqp,
-        cellmap,
-    )
-end
-
-function face_quadrature_rules(levelset, signcondition, quad1d)
-    bq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
-        [x -> levelset(extend(x, 2, -1.0))],
-        [signcondition],
-        -1.0,
-        +1.0,
-        quad1d,
-    ))
-    bq = extend_to_face(bq, 1)
-
-    rq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
-        [x -> levelset(extend(x, 1, +1.0))],
-        [signcondition],
-        -1.0,
-        +1.0,
-        quad1d,
-    ))
-    rq = extend_to_face(rq, 2)
-
-    tq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
-        [x -> levelset(extend(x, 2, +1.0))],
-        [signcondition],
-        -1.0,
-        +1.0,
-        quad1d,
-    ))
-    tq = extend_to_face(tq, 3)
-
-    lq = QuadratureRule(ImplicitDomainQuadrature.one_dimensional_quadrature(
-        [x -> levelset(extend(x, 1, -1.0))],
-        [signcondition],
-        -1.0,
-        +1.0,
-        quad1d,
-    ))
-    lq = extend_to_face(lq, 4)
-
-    return bq, rq, tq, lq
+function cell_map(cutmesh::CutMesh, cellid)
+    return cell_map(cutmesh.mesh, cellid)
 end
 
 function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
@@ -223,14 +85,18 @@ function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
     for cellid = 1:ncells
         nodeids = nodalconnectivity[:, cellid]
         update!(levelset, levelsetcoeffs[nodeids])
-        cellsign[cellid] = sign(levelset, box)
+        s = sign(levelset,box)
+        if (s == +1 || s == -1)
+            cellsign[cellid] = s
+        else
+            cellsign[cellid] = 0
+        end
     end
     return cellsign
 end
 
-
 function active_node_ids(s, cellsign, nodalconnectivity)
-    @assert s ∈ [-1, 1]
+    @assert (s == -1 || s == +1)
     activenodeids = Int[]
     numcells = size(nodalconnectivity)[2]
     for cellid = 1:numcells
@@ -257,285 +123,16 @@ function cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
     return cutmeshnodeids
 end
 
-struct CutMesh
-    mesh::Mesh
-    cellsign::Vector{Int}
-    cutmeshnodeids::Matrix{Int}
-    ncells::Int
-    numnodes::Int
-    function CutMesh(
-        mesh::Mesh,
-        cellsign::Vector{Int},
-        cutmeshnodeids::Matrix{Int},
-    )
-        ncells = number_of_cells(mesh)
-        numnodes = total_number_of_nodes(mesh)
-        @assert length(cellsign) == ncells
-        @assert size(cutmeshnodeids) == (2, numnodes)
-        totalnumnodes = maximum(cutmeshnodeids)
-        new(mesh, cellsign, cutmeshnodeids, ncells, totalnumnodes)
-    end
-end
-
-function total_number_of_nodes(cutmesh::CutMesh)
-    return cutmesh.numnodes
-end
-
-function number_of_cells(cutmesh::CutMesh)
-    return cutmesh.ncells
-end
-
-function cell_sign(cutmesh::CutMesh)
-    return cutmesh.cellsign
-end
-
-function cell_sign(cutmesh::CutMesh, cellid)
-    return cutmesh.cellsign[cellid]
-end
-
-function cell_map(cutmesh::CutMesh, cellid)
-    return cell_map(cutmesh.mesh, cellid)
-end
-
-function CutMesh(levelset::InterpolatingPolynomial, levelsetcoeffs, mesh)
-    nodalconnectivity = nodal_connectivity(mesh)
-    cellsign = cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
-
-    posactivenodeids = active_node_ids(+1, cellsign, nodalconnectivity)
-    negactivenodeids = active_node_ids(-1, cellsign, nodalconnectivity)
-
-    totalnumnodes = total_number_of_nodes(mesh)
-    cutmeshnodeids =
-        cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
-    return CutMesh(mesh, cellsign, cutmeshnodeids)
-end
-
-function nodal_connectivity(cutmesh::CutMesh, s, cellid)
-    @assert s == -1 || s == +1
-    ncells = cutmesh.mesh.ncells
-    @assert 1 <= cellid <= ncells
-    @assert cell_sign(cutmesh, cellid) == s || cell_sign(cutmesh, cellid) == 0
-    row = s == +1 ? 1 : 2
-
-    nc = nodal_connectivity(cutmesh.mesh)
-    ids = nc[:, cellid]
-    nodeids = cutmesh.cutmeshnodeids[row, ids]
-    return nodeids
-end
-
-struct CutMeshBilinearForms
-    cellmatrices::Any
-    celltomatrix::Any
-    ncells::Any
-    function CutMeshBilinearForms(cellmatrices, celltomatrix)
-        nphase, ncells = size(celltomatrix)
-        @assert nphase == 2
-        @assert all(celltomatrix .>= 0)
-        @assert all(celltomatrix .<= length(cellmatrices))
-        new(cellmatrices, celltomatrix, ncells)
-    end
-end
-
-function Base.getindex(cbf::CutMeshBilinearForms, s, cellid)
-    flag = (s == -1 || s == +1) && (1 <= cellid <= cbf.ncells)
-    flag || throw(BoundsError(cbf.celltomatrix, [s, cellid]))
-    row = s == +1 ? 1 : 2
-    return cbf.cellmatrices[cbf.celltomatrix[row, cellid]]
-end
-
-function Base.getindex(cbf::CutMeshBilinearForms, s)
-    flag = (s == -1 || s == +1)
-    flag || error("Expected s ∈ {-1,1}, got s = $s")
-    idx = s == +1 ? 1 : 2
-    return cbf.cellmatrices[idx]
-end
-
-function CutMeshBilinearForms(
-    basis,
-    cutmeshquads,
-    stiffnesses,
-    cellsign,
-    cellmap,
-)
-    @assert length(stiffnesses) == 2
-    ncells = length(cellsign)
-
-    uniformquad = uniform_cell_quadrature(cutmeshquads)
-    uniformbf1 = bilinear_form(basis, uniformquad, stiffnesses[1], cellmap)
-    uniformbf2 = bilinear_form(basis, uniformquad, stiffnesses[2], cellmap)
-
-    cellmatrices = [uniformbf1, uniformbf2]
-    celltomatrix = zeros(Int, 2, ncells)
-
-    for cellid = 1:ncells
-        if cellsign[cellid] == +1
-            celltomatrix[1, cellid] = 1
-        elseif cellsign[cellid] == -1
-            celltomatrix[2, cellid] = 2
-        else
-            pquad = cutmeshquads[+1, cellid]
-            pbf = bilinear_form(basis, pquad, stiffnesses[1], cellmap)
-            push!(cellmatrices, pbf)
-            celltomatrix[1, cellid] = length(cellmatrices)
-
-            nquad = cutmeshquads[-1, cellid]
-            nbf = bilinear_form(basis, nquad, stiffnesses[2], cellmap)
-            push!(cellmatrices, nbf)
-            celltomatrix[2, cellid] = length(cellmatrices)
-        end
-    end
-    return CutMeshBilinearForms(cellmatrices, celltomatrix)
-end
-
-function CutMeshBilinearForms(basis, cutmeshquads, stiffnesses, cutmesh)
-    cellsign = cell_sign(cutmesh)
-    cellmap = cell_map(cutmesh, 1)
-    return CutMeshBilinearForms(
-        basis,
-        cutmeshquads,
-        stiffnesses,
-        cellsign,
-        cellmap,
-    )
-end
-
-function assemble_bilinear_form!(
-    sysmatrix::SystemMatrix,
-    cutmeshbfs::CutMeshBilinearForms,
-    cutmesh::CutMesh,
-    dofspernode,
-)
-
-    ncells = number_of_cells(cutmesh)
-    cellsign = cell_sign(cutmesh)
-
-    uniformvals1 = vec(cutmeshbfs[+1])
-    uniformvals2 = vec(cutmeshbfs[-1])
-
-    for cellid = 1:ncells
-        s = cellsign[cellid]
-        if s == +1
-            nodeids = nodal_connectivity(cutmesh, +1, cellid)
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids,
-                dofspernode,
-                uniformvals1,
-            )
-        elseif s == -1
-            nodeids = nodal_connectivity(cutmesh, -1, cellid)
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids,
-                dofspernode,
-                uniformvals2,
-            )
+function number_of_elements(cellsign)
+    nelmts = 0
+    for s in cellsign
+        if s == +1 || s == -1
+            nelmts += 1
         elseif s == 0
-            nodeids1 = nodal_connectivity(cutmesh, +1, cellid)
-            vals1 = vec(cutmeshbfs[+1, cellid])
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids1,
-                dofspernode,
-                vals1,
-            )
-
-            nodeids2 = nodal_connectivity(cutmesh, -1, cellid)
-            vals2 = vec(cutmeshbfs[-1, cellid])
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids2,
-                dofspernode,
-                vals2,
-            )
+            nelmts += 2
         else
-            error("Expected s ∈ {+1,0,-1}, received s = $s")
+            error("Expected cellsign ∈ {-1,0,+1}, got cellsign = $s")
         end
     end
-end
-
-struct CutMeshInterfaceConstraints
-    cellmatrices::Any
-    celltomatrix::Any
-    ncells::Any
-    function CutMeshInterfaceConstraints(cellmatrices, celltomatrix)
-        ncells = length(celltomatrix)
-        @assert all(celltomatrix .>= 0)
-        @assert all(celltomatrix .<= length(cellmatrices))
-        new(cellmatrices, celltomatrix, ncells)
-    end
-end
-
-function Base.getindex(ic::CutMeshInterfaceConstraints, cellid)
-    1 <= cellid <= ic.ncells || throw(BoundsError(ic.celltomatrix, [cellid]))
-    idx = ic.celltomatrix[cellid]
-    idx > 0 || throw(BoundsError(ic.cellmatrices, [idx]))
-    return ic.cellmatrices[idx]
-end
-
-function coherent_constraint_on_cells(
-    basis,
-    cutmeshinterfacequads,
-    cellsign,
-    cellmap,
-    penalty,
-)
-
-    ncells = length(cellsign)
-    cellmatrices = []
-    celltomatrix = zeros(Int, ncells)
-
-    for cellid = 1:ncells
-        if cellsign[cellid] == 0
-            squad = cutmeshinterfacequads[cellid]
-            normals = interface_normals(cutmeshinterfacequads, cellid)
-
-            scale = scale_area(cellmap, normals)
-            matrix = penalty * mass_matrix(basis, squad, scale, 2)
-
-            push!(cellmatrices, matrix)
-            celltomatrix[cellid] = length(cellmatrices)
-        end
-    end
-    return CutMeshInterfaceConstraints(cellmatrices, celltomatrix)
-end
-
-function coherent_constraint_on_cells(basis, interfacequads, cutmesh, penalty)
-    cellsign = cell_sign(cutmesh)
-    cellmap = cell_map(cutmesh, 1)
-    return coherent_constraint_on_cells(
-        basis,
-        interfacequads,
-        cellsign,
-        cellmap,
-        penalty,
-    )
-end
-
-function assemble_interface_constraints!(
-    sysmatrix::SystemMatrix,
-    interfaceconstraints,
-    cutmesh,
-    dofspernode,
-)
-
-    ncells = number_of_cells(cutmesh)
-    cellsign = cell_sign(cutmesh)
-
-    for cellid = 1:ncells
-        if cellsign[cellid] == 0
-            constraintmatrix = interfaceconstraints[cellid]
-
-            nodeids1 = nodal_connectivity(cutmesh, +1, cellid)
-            nodeids2 = nodal_connectivity(cutmesh, -1, cellid)
-
-            assemble_coherent_interface!(
-                sysmatrix,
-                constraintmatrix,
-                nodeids1,
-                nodeids2,
-                2,
-            )
-        end
-    end
+    return nelmts
 end

@@ -5,16 +5,7 @@ using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
 using CutCell
-
-function plane_distance_function(coords, normal, x0)
-    return (coords .- x0)' * normal
-end
-
-function circle_distance_function(coords, center, radius)
-    difference = coords .- center
-    distance = [radius - norm(difference[:,i]) for i = 1:size(difference)[2]]
-    return distance
-end
+include("useful_routines.jl")
 
 function left_boundary_nodeids(nf)
     nfside = sqrt(nf)

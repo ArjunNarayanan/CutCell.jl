@@ -20,3 +20,17 @@ end
 function ==(c1::CutCell.CellMap, c2::CutCell.CellMap)
     return isequal(c1, c2)
 end
+
+function plane_distance_function(coords, normal, x0)
+    return (coords .- x0)' * normal
+end
+
+function plane_distance_function(coords, normal, x0)
+    return (coords .- x0)' * normal
+end
+
+function circle_distance_function(coords, center, radius)
+    difference = coords .- center
+    distance = [radius - norm(difference[:,i]) for i = 1:size(difference)[2]]
+    return distance
+end

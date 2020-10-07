@@ -12,12 +12,12 @@ struct CellMap
     end
 end
 
-function Base.show(io::IO,cellmap::CellMap)
+function Base.show(io::IO, cellmap::CellMap)
     dim = cellmap.dim
     yL = cellmap.yL
     yR = cellmap.yR
     str = "CellMap\n\tLeft : $yL\n\tRight: $yR"
-    print(io,str)
+    print(io, str)
 end
 
 function dimension(C::CellMap)
@@ -38,7 +38,7 @@ end
 
 function face_determinant_jacobian(C)
     jac = jacobian(C)
-    return [jac[1],jac[2],jac[1],jac[2]]
+    return [jac[1], jac[2], jac[1], jac[2]]
 end
 
 function (C::CellMap)(x)
@@ -48,14 +48,14 @@ function (C::CellMap)(x)
 end
 
 struct Mesh
-    dim
+    dim::Any
     cellmaps::Any
     nodalcoordinates::Any
     nodalconnectivity::Any
     cellconnectivity::Any
     ncells::Any
     nfmside::Any
-    totalnodes
+    totalnodes::Any
     nodesperelement::Any
 end
 
@@ -87,27 +87,27 @@ end
 
 function Base.show(io::IO, mesh::Mesh)
     ncells = number_of_cells(mesh)
-    numnodes = total_number_of_nodes(mesh)
+    numnodes = number_of_nodes(mesh)
     dim = dimension(mesh)
     nf = nodes_per_element(mesh)
     str = "Mesh\n\tDimension : $dim\n\tNum. Cells: $ncells\n\tNum. Nodes: $numnodes\n\tNodes/Cell: $nf"
-    print(io,str)
+    print(io, str)
 end
 
 function number_of_cells(mesh::Mesh)
     return mesh.ncells
 end
 
-function Mesh(x0,widths,nelements,nf)
-    mesh = UniformMesh(x0,widths,nelements)
-    return Mesh(mesh,nf)
+function Mesh(x0, widths, nelements, nf)
+    mesh = UniformMesh(x0, widths, nelements)
+    return Mesh(mesh, nf)
 end
 
 function nodes_per_mesh_side(mesh::Mesh)
     return mesh.nfmside
 end
 
-function total_number_of_nodes(mesh::Mesh)
+function number_of_nodes(mesh::Mesh)
     return mesh.totalnodes
 end
 
@@ -182,6 +182,14 @@ function dimension(mesh::UniformMesh)
     return CartesianMesh.dimension(mesh)
 end
 
+function faces_per_cell(mesh::UniformMesh)
+    return CartesianMesh.faces_per_cell(mesh)
+end
+
+function number_of_elements(mesh::UniformMesh)
+    return CartesianMesh.number_of_elements(mesh)
+end
+
 function nodal_connectivity(nfmside, nfeside, nodesperelement, nelements)
     numnodes = prod(nfmside)
     ncells = prod(nelements)
@@ -206,10 +214,6 @@ function nodal_connectivity(nfmside, nfeside, nodesperelement, nelements)
         colend += nfeside - 1
     end
     return connectivity
-end
-
-function faces_per_cell(mesh::UniformMesh)
-    return CartesianMesh.faces_per_cell(mesh)
 end
 
 function cell_connectivity(mesh)
@@ -250,13 +254,13 @@ end
 
 function number_of_degrees_of_freedom(mesh::Mesh)
     dim = size(mesh.nodalcoordinates)[1]
-    numnodes = total_number_of_nodes(mesh)
+    numnodes = number_of_nodes(mesh)
     return numnodes * dim
 end
 
 function is_interior_cell(cellconnectivity)
     numcells = size(cellconnectivity)[2]
-    isinteriorcell = [all(cellconnectivity[:,i] .!= 0) for i = 1:numcells]
+    isinteriorcell = [all(cellconnectivity[:, i] .!= 0) for i = 1:numcells]
     return isinteriorcell
 end
 
@@ -270,24 +274,40 @@ function is_boundary_cell(x)
 end
 
 function reference_bottom_face_midpoint()
-    [0.,-1.]
+    [0.0, -1.0]
 end
 
 function reference_right_face_midpoint()
-    [1.,0.]
+    [1.0, 0.0]
 end
 
 function reference_top_face_midpoint()
-    [0.,1.]
+    [0.0, 1.0]
 end
 
 function reference_left_face_midpoint()
-    [-1.,0.]
+    [-1.0, 0.0]
+end
+
+function reference_face(faceid)
+    if faceid == 1
+        return (2, -1.0)
+    elseif faceid == 2
+        return (1, +1.0)
+    elseif faceid == 3
+        return (2, +1.0)
+    elseif faceid == 4
+        return (1, -1.0)
+    else
+        error("Expected faceid ∈ {1,2,3,4}, got faceid = $faceid")
+    end
 end
 
 function reference_face_midpoints()
-    [reference_bottom_face_midpoint(),
-     reference_right_face_midpoint(),
-     reference_top_face_midpoint(),
-     reference_left_face_midpoint()]
+    [
+        reference_bottom_face_midpoint(),
+        reference_right_face_midpoint(),
+        reference_top_face_midpoint(),
+        reference_left_face_midpoint(),
+    ]
 end
