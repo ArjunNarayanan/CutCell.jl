@@ -10,6 +10,59 @@ function circle_distance_function(coords, center, radius)
     return sqrt.(mapslices(sum, diff2, dims = 1)') .- radius
 end
 
+function displacement_field(x)
+    u1 = x[1]^2 + 2x[1] * x[2]
+    u2 = x[2]^2 + 3x[1]
+    return [u1, u2]
+end
+
+function body_force(lambda, mu)
+    b1 = -2 * (lambda + 2mu)
+    b2 = -(4lambda + 6mu)
+    return [b1, b2]
+end
+
+function add_cell_error_squared!(
+    err,
+    interpolater,
+    exactsolution,
+    cellmap,
+    quad,
+)
+    detjac = CutCell.determinant_jacobian(cellmap)
+    for (p, w) in quad
+        numsol = interpolater(p)
+        exsol = exactsolution(cellmap(p))
+        err .+= (numsol - exsol) .^ 2 * detjac * w
+    end
+end
+
+
+function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
+    err = zeros(2)
+    interpolater = InterpolatingPolynomial(2,basis)
+    ncells = CutCell.number_of_cells(cutmesh)
+    for cellid in 1:ncells
+        s = CutCell.cell_sign(cutmesh,cellid)
+        @assert s == -1 || s == 0 || s == 1
+        if s == 1 || s == 0
+            nodeids = CutCell.nodal_connectivity(cutmesh, 1, cellid)
+            elementsolution = nodalsolutions[:,nodeids]
+            update!(interpolater,elementsolution)
+            quad = cellquads[1,cellid]
+            add_cell_error_squared!(err,interpolater,exactsolution,cellmap,quad)
+        end
+        if s == -1 || s == 0
+            nodeids = CutCell.nodal_connectivity(cutmesh,-1,cellid)
+            elementsolution = nodalsolutions[:,nodeids]
+            update!(interpolater,elementsolution)
+            quad = cellquads[-1,cellid]
+            add_cell_error_squared!(err,interpolater,exactsolution,cellmap,quad)
+        end
+    end
+    return sqrt.(err)
+end
+
 lambda = 1.0
 mu = 2.0
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
@@ -17,13 +70,13 @@ stiffnesses = [stiffness, stiffness]
 
 polyorder = 2
 numqp = 4
-numcutqp = 6
-penalty = 1e3
+numcutqp = 4
+interfacepenalty = 1e3
 basis = TensorProductBasis(2, polyorder)
 levelset = InterpolatingPolynomial(1, basis)
 nf = CutCell.number_of_basis_functions(basis)
 
-mesh = CutCell.Mesh([0.0, 0.0], [1.0, 1.0], [2, 2], nf)
+mesh = CutCell.Mesh([0.0, 0.0], [1.0, 1.0], [4, 4], nf)
 
 center = [0.5, 0.5]
 radius = 0.25
@@ -42,16 +95,42 @@ interfaceconstraints = CutCell.coherent_interface_constraint(
     basis,
     interfacequads,
     cutmesh,
-    penalty,
+    interfacepenalty,
 )
 
 sysmatrix = CutCell.SystemMatrix()
 sysrhs = CutCell.SystemRHS()
 
-CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh, 2)
-CutCell.assemble_interface_constraints!(sysmatrix,interfaceconstraints,cutmesh)
+CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+CutCell.assemble_interface_constraints!(
+    sysmatrix,
+    interfaceconstraints,
+    cutmesh,
+)
+CutCell.assemble_cut_mesh_body_force_linear_form!(
+    sysrhs,
+    x -> body_force(lambda, mu),
+    basis,
+    cellquads,
+    cutmesh,
+)
 
-matrix = CutCell.stiffness(sysmatrix,cutmesh)
-rhs = CutCell.rhs(sysrhs,cutmesh)
+matrix = CutCell.stiffness(sysmatrix, cutmesh)
+rhs = CutCell.rhs(sysrhs, cutmesh)
+
+nodalcoordinates = CutCell.nodal_coordinates(cutmesh.mesh)
+boundarynodeids = CutCell.boundary_node_ids(cutmesh.mesh)
+boundarynodecoords = nodalcoordinates[:, boundarynodeids]
+boundarydisplacement =
+    mapslices(displacement_field, boundarynodecoords, dims = 1)
+CutCell.apply_dirichlet_bc!(matrix, rhs, boundarynodeids, boundarydisplacement)
+
+sol = matrix \ rhs
+cutdisp = reshape(sol, 2, :)
+
+err = mesh_L2_error(cutdisp,displacement_field,basis,cellquads,cutmesh)
+
+println(err)
+
 # plot_interface_quadrature_points(interfacequads,cutmesh)
 # plot_cell_quadrature_points(cellquads,cutmesh,+1)

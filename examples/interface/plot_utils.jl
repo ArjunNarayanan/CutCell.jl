@@ -1,7 +1,7 @@
 using Plots
 
-function plot_cell_quadrature_points(cellquads,cutmesh,cellsign)
-    plt = plot(aspect_ratio=:equal,xlims=(0,1),ylims=(0,1))
+function plot_cell_quadrature_points(cellquads,cutmesh,cellsign,xlims,ylims)
+    plt = plot(aspect_ratio=:equal,xlims=xlims,ylims=ylims)
     ncells = CutCell.number_of_cells(cutmesh)
     for cellid in 1:ncells
         cellmap = CutCell.cell_map(cutmesh,cellid)
@@ -15,8 +15,8 @@ function plot_cell_quadrature_points(cellquads,cutmesh,cellsign)
     return plt
 end
 
-function plot_interface_quadrature_points(interfacequads,cutmesh)
-    plt = plot(aspect_ratio=:equal,xlims=(0,1),ylims=(0,1))
+function plot_interface_quadrature_points(interfacequads,cutmesh,xlims,ylims)
+    plt = plot(aspect_ratio=:equal,xlims=xlims,ylims=ylims)
     ncells = CutCell.number_of_cells(cutmesh)
     for cellid in 1:ncells
         cellmap = CutCell.cell_map(cutmesh,cellid)

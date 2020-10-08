@@ -73,6 +73,7 @@ function mesh_L2_error(nodalsolutions, exactsolution, cutmesh, basis, cellquads)
     cellsign = CutCell.cell_sign(cutmesh)
 
     for (cellid, s) in enumerate(cellsign)
+        @assert s == +1 || s == 0 || s == -1
         cellmap = CutCell.cell_map(cutmesh, cellid)
         if s == +1 || s == 0
             quad = cellquads[+1, cellid]
@@ -86,7 +87,8 @@ function mesh_L2_error(nodalsolutions, exactsolution, cutmesh, basis, cellquads)
                 quad,
                 detjac,
             )
-        elseif s == -1 || s == 0
+        end
+        if s == -1 || s == 0
             quad = cellquads[-1, cellid]
             nodeids = CutCell.nodal_connectivity(cutmesh, -1, cellid)
             update!(interpolater, nodalsolutions[:, nodeids])
@@ -98,8 +100,6 @@ function mesh_L2_error(nodalsolutions, exactsolution, cutmesh, basis, cellquads)
                 quad,
                 detjac,
             )
-        else
-            error("Expected cellsign ∈ {-1,0,+1}, got cellsign = $s")
         end
     end
     return sqrt.(err)
@@ -217,7 +217,7 @@ function solve_two_cell_plane_interface(
     matrix = CutCell.sparse(sysmatrix, totalndofs)
     rhs = CutCell.rhs(sysrhs, totalndofs)
 
-    apply_two_cell_displacement_bc!(matrix,rhs,cutmesh,nf,0.1)
+    apply_two_cell_displacement_bc!(matrix,rhs,cutmesh,nf,dx)
     # CutCell.apply_dirichlet_bc!(matrix, rhs, [7, 7], [1, 2], [0.0, 0.0], 2)
     # CutCell.apply_dirichlet_bc!(matrix, rhs, [8], [1], [0.0], 2)
     # CutCell.apply_dirichlet_bc!(matrix, rhs, [5, 6], [1, 1], [0.1, 0.1], 2)
@@ -271,7 +271,7 @@ function error_for_interface_positions(
     end
 
     filename =
-        "examples/interface/error-vs-position.csv"
+        "examples/interface/plane/error-vs-position.csv"
     df = DataFrame(
         position = interfaceposition,
         ErrorU1 = err[:, 1],
@@ -305,7 +305,7 @@ function error_for_interface_angles(
         )
     end
 
-    filename = "examples/interface/error-vs-angle.csv"
+    filename = "examples/interface/plane/error-vs-angle.csv"
     df = DataFrame(
         angles = interfaceangles,
         ErrorU1 = err[:, 1],
@@ -343,7 +343,7 @@ function error_for_penalty_parameter(
         )
     end
 
-    filename = "examples/interface/error-vs-penalty.csv"
+    filename = "examples/interface/plane/error-vs-penalty.csv"
     df =
         DataFrame(penalty = penalties, ErrorU1 = err[:, 1], ErrorU2 = err[:, 2])
     CSV.write(filename, df)
@@ -366,18 +366,19 @@ function condition_number_for_interface_position(
             condition_number(normal, x0, polyorder, numqp, stiffnesses, penalty)
     end
 
-    filename = "examples/interface/condition-number-vs-position.csv"
+    filename = "examples/interface/plane/condition-number-vs-position.csv"
     df = DataFrame(position = interfacepositions, condition = condnum)
     CSV.write(filename, df)
 end
 
 polyorder = 1
-numqp = 2
-penalty = 1e3
+numqp = 4
+# penalty = 1e3
 lambda, mu = (1.0, 2.0)
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
 stiffnesses = [stiffness, stiffness]
-e11 = 0.1 / 4.0
+dx = 0.1
+e11 = dx / 4.0
 
 
 
@@ -406,16 +407,16 @@ e11 = 0.1 / 4.0
 #     penalty,
 # )
 
-# penalties = 10:20:1000
-# error_for_penalty_parameter(
-#     1.0,
-#     0,
-#     polyorder,
-#     numqp,
-#     stiffnesses,
-#     penalties,
-#     x -> exact_solution(lambda, mu, e11, x),
-# )
+penalties = [1,1e1,1e2,1e3,1e4,1e5]
+error_for_penalty_parameter(
+    1.0,
+    0,
+    polyorder,
+    numqp,
+    stiffnesses,
+    penalties,
+    x -> exact_solution(lambda, mu, e11, x),
+)
 
 # interfaceangle = 0
 # interfacepositions = range(0.0, stop = 2.0, length = 100)[2:end-1]

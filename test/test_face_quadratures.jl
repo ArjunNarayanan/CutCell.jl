@@ -91,6 +91,6 @@ levelsetcoeffs = plane_distance_function(nodalcoordinates, normal, x0)
 
 cutmesh = CutCell.CutMesh(levelset,levelsetcoeffs,mesh)
 facequads = CutCell.FaceQuadratures(levelset,levelsetcoeffs,cutmesh,numqp)
-idx = [5,6,7,8,9,10,11,12,1,2,3,4,0,0,0,0]
-testfacetoquad = reshape(idx,4,2,2)
+idx = [5,9,6,10,7,11,8,12,1,0,2,0,3,0,4,0]
+testfacetoquad = reshape(idx,2,4,2)
 @test allequal(testfacetoquad,facequads.facetoquad)

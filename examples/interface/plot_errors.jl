@@ -38,7 +38,7 @@ end
 
 function plot_errors_vs_penalties(penalties, err; title = "", filename = "")
     fig, ax = PyPlot.subplots()
-    ax.plot(penalties, err, linewidth = 2)
+    ax.loglog(penalties, err, linewidth = 2)
     ax.set_title(title)
     # slope = mean_log_slope(penalties,err)
     # annotation = @sprintf "Mean slope = %1.2f" slope
@@ -70,14 +70,14 @@ function plot_condition_vs_position(positions, cond; title = "", filename = "")
     end
 end
 
-condfile = "examples/interface/condition-number-vs-position.csv"
-df = CSV.read(condfile, DataFrame)
-plot_condition_vs_position(
-    df[:, :position],
-    df[:, :condition],
-    title = "Condition no. vs. interface position for P = 1000",
-    filename = "examples/interface/cond-vs-position.png",
-)
+# condfile = "examples/interface/condition-number-vs-position.csv"
+# df = CSV.read(condfile, DataFrame)
+# plot_condition_vs_position(
+#     df[:, :position],
+#     df[:, :condition],
+#     title = "Condition no. vs. interface position for P = 1000",
+#     filename = "examples/interface/cond-vs-position.png",
+# )
 
 
 # filename1 = "examples/interface/plane_theta-0-poly-1-penalty-1000.csv"
@@ -86,15 +86,15 @@ plot_condition_vs_position(
 # df2 = CSV.read(filename2, DataFrame)
 # filename3 = "examples/interface/plane_theta-0-poly-1-penalty-10.csv"
 # df3 = CSV.read(filename3, DataFrame)
-#
-# penaltyfile = "examples/interface/error-vs-penalty.csv"
-# dfp = CSV.read(penaltyfile, DataFrame)
-# plot_errors_vs_penalties(
-#     dfp[:, :penalty],
-#     dfp[:, :ErrorU1],
-#     title = "Error vs. penalty parameter",
-#     filename = "examples/interface/error-vs-penalty.png",
-# )
+
+penaltyfile = "examples/interface/curved/error-vs-penalty.csv"
+dfp = CSV.read(penaltyfile, DataFrame)
+plot_errors_vs_penalties(
+    dfp[:, :penalty],
+    dfp[:, :ErrorU1],
+    title = "Error vs. penalty parameter",
+    filename = "examples/interface/curved/error-vs-penalty.png",
+)
 
 # plot_error_vs_position(
 #     df1[:, :position],

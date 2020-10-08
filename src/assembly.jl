@@ -74,7 +74,7 @@ function element_dofs_to_operator_dofs(rowdofs, coldofs)
     return rows, cols
 end
 
-function assemble_cell_bilinear_form!(
+function assemble_cell_matrix!(
     sysmatrix::SystemMatrix,
     nodeids,
     dofspernode,
@@ -97,7 +97,7 @@ function assemble_bilinear_form!(
     vals = vec(cellmatrix)
     for cellid = 1:ncells
         nodeids = nodalconnectivity[:, cellid]
-        assemble_cell_bilinear_form!(sysmatrix, nodeids, dofspernode, vals)
+        assemble_cell_matrix!(sysmatrix, nodeids, dofspernode, vals)
     end
 end
 
@@ -187,7 +187,13 @@ function assemble_traction_force_linear_form!(
 end
 
 function stiffness(sysmatrix::SystemMatrix, ndofs::Int)
-    return sparse(sysmatrix.rows, sysmatrix.cols, sysmatrix.vals, ndofs, ndofs)
+    return dropzeros!(sparse(
+        sysmatrix.rows,
+        sysmatrix.cols,
+        sysmatrix.vals,
+        ndofs,
+        ndofs,
+    ))
 end
 
 function stiffness(sysmatrix::SystemMatrix, mesh)

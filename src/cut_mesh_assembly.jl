@@ -86,52 +86,53 @@ function assemble_bilinear_form!(
         s = cellsign[cellid]
         if s == +1
             nodeids = nodal_connectivity(cutmesh, +1, cellid)
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids,
-                dofspernode,
-                uniformvals1,
-            )
+            assemble_cell_matrix!(sysmatrix, nodeids, dofspernode, uniformvals1)
         elseif s == -1
             nodeids = nodal_connectivity(cutmesh, -1, cellid)
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids,
-                dofspernode,
-                uniformvals2,
-            )
+            assemble_cell_matrix!(sysmatrix, nodeids, dofspernode, uniformvals2)
         elseif s == 0
             nodeids1 = nodal_connectivity(cutmesh, +1, cellid)
             vals1 = vec(cutmeshbfs[+1, cellid])
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids1,
-                dofspernode,
-                vals1,
-            )
+            assemble_cell_matrix!(sysmatrix, nodeids1, dofspernode, vals1)
 
             nodeids2 = nodal_connectivity(cutmesh, -1, cellid)
             vals2 = vec(cutmeshbfs[-1, cellid])
-            assemble_cell_bilinear_form!(
-                sysmatrix,
-                nodeids2,
-                dofspernode,
-                vals2,
-            )
+            assemble_cell_matrix!(sysmatrix, nodeids2, dofspernode, vals2)
         else
             error("Expected cellsign ∈ {+1,0,-1}, got cellsign = $s")
         end
     end
 end
 
-function assemble_penalty_displacement_bc!(
-    sysmatrix::SystemMatrix,
+function assemble_cut_mesh_body_force_linear_form!(
+    systemrhs,
+    rhsfunc,
     basis,
-    facequads,
+    cellquads,
     cutmesh,
-    onboundary,
-    penalty,
 )
 
-    
+    ncells = number_of_cells(cutmesh)
+    cellsign = cell_sign(cutmesh)
+    dofspernode = dimension(cutmesh)
+
+    for cellid in 1:ncells
+        s = cellsign[cellid]
+        @assert s == -1 || s == 0 || s == 1
+        cellmap = cell_map(cutmesh,cellid)
+        if s == +1 || s == 0
+            pquad = cellquads[+1,cellid]
+            rhs = linear_form(rhsfunc,basis,pquad,cellmap)
+            nodeids = nodal_connectivity(cutmesh,+1,cellid)
+            edofs = element_dofs(nodeids,dofspernode)
+            assemble!(systemrhs,edofs,rhs)
+        end
+        if s == -1 || s == 0
+            nquad = cellquads[-1,cellid]
+            rhs = linear_form(rhsfunc,basis,nquad,cellmap)
+            nodeids = nodal_connectivity(cutmesh,-1,cellid)
+            edofs = element_dofs(nodeids,dofspernode)
+            assemble!(systemrhs,edofs,rhs)
+        end
+    end
 end

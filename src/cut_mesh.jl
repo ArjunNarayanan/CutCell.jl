@@ -89,6 +89,14 @@ function cell_map(cutmesh::CutMesh, cellid)
     return cell_map(cutmesh.mesh, cellid)
 end
 
+function is_interior_cell(cutmesh::CutMesh)
+    return is_interior_cell(cutmesh.mesh)
+end
+
+function cell_connectivity(cutmesh::CutMesh)
+    return cell_connectivity(cutmesh.mesh)
+end
+
 function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
     ncells = size(nodalconnectivity)[2]
     cellsign = zeros(Int, ncells)
