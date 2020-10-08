@@ -11,13 +11,7 @@ struct BilinearForms
     end
 end
 
-function BilinearForms(
-    basis,
-    cellquads,
-    stiffnesses,
-    cellsign,
-    cellmap,
-)
+function BilinearForms(basis, cellquads, stiffnesses, cellsign, cellmap)
     @assert length(stiffnesses) == 2
     ncells = length(cellsign)
 
@@ -51,13 +45,7 @@ end
 function BilinearForms(basis, cellquads, stiffnesses, cutmesh)
     cellsign = cell_sign(cutmesh)
     cellmap = cell_map(cutmesh, 1)
-    return BilinearForms(
-        basis,
-        cellquads,
-        stiffnesses,
-        cellsign,
-        cellmap,
-    )
+    return BilinearForms(basis, cellquads, stiffnesses, cellsign, cellmap)
 end
 
 function Base.getindex(cbf::BilinearForms, s, cellid)
@@ -78,16 +66,16 @@ function Base.show(io::IO, bf::BilinearForms)
     ncells = bf.ncells
     nuniquematrices = length(bf.cellmatrices)
     str = "BilinearForms\n\tNum. Cells: $ncells\n\tNum. Unique Cell Matrices: $nuniquematrices"
-    print(io,str)
+    print(io, str)
 end
 
 function assemble_bilinear_form!(
     sysmatrix::SystemMatrix,
     cutmeshbfs::BilinearForms,
     cutmesh::CutMesh,
-    dofspernode,
 )
 
+    dofspernode = dimension(cutmesh)
     ncells = number_of_cells(cutmesh)
     cellsign = cell_sign(cutmesh)
 
@@ -134,4 +122,16 @@ function assemble_bilinear_form!(
             error("Expected cellsign ∈ {+1,0,-1}, got cellsign = $s")
         end
     end
+end
+
+function assemble_penalty_displacement_bc!(
+    sysmatrix::SystemMatrix,
+    basis,
+    facequads,
+    cutmesh,
+    onboundary,
+    penalty,
+)
+
+    
 end

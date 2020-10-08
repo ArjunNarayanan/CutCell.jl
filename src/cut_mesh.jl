@@ -38,11 +38,12 @@ function Base.show(io::IO, cutmesh::CutMesh)
     nnodes = number_of_nodes(cutmesh)
     nelmts = number_of_elements(cutmesh)
     str = "CutMesh\n\tNum. Cells: $ncells\n\tNum. Elements: $nelmts\n\tNum. Nodes: $nnodes"
-    print(io,str)
+    print(io, str)
 end
 
 function nodal_connectivity(cutmesh::CutMesh, s, cellid)
-    @assert s == -1 || s == +1
+    (s == -1 || s == +1) ||
+        error("Use ±1 indexing for rows (i.e. phase) of CutMesh")
     ncells = cutmesh.mesh.ncells
     @assert 1 <= cellid <= ncells
     @assert cell_sign(cutmesh, cellid) == s || cell_sign(cutmesh, cellid) == 0
@@ -54,8 +55,18 @@ function nodal_connectivity(cutmesh::CutMesh, s, cellid)
     return nodeids
 end
 
+function dimension(cutmesh::CutMesh)
+    return dimension(cutmesh.mesh)
+end
+
 function number_of_nodes(cutmesh::CutMesh)
     return cutmesh.numnodes
+end
+
+function number_of_degrees_of_freedom(cutmesh::CutMesh)
+    dim = dimension(cutmesh)
+    numnodes = number_of_nodes(cutmesh)
+    return dim * numnodes
 end
 
 function number_of_cells(cutmesh::CutMesh)
@@ -85,7 +96,7 @@ function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
     for cellid = 1:ncells
         nodeids = nodalconnectivity[:, cellid]
         update!(levelset, levelsetcoeffs[nodeids])
-        s = sign(levelset,box)
+        s = sign_allow_perturbations(levelset, box)
         if (s == +1 || s == -1)
             cellsign[cellid] = s
         else

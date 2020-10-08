@@ -46,9 +46,9 @@ function Mesh(x0, widths, nelements, nf::Int)
     return Mesh(mesh, nf)
 end
 
-function Mesh(x0,widths,nelements,basis)
+function Mesh(x0, widths, nelements, basis)
     nf = number_of_basis_functions(basis)
-    return Mesh(x0,widths,nelements,nf)
+    return Mesh(x0, widths, nelements, nf)
 end
 
 function Base.show(io::IO, mesh::Mesh)
@@ -209,9 +209,18 @@ function left_boundary_node_ids(mesh)
 end
 
 function number_of_degrees_of_freedom(mesh::Mesh)
-    dim = size(mesh.nodalcoordinates)[1]
+    dim = dimension(mesh)
     numnodes = number_of_nodes(mesh)
     return numnodes * dim
+end
+
+function boundary_node_ids(mesh::Mesh)
+    vcat(
+        bottom_boundary_node_ids(mesh),
+        right_boundary_node_ids(mesh),
+        top_boundary_node_ids(mesh),
+        left_boundary_node_ids(mesh),
+    )
 end
 
 function is_interior_cell(cellconnectivity)

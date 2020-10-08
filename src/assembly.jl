@@ -18,7 +18,7 @@ end
 function Base.show(io::IO, sysmatrix::SystemMatrix)
     numvals = length(sysmatrix.rows)
     str = "SystemMatrix with $numvals entries"
-    print(io,str)
+    print(io, str)
 end
 
 function assemble!(matrix::SystemMatrix, rows, cols, vals)
@@ -41,10 +41,10 @@ function SystemRHS()
     SystemRHS(Int[], zeros(0))
 end
 
-function Base.show(io::IO,sysrhs::SystemRHS)
+function Base.show(io::IO, sysrhs::SystemRHS)
     numvals = length(sysrhs.rows)
     str = "SystemRHS with $numvals entries"
-    print(io,str)
+    print(io, str)
 end
 
 function assemble!(systemrhs::SystemRHS, rows, vals)
@@ -81,9 +81,9 @@ function assemble_cell_bilinear_form!(
     vals,
 )
 
-    edofs = element_dofs(nodeids,dofspernode)
-    rows,cols = element_dofs_to_operator_dofs(edofs,edofs)
-    assemble!(sysmatrix,rows,cols,vals)
+    edofs = element_dofs(nodeids, dofspernode)
+    rows, cols = element_dofs_to_operator_dofs(edofs, edofs)
+    assemble!(sysmatrix, rows, cols, vals)
 end
 
 function assemble_bilinear_form!(
@@ -97,12 +97,28 @@ function assemble_bilinear_form!(
     vals = vec(cellmatrix)
     for cellid = 1:ncells
         nodeids = nodalconnectivity[:, cellid]
-        assemble_cell_bilinear_form!(sysmatrix,nodeids,dofspernode,vals)
+        assemble_cell_bilinear_form!(sysmatrix, nodeids, dofspernode, vals)
     end
 end
 
+function assemble_bilinear_form!(
+    sysmatrix::SystemMatrix,
+    cellmatrix,
+    mesh::Mesh,
+)
+
+    dofspernode = dimension(mesh)
+    nodalconnectivity = nodal_connectivity(mesh)
+    assemble_bilinear_form!(
+        sysmatrix,
+        cellmatrix,
+        nodalconnectivity,
+        dofspernode,
+    )
+end
+
 function assemble_body_force_linear_form!(
-    systemrhs::SystemRHS,
+    systemrhs,
     rhsfunc,
     basis,
     quad,
@@ -119,6 +135,19 @@ function assemble_body_force_linear_form!(
         edofs = element_dofs(nodalconnectivity[:, idx], dim)
         assemble!(systemrhs, edofs, rhs)
     end
+end
+
+function assemble_body_force_linear_form!(systemrhs, rhsfunc, basis, quad, mesh)
+    cellmaps = cell_maps(mesh)
+    nodalconnectivity = nodal_connectivity(mesh)
+    assemble_body_force_linear_form!(
+        systemrhs,
+        rhsfunc,
+        basis,
+        quad,
+        cellmaps,
+        nodalconnectivity,
+    )
 end
 
 function assemble_traction_force_linear_form!(
@@ -149,18 +178,28 @@ function assemble_traction_force_linear_form!(
                         cellmap,
                         facedetjac[faceid],
                     )
-                    edofs = element_dofs(nodalconnectivity[:,cellid],dim)
-                    assemble!(systemrhs,edofs,rhs)
+                    edofs = element_dofs(nodalconnectivity[:, cellid], dim)
+                    assemble!(systemrhs, edofs, rhs)
                 end
             end
         end
     end
 end
 
-function SparseArrays.sparse(sysmatrix::SystemMatrix, ndofs)
+function stiffness(sysmatrix::SystemMatrix, ndofs::Int)
     return sparse(sysmatrix.rows, sysmatrix.cols, sysmatrix.vals, ndofs, ndofs)
 end
 
-function rhs(sysrhs::SystemRHS, ndofs)
+function stiffness(sysmatrix::SystemMatrix, mesh)
+    totaldofs = number_of_degrees_of_freedom(mesh)
+    return stiffness(sysmatrix, totaldofs)
+end
+
+function rhs(sysrhs::SystemRHS, ndofs::Int)
     return Array(sparsevec(sysrhs.rows, sysrhs.vals, ndofs))
+end
+
+function rhs(sysrhs::SystemRHS, mesh)
+    totaldofs = number_of_degrees_of_freedom(mesh)
+    return rhs(sysrhs, totaldofs)
 end

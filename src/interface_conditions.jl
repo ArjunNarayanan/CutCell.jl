@@ -48,9 +48,9 @@ function assemble_interface_constraints!(
     sysmatrix::SystemMatrix,
     interfaceconstraints,
     cutmesh,
-    dofspernode,
 )
 
+    dofspernode = dimension(cutmesh)
     ncells = number_of_cells(cutmesh)
     cellsign = cell_sign(cutmesh)
 

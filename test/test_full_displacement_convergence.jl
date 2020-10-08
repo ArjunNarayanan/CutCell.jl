@@ -114,9 +114,8 @@ function linear_system(basis, quad, stiffness, femesh, bodyforcefunc)
         nodalconnectivity,
     )
 
-    ndofs = CutCell.number_of_degrees_of_freedom(femesh)
-    K = CutCell.sparse(sysmatrix, ndofs)
-    R = CutCell.rhs(sysrhs, ndofs)
+    K = CutCell.stiffness(sysmatrix, femesh)
+    R = CutCell.rhs(sysrhs, femesh)
 
     return K, R
 end
