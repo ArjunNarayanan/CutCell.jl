@@ -39,12 +39,7 @@ grad = CutCell.transform_gradient(gradient(basis,0.,0.),CutCell.jacobian(cellmap
 @test allapprox(grad[4,:],[1/6,1/2])
 
 l,m = 1.,2.
-stiffness = CutCell.plane_strain_voigt_hooke_matrix(l,m)
-teststiffness = [5. 1. 0.
-                 1. 5. 0.
-                 0. 0. 2.]
-@test allapprox(teststiffness,stiffness)
-
+stiffness = plane_strain_voigt_hooke_matrix(1.,2.)
 cellmap = CutCell.CellMap([0.,0.],[1.,1.])
 quad = tensor_product_quadrature(2,2)
 bf = CutCell.bilinear_form(basis,quad,stiffness,CutCell.jacobian(cellmap))

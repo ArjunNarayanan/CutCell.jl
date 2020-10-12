@@ -49,7 +49,7 @@ CutCell.assemble_traction_force_linear_form!(
     istractionboundary,
 )
 
-matrix = CutCell.stiffness(sysmatrix,mesh)
+matrix = CutCell.make_sparse(sysmatrix,mesh)
 rhs = CutCell.rhs(sysrhs,mesh)
 
 bottomnodeids = CutCell.bottom_boundary_node_ids(mesh)
@@ -108,7 +108,7 @@ CutCell.assemble_traction_force_linear_form!(
     istractionboundary,
 )
 
-matrix = CutCell.stiffness(sysmatrix,mesh)
+matrix = CutCell.make_sparse(sysmatrix,mesh)
 rhs = CutCell.rhs(sysrhs,mesh)
 
 bottomnodeids = CutCell.bottom_boundary_node_ids(mesh)

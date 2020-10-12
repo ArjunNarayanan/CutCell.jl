@@ -152,7 +152,7 @@ function linear_system(
     )
 
 
-    K = CutCell.stiffness(sysmatrix, femesh)
+    K = CutCell.make_sparse(sysmatrix, femesh)
     R = CutCell.rhs(sysrhs, femesh)
 
     return K, R

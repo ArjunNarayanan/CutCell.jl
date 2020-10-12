@@ -61,8 +61,7 @@ function element_dofs(nodeids, dofspernode)
     numnodes = length(nodeids)
     extnodeids = repeat(nodeids, inner = dofspernode)
     dofs = repeat(1:dofspernode, numnodes)
-    edofs =
-        [node_to_dof_id(n, d, dofspernode) for (n, d) in zip(extnodeids, dofs)]
+    edofs = [node_to_dof_id(n, d, dofspernode) for (n, d) in zip(extnodeids, dofs)]
     return edofs
 end
 
@@ -74,12 +73,15 @@ function element_dofs_to_operator_dofs(rowdofs, coldofs)
     return rows, cols
 end
 
-function assemble_cell_matrix!(
-    sysmatrix::SystemMatrix,
-    nodeids,
-    dofspernode,
-    vals,
-)
+function assemble_couple_cell_matrix!(sysmatrix, nodeids1, nodeids2, dofspernode, vals)
+    edofs1 = element_dofs(nodeids1, dofspernode)
+    edofs2 = element_dofs(nodeids2, dofspernode)
+
+    rows, cols = element_dofs_to_operator_dofs(edofs1, edofs2)
+    assemble!(sysmatrix, rows, cols, vals)
+end
+
+function assemble_cell_matrix!(sysmatrix::SystemMatrix, nodeids, dofspernode, vals)
 
     edofs = element_dofs(nodeids, dofspernode)
     rows, cols = element_dofs_to_operator_dofs(edofs, edofs)
@@ -101,20 +103,11 @@ function assemble_bilinear_form!(
     end
 end
 
-function assemble_bilinear_form!(
-    sysmatrix::SystemMatrix,
-    cellmatrix,
-    mesh::Mesh,
-)
+function assemble_bilinear_form!(sysmatrix::SystemMatrix, cellmatrix, mesh::Mesh)
 
     dofspernode = dimension(mesh)
     nodalconnectivity = nodal_connectivity(mesh)
-    assemble_bilinear_form!(
-        sysmatrix,
-        cellmatrix,
-        nodalconnectivity,
-        dofspernode,
-    )
+    assemble_bilinear_form!(sysmatrix, cellmatrix, nodalconnectivity, dofspernode)
 end
 
 function assemble_body_force_linear_form!(
@@ -186,19 +179,13 @@ function assemble_traction_force_linear_form!(
     end
 end
 
-function stiffness(sysmatrix::SystemMatrix, ndofs::Int)
-    return dropzeros!(sparse(
-        sysmatrix.rows,
-        sysmatrix.cols,
-        sysmatrix.vals,
-        ndofs,
-        ndofs,
-    ))
+function make_sparse(sysmatrix::SystemMatrix, ndofs::Int)
+    return dropzeros!(sparse(sysmatrix.rows, sysmatrix.cols, sysmatrix.vals, ndofs, ndofs))
 end
 
-function stiffness(sysmatrix::SystemMatrix, mesh)
+function make_sparse(sysmatrix::SystemMatrix, mesh)
     totaldofs = number_of_degrees_of_freedom(mesh)
-    return stiffness(sysmatrix, totaldofs)
+    return make_sparse(sysmatrix, totaldofs)
 end
 
 function rhs(sysrhs::SystemRHS, ndofs::Int)

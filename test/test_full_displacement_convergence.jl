@@ -114,7 +114,7 @@ function linear_system(basis, quad, stiffness, femesh, bodyforcefunc)
         nodalconnectivity,
     )
 
-    K = CutCell.stiffness(sysmatrix, femesh)
+    K = CutCell.make_sparse(sysmatrix, femesh)
     R = CutCell.rhs(sysrhs, femesh)
 
     return K, R

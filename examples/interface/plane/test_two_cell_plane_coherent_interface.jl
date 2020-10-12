@@ -194,14 +194,9 @@ function solve_two_cell_plane_interface(
     )
 
     bilinearforms =
-        CutCell.CutMeshBilinearForms(basis, cellquads, stiffnesses, cutmesh)
-    interfaceconstraints = CutCell.coherent_constraint_on_cells(
-        basis,
-        interfacequads,
-        cutmesh,
-        penalty,
-    )
+        CutCell.BilinearForms(basis, cellquads, stiffnesses, cutmesh)
 
+    
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
 
@@ -218,9 +213,6 @@ function solve_two_cell_plane_interface(
     rhs = CutCell.rhs(sysrhs, totalndofs)
 
     apply_two_cell_displacement_bc!(matrix,rhs,cutmesh,nf,dx)
-    # CutCell.apply_dirichlet_bc!(matrix, rhs, [7, 7], [1, 2], [0.0, 0.0], 2)
-    # CutCell.apply_dirichlet_bc!(matrix, rhs, [8], [1], [0.0], 2)
-    # CutCell.apply_dirichlet_bc!(matrix, rhs, [5, 6], [1, 1], [0.1, 0.1], 2)
 
     sol = matrix \ rhs
     nodalsolutions = reshape(sol, 2, :)
@@ -245,188 +237,15 @@ function solve_two_cell_plane_interface(
     return err ./ normalizer
 end
 
-function error_for_interface_positions(
-    interfaceposition,
-    interfaceangle,
-    polyorder,
-    numqp,
-    stiffnesses,
-    penalty,
-    exactsolution,
-)
-
-    normal = normal_from_angle(interfaceangle)
-    err = zeros(length(interfaceposition), 2)
-
-    for (idx, x0) in enumerate(interfaceposition)
-        err[idx, :] = solve_two_cell_plane_interface(
-            normal,
-            x0,
-            polyorder,
-            numqp,
-            stiffnesses,
-            penalty,
-            exactsolution,
-        )
-    end
-
-    filename =
-        "examples/interface/plane/error-vs-position.csv"
-    df = DataFrame(
-        position = interfaceposition,
-        ErrorU1 = err[:, 1],
-        ErrorU2 = err[:, 2],
-    )
-    CSV.write(filename, df)
-end
-
-function error_for_interface_angles(
-    interfaceposition,
-    interfaceangles,
-    polyorder,
-    numqp,
-    stiffnesses,
-    penalty,
-    exactsolution,
-)
-
-    err = zeros(length(interfaceangles), 2)
-
-    for (idx, angle) in enumerate(interfaceangles)
-        normal = normal_from_angle(angle)
-        err[idx, :] = solve_two_cell_plane_interface(
-            normal,
-            interfaceposition,
-            polyorder,
-            numqp,
-            stiffnesses,
-            penalty,
-            exactsolution,
-        )
-    end
-
-    filename = "examples/interface/plane/error-vs-angle.csv"
-    df = DataFrame(
-        angles = interfaceangles,
-        ErrorU1 = err[:, 1],
-        ErrorU2 = err[:, 2],
-    )
-    CSV.write(filename, df)
-end
-
 function normal_from_angle(theta)
     return [cosd(theta), sind(theta)]
 end
 
-function error_for_penalty_parameter(
-    interfaceposition,
-    interfaceangle,
-    polyorder,
-    numqp,
-    stiffnesses,
-    penalties,
-    exactsolution,
-)
-
-    normal = normal_from_angle(interfaceangle)
-    err = zeros(length(penalties), 2)
-
-    for (idx, penalty) in enumerate(penalties)
-        err[idx, :] = solve_two_cell_plane_interface(
-            normal,
-            interfaceposition,
-            polyorder,
-            numqp,
-            stiffnesses,
-            penalty,
-            exactsolution,
-        )
-    end
-
-    filename = "examples/interface/plane/error-vs-penalty.csv"
-    df =
-        DataFrame(penalty = penalties, ErrorU1 = err[:, 1], ErrorU2 = err[:, 2])
-    CSV.write(filename, df)
-end
-
-function condition_number_for_interface_position(
-    interfacepositions,
-    interfaceangle,
-    polyorder,
-    numqp,
-    stiffnesses,
-    penalty,
-)
-
-    normal = normal_from_angle(interfaceangle)
-    condnum = zeros(length(interfacepositions))
-
-    for (idx, x0) in enumerate(interfacepositions)
-        condnum[idx] =
-            condition_number(normal, x0, polyorder, numqp, stiffnesses, penalty)
-    end
-
-    filename = "examples/interface/plane/condition-number-vs-position.csv"
-    df = DataFrame(position = interfacepositions, condition = condnum)
-    CSV.write(filename, df)
-end
 
 polyorder = 1
 numqp = 4
-# penalty = 1e3
 lambda, mu = (1.0, 2.0)
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
 stiffnesses = [stiffness, stiffness]
 dx = 0.1
 e11 = dx / 4.0
-
-
-
-# interfaceposition = 1.0
-# interfaceangles = range(-30, stop = 30, step = 1)
-# error_for_interface_angles(
-#     interfaceposition,
-#     interfaceangles,
-#     polyorder,
-#     numqp,
-#     stiffnesses,
-#     penalty,
-#     x -> exact_solution(lambda, mu, e11, x),
-# )
-
-
-# interfaceangle = 0
-# interfacepositions = range(0.0, stop = 2.0, length = 100)[2:end-1]
-
-# condition_number_for_interface_position(
-#     interfacepositions,
-#     interfaceangle,
-#     polyorder,
-#     numqp,
-#     stiffnesses,
-#     penalty,
-# )
-
-penalties = [1,1e1,1e2,1e3,1e4,1e5]
-error_for_penalty_parameter(
-    1.0,
-    0,
-    polyorder,
-    numqp,
-    stiffnesses,
-    penalties,
-    x -> exact_solution(lambda, mu, e11, x),
-)
-
-# interfaceangle = 0
-# interfacepositions = range(0.0, stop = 2.0, length = 100)[2:end-1]
-#
-# error_for_interface_positions(
-#     interfacepositions,
-#     interfaceangle,
-#     polyorder,
-#     numqp,
-#     stiffnesses,
-#     penalty,
-#     x -> exact_solution(lambda, mu, e11, x),
-# )

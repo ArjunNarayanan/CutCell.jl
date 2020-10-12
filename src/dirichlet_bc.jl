@@ -25,14 +25,17 @@ function apply_dirichlet_bc!(
 ) where {Z<:Integer,R<:Real}
 
     m, n = size(matrix)
-    modifyrhs = matrix[:, index]
-    for i = 1:m
+    @assert length(rhs) == m
+    @assert m == n
+
+    modifyrhs = matrix[:,index]
+    for i = 1:n
         if i == index
-            rhs[i] = modifyrhs[i] * value
+            rhs[i] = matrix[i,i] * value
         else
-            rhs[i] -= modifyrhs[i] * value
-            matrix[i, index] = 0.0
             matrix[index, i] = 0.0
+            matrix[i,index] = 0.0
+            rhs[i] -= modifyrhs[i]*value
         end
     end
 end

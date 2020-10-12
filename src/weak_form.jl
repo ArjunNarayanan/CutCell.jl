@@ -35,15 +35,6 @@ function number_of_basis_functions(
       return NF
 end
 
-function plane_strain_voigt_hooke_matrix(lambda, mu)
-      l2mu = lambda + 2mu
-      return [
-            l2mu lambda 0.0
-            lambda l2mu 0.0
-            0.0 0.0 mu
-      ]
-end
-
 function bilinear_form(basis, quad, stiffness, jacobian)
       dim = dimension(basis)
       nf = number_of_basis_functions(basis)
@@ -74,6 +65,28 @@ function mass_matrix(basis, quad, detjac::R, ndofs) where {R<:Real}
             vals = basis(p)
             N = interpolation_matrix(vals, ndofs)
             matrix .+= N' * N * detjac * w
+      end
+      return matrix
+end
+
+function mass_matrix(basis,testquad,trialquad,detjac,ndofs)
+      numqp = length(testquad)
+      @assert length(trialquad) == numqp
+      nf = number_of_basis_functions(basis)
+      totaldofs = nf*ndofs
+      matrix = zeros(totaldofs,totaldofs)
+      for idx in 1:numqp
+            testp,testw = testquad[idx]
+            trialp,trialw = trialquad[idx]
+            @assert testw ≈ trialw
+
+            testvals = basis(testp)
+            trialvals = basis(trialp)
+
+            Ntest = interpolation_matrix(testvals,ndofs)
+            Ntrial = interpolation_matrix(trialvals,ndofs)
+
+            matrix .+= Ntest' * Ntrial * detjac * testw
       end
       return matrix
 end

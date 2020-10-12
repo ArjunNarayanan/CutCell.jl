@@ -35,7 +35,11 @@ function plane_distance_function(coords, normal, x0)
 end
 
 function circle_distance_function(coords, center, radius)
-    difference = coords .- center
-    distance = [radius - norm(difference[:,i]) for i = 1:size(difference)[2]]
+    difference = (coords .- center).^2
+    distance = radius .- sqrt.(mapslices(sum,difference,dims=1)')
     return distance
+end
+
+function normal_from_angle(theta)
+    return [cosd(theta),sind(theta)]
 end

@@ -9,6 +9,7 @@ using ImplicitDomainQuadrature
 import ImplicitDomainQuadrature: extend
 
 include("cell_map.jl")
+include("elasticity.jl")
 include("mesh_routines.jl")
 include("weak_form.jl")
 include("assembly.jl")

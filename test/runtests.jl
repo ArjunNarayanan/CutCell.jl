@@ -4,6 +4,10 @@ using SafeTestsets
     include("test_mesh_routines.jl")
 end
 
+@safetestset "Test Hooke Stiffness" begin
+    include("test_elasticity.jl")
+end
+
 @safetestset "Test Weak Form" begin
     include("test_weak_form.jl")
 end

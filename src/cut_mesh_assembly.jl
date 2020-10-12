@@ -12,12 +12,11 @@ struct BilinearForms
 end
 
 function BilinearForms(basis, cellquads, stiffnesses, cellsign, cellmap)
-    @assert length(stiffnesses) == 2
     ncells = length(cellsign)
 
     uniformquad = uniform_cell_quadrature(cellquads)
-    uniformbf1 = bilinear_form(basis, uniformquad, stiffnesses[1], cellmap)
-    uniformbf2 = bilinear_form(basis, uniformquad, stiffnesses[2], cellmap)
+    uniformbf1 = bilinear_form(basis, uniformquad, stiffnesses[+1], cellmap)
+    uniformbf2 = bilinear_form(basis, uniformquad, stiffnesses[-1], cellmap)
 
     cellmatrices = [uniformbf1, uniformbf2]
     celltomatrix = zeros(Int, 2, ncells)
@@ -29,12 +28,12 @@ function BilinearForms(basis, cellquads, stiffnesses, cellsign, cellmap)
             celltomatrix[2, cellid] = 2
         else
             pquad = cellquads[+1, cellid]
-            pbf = bilinear_form(basis, pquad, stiffnesses[1], cellmap)
+            pbf = bilinear_form(basis, pquad, stiffnesses[+1], cellmap)
             push!(cellmatrices, pbf)
             celltomatrix[1, cellid] = length(cellmatrices)
 
             nquad = cellquads[-1, cellid]
-            nbf = bilinear_form(basis, nquad, stiffnesses[2], cellmap)
+            nbf = bilinear_form(basis, nquad, stiffnesses[-1], cellmap)
             push!(cellmatrices, nbf)
             celltomatrix[2, cellid] = length(cellmatrices)
         end
