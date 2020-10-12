@@ -1,80 +1,164 @@
-function apply_homogeneous_linear_constraint!(matrix, row, cols, coeffs)
-    @assert length(cols) == length(coeffs)
-    @assert row in cols
+struct InterfaceMassOperator
+    operators::Any
+    celltooperator::Any
+    ncells::Any
+    function InterfaceMassOperator(operators, celltooperator)
+        ncells = length(celltooperator)
+        @assert all(celltooperator .>= 0)
+        @assert all(celltooperator .<= length(operators))
+        new(operators, celltooperator, ncells)
+    end
+end
 
-    set_to_zero = matrix[row, :]
-    for idx in set_to_zero.nzind
-        if idx != row
-            matrix[row, idx] = 0.0
+function InterfaceMassOperator(basis, interfacequads, cellmap, cellsign, penalty)
+    ncells = length(cellsign)
+    operators = []
+    celltooperator = zeros(Int, ncells)
+    dim = dimension(basis)
+
+    for (cellid, s) in enumerate(cellsign)
+        if s == 0
+            fquad = interfacequads[cellid]
+            normal = interface_normals(interfacequads, cellid)
+            facescale = scale_area(cellmap, normal)
+
+            mass = penalty * mass_matrix(basis, fquad, facescale, dim)
+            push!(operators, mass)
+            celltooperator[cellid] = length(operators)
         end
     end
+    return InterfaceMassOperator(operators, celltooperator)
+end
 
-    scale = matrix[row, row]
-    for (idx, col) in enumerate(cols)
-        matrix[row, col] = scale * coeffs[idx]
+function InterfaceMassOperator(basis, interfacequads, cutmesh, penalty)
+    cellmap = cell_map(cutmesh, 1)
+    cellsign = cell_sign(cutmesh)
+    return InterfaceMassOperator(basis, interfacequads, cellmap, cellsign, penalty)
+end
+
+function Base.getindex(massoperator::InterfaceMassOperator, cellid)
+    return massoperator.operators[massoperator.celltooperator[cellid]]
+end
+
+function Base.show(io::IO, massoperator::InterfaceMassOperator)
+    ncells = massoperator.ncells
+    nuniqueoperators = length(massoperator.operators)
+    str = "InterfaceMassOperator\n\tNum. Cells: $ncells\n\tNum. Unique Operators: $nuniqueoperators"
+    print(io, str)
+end
+
+function number_of_cells(massoperator::InterfaceMassOperator)
+    return massoperator.ncells
+end
+
+struct InterfaceTractionOperator
+    operators::Any
+    celltooperator::Any
+    ncells::Any
+    function InterfaceTractionOperator(operators, celltooperator)
+        nphase, ncells = size(celltooperator)
+        @assert nphase == 2
+        @assert all(celltooperator .>= 0)
+        @assert all(celltooperator .<= length(operators))
+        new(operators, celltooperator, ncells)
     end
 end
 
-function couple_node_degrees_of_freedom!(
-    matrix,
-    positivenodeids,
-    negativenodeids,
-    equationnodeid,
-    dof,
-    basisvals,
-)
-    @assert length(positivenodeids) == length(negativenodeids) == length(basisvals)
+function InterfaceTractionOperator(basis, interfacequads, stiffness, cellmap, cellsign)
+    ncells = length(cellsign)
+    operators = []
+    celltooperator = zeros(Int, 2, ncells)
 
-    positivedofs = [node_to_dof_id(n, dof, 2) for n in positivenodeids]
-    negativedofs = [node_to_dof_id(n, dof, 2) for n in negativenodeids]
-    equationdof = node_to_dof_id(equationnodeid, dof, 2)
+    for (cellid, s) in enumerate(cellsign)
+        if s == 0
+            fquad = interfacequads[cellid]
+            negativenormal = interface_normals(interfacequads, cellid)
+            positivenormal = -negativenormal
 
-    coeffs = vcat(basisvals, -basisvals)
-    cols = vcat(positivedofs, negativedofs)
+            positivetop = coherent_traction_operator(
+                basis,
+                fquad,
+                negativenormal,
+                stiffness[-1],
+                cellmap,
+            )
+            push!(operators, positivetop)
+            celltooperator[1, cellid] = length(operators)
 
-    apply_homogeneous_linear_constraint!(matrix, equationdof, cols, coeffs)
+            negativetop = coherent_traction_operator(
+                basis,
+                fquad,
+                positivenormal,
+                stiffness[+1],
+                cellmap,
+            )
+            push!(operators, negativetop)
+            celltooperator[2, cellid] = length(operators)
+        end
+    end
+    return InterfaceTractionOperator(operators, celltooperator)
 end
 
-function apply_coherent_displacement_constraint!(matrix, basis, interfacequads, cutmesh)
-
+function InterfaceTractionOperator(basis, interfacequads, stiffness, cutmesh)
+    cellmap = cell_map(cutmesh, 1)
     cellsign = cell_sign(cutmesh)
-    cellid = findfirst(x -> x == 0, cellsign)
+    return InterfaceTractionOperator(basis, interfacequads, stiffness, cellmap, cellsign)
+end
 
-    positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
-    negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
+function Base.getindex(tractionoperator::InterfaceTractionOperator, s, cellid)
+    (s == -1 || s == +1) ||
+        error("Use ±1 to index into 1st dimension of InterfaceTractionOperator, got index = $s")
+    row = s == +1 ? 1 : 2
+    return tractionoperator.operators[tractionoperator.celltooperator[row, cellid]]
+end
 
-    quad = interfacequads[cellid]
-    @assert length(quad) > 1
+function Base.show(io::IO, tractionoperator::InterfaceTractionOperator)
+    ncells = tractionoperator.ncells
+    nuniqueoperators = length(tractionoperator.operators)
+    str = "InterfaceTractionOperator\n\tNum. Cells: $ncells\n\tNum. Unique Operators: $nuniqueoperators"
+    print(io, str)
+end
 
-    p1 = quad[1][1]
-    basisvals = basis(p1)
-    CutCell.couple_node_degrees_of_freedom!(
-        matrix,
-        positivenodeids,
-        negativenodeids,
-        positivenodeids[1],
-        1,
-        basisvals,
+function number_of_cells(tractionoperator::InterfaceTractionOperator)
+    return tractionoperator.ncells
+end
+
+struct InterfaceCondition
+    tractionoperator::Any
+    massoperator::Any
+    penalty::Any
+    ncells::Any
+    function InterfaceCondition(
+        tractionoperator::InterfaceTractionOperator,
+        massoperator::InterfaceMassOperator,
+        penalty,
     )
-    CutCell.couple_node_degrees_of_freedom!(
-        matrix,
-        positivenodeids,
-        negativenodeids,
-        positivenodeids[1],
-        2,
-        basisvals,
-    )
 
-    p2 = quad[2][1]
-    basisvals = basis(p2)
-    CutCell.couple_node_degrees_of_freedom!(
-        matrix,
-        positivenodeids,
-        negativenodeids,
-        positivenodeids[2],
-        1,
-        basisvals,
-    )
+        ncells = number_of_cells(massoperator)
+        @assert number_of_cells(tractionoperator) == ncells
+        new(tractionoperator,massoperator,penalty,ncells)
+    end
+end
+
+function InterfaceCondition(basis,interfacequads,stiffness,cutmesh,penalty)
+    tractionoperator = InterfaceTractionOperator(basis,interfacequads,stiffness,cutmesh)
+    massoperator = InterfaceMassOperator(basis,interfacequads,cutmesh,penalty)
+    return InterfaceCondition(tractionoperator,massoperator,penalty)
+end
+
+function traction_operator(interfacecondition::InterfaceCondition,s,cellid)
+    return interfacecondition.tractionoperator[s,cellid]
+end
+
+function mass_operator(interfacecondition::InterfaceCondition,cellid)
+    return interfacecondition.massoperator[cellid]
+end
+
+function Base.show(io::IO,interfacecondition::InterfaceCondition)
+    ncells = interfacecondition.ncells
+    penalty = interfacecondition.penalty
+    str = "InterfaceCondition\n\tNum. Cells: $ncells\n\tDisplacement Penalty: $penalty"
+    print(io,str)
 end
 
 function coherent_traction_operator(basis, quad, normals, stiffness, cellmap)
@@ -103,96 +187,4 @@ function coherent_traction_operator(basis, quad, normals, stiffness, cellmap)
         matrix .+= NI' * N * stiffness * NK * scalearea[idx] * w
     end
     return matrix
-end
-
-function coherent_traction_operator(basis, testquad, trialquad, normals, stiffness, cellmap)
-    numqp = length(testquad)
-    @assert length(trialquad) == numqp
-    @assert size(normals)[2] == numqp
-
-    dim = dimension(basis)
-    nf = number_of_basis_functions(basis)
-    ndofs = dim * nf
-    matrix = zeros(ndofs, ndofs)
-    vectorsymmconverter = vector_to_symmetric_matrix_converter()
-
-    jac = jacobian(cellmap)
-    scalearea = scale_area(cellmap, normals)
-
-    for idx = 1:numqp
-        testp, testw = testquad[idx]
-        trialp, trialw = trialquad[idx]
-
-        grad = transform_gradient(gradient(basis, trialp), jac)
-        vals = basis(testp)
-
-        normal = normals[:, idx]
-        NK = zeros(3, 2nf)
-        N = zeros(2, 3)
-        for k = 1:dim
-            NK .+= make_row_matrix(vectorsymmconverter[k], grad[:, k])
-            N .+= normal[k] * vectorsymmconverter[k]'
-        end
-        NI = interpolation_matrix(vals, dim)
-        matrix .+= NI' * N * stiffness * NK * scalearea[idx] * testw
-    end
-    return matrix
-end
-
-function assemble_coherent_traction_operator!(
-    sysmatrix,
-    basis,
-    interfacequads,
-    stiffness,
-    cutmesh,
-)
-
-    cellsign = cell_sign(cutmesh)
-    ncells = number_of_cells(cutmesh)
-    dim = dimension(cutmesh)
-
-    for cellid = 1:ncells
-        s = cellsign[cellid]
-        if s == 0
-            cellmap = cell_map(cutmesh, cellid)
-            normals = interface_normals(interfacequads, cellid)
-            quad = interfacequads[cellid]
-            positivestiffness = stiffness[1]
-            negativestiffness = stiffness[-1]
-            positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
-            negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
-
-            positiveop =
-                +coherent_traction_operator(
-                    basis,
-                    quad,
-                    normals,
-                    negativestiffness,
-                    cellmap,
-                )
-            assemble_couple_cell_matrix!(
-                sysmatrix,
-                positivenodeids,
-                negativenodeids,
-                dim,
-                vec(positiveop),
-            )
-
-            # negativeop =
-            #     -coherent_traction_operator(
-            #         basis,
-            #         quad,
-            #         normals,
-            #         positivestiffness,
-            #         cellmap,
-            #     )
-            # assemble_couple_cell_matrix!(
-            #     sysmatrix,
-            #     negativenodeids,
-            #     positivenodeids,
-            #     dim,
-            #     vec(negativeop),
-            # )
-        end
-    end
 end

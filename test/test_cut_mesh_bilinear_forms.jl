@@ -22,11 +22,10 @@ cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
 lambda, mu = (1.0, 2.0)
-stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda, mu)
-stiffnesses = [stiffness, stiffness]
+stiffness = CutCell.HookeStiffness(lambda,mu,lambda,mu)
 
 bilinearforms =
-    CutCell.BilinearForms(basis, cellquads, stiffnesses, cutmesh)
+    CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
 
 @test length(bilinearforms.cellmatrices) == 4
 testcelltomatrix = [

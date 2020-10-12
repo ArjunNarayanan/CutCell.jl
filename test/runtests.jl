@@ -1,11 +1,15 @@
 using SafeTestsets
 
-@safetestset "Test Mesh Routines" begin
-    include("test_mesh_routines.jl")
+@safetestset "Test Cell Maps" begin
+    include("test_cell_map.jl")
 end
 
 @safetestset "Test Hooke Stiffness" begin
     include("test_elasticity.jl")
+end
+
+@safetestset "Test Mesh Routines" begin
+    include("test_mesh_routines.jl")
 end
 
 @safetestset "Test Weak Form" begin
@@ -18,10 +22,6 @@ end
 
 @safetestset "Test Full Displacement BC Convergence" begin
     include("test_full_displacement_convergence.jl")
-end
-
-@safetestset "Test Face Quadrature Rules" begin
-    include("test_face_quadratures.jl")
 end
 
 @safetestset "Test Uniform Tension" begin
@@ -40,10 +40,18 @@ end
     include("test_cell_quadratures.jl")
 end
 
+@safetestset "Test Face Quadrature Rules" begin
+    include("test_face_quadratures.jl")
+end
+
 @safetestset "Test Interface Quadratures" begin
     include("test_interface_quadratures.jl")
 end
 
-@safetestset "Test Cut Mesh Assembly" begin
-    include("test_cut_mesh_assembly.jl")
+@safetestset "Test Cut Mesh Bilinear Forms" begin
+    include("test_cut_mesh_bilinear_forms.jl")
+end
+
+@safetestset "Test Interface Conditions" begin
+    include("test_interface_conditions.jl")
 end

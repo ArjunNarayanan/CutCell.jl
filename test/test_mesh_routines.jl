@@ -4,12 +4,6 @@ using Revise
 using CutCell
 include("useful_routines.jl")
 
-cm = CutCell.CellMap([0.,2.],[3.,3.])
-@test CutCell.dimension(cm) == 2
-@test CutCell.jacobian(cm) == [1.5,0.5]
-@test allapprox(cm([0.,0.]),[1.5,2.5])
-@test allapprox(cm([1.,0.]),[3.,2.5])
-
 mesh = UniformMesh([0.,0.],[1.,1.],[2,2])
 @test allequal(CutCell.elements_per_mesh_side(mesh),[2,2])
 cellmaps = CutCell.cell_maps(mesh)
@@ -55,12 +49,6 @@ c6 = [5,0,0,4]
 testconn = hcat(c1,c2,c3,c4,c5,c6)
 @test allequal(cellconnectivity,testconn)
 
-
-cm = CutCell.CellMap([0.,0.],[1.,1.])
-@test CutCell.determinant_jacobian(cm) ≈ 0.25
-
-cm = CutCell.CellMap([1.,1.],[5.,8.])
-@test CutCell.determinant_jacobian(cm) ≈ 7.0
 
 mesh = UniformMesh([0.,0.],[1.,1.],[3,2])
 femesh = CutCell.Mesh(mesh,16)

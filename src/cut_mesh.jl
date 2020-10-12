@@ -89,6 +89,10 @@ function cell_map(cutmesh::CutMesh, cellid)
     return cell_map(cutmesh.mesh, cellid)
 end
 
+function face_determinant_jacobian(cutmesh::CutMesh)
+    return face_determinant_jacobian(cutmesh.mesh)
+end
+
 function is_interior_cell(cutmesh::CutMesh)
     return is_interior_cell(cutmesh.mesh)
 end

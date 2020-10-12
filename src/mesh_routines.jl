@@ -101,6 +101,10 @@ function cell_map(mesh::Mesh, i)
     return mesh.cellmaps[i]
 end
 
+function face_determinant_jacobian(mesh::Mesh)
+    return face_determinant_jacobian(cell_map(mesh,1))
+end
+
 function nodes_per_mesh_side(nelements, nfeside)
     return (nfeside - 1) * nelements .+ 1
 end

@@ -1,73 +1,3 @@
-struct BilinearForms
-    cellmatrices::Any
-    celltomatrix::Any
-    ncells::Any
-    function BilinearForms(cellmatrices, celltomatrix)
-        nphase, ncells = size(celltomatrix)
-        @assert nphase == 2
-        @assert all(celltomatrix .>= 0)
-        @assert all(celltomatrix .<= length(cellmatrices))
-        new(cellmatrices, celltomatrix, ncells)
-    end
-end
-
-function BilinearForms(basis, cellquads, stiffnesses, cellsign, cellmap)
-    ncells = length(cellsign)
-
-    uniformquad = uniform_cell_quadrature(cellquads)
-    uniformbf1 = bilinear_form(basis, uniformquad, stiffnesses[+1], cellmap)
-    uniformbf2 = bilinear_form(basis, uniformquad, stiffnesses[-1], cellmap)
-
-    cellmatrices = [uniformbf1, uniformbf2]
-    celltomatrix = zeros(Int, 2, ncells)
-
-    for cellid = 1:ncells
-        if cellsign[cellid] == +1
-            celltomatrix[1, cellid] = 1
-        elseif cellsign[cellid] == -1
-            celltomatrix[2, cellid] = 2
-        else
-            pquad = cellquads[+1, cellid]
-            pbf = bilinear_form(basis, pquad, stiffnesses[+1], cellmap)
-            push!(cellmatrices, pbf)
-            celltomatrix[1, cellid] = length(cellmatrices)
-
-            nquad = cellquads[-1, cellid]
-            nbf = bilinear_form(basis, nquad, stiffnesses[-1], cellmap)
-            push!(cellmatrices, nbf)
-            celltomatrix[2, cellid] = length(cellmatrices)
-        end
-    end
-    return BilinearForms(cellmatrices, celltomatrix)
-end
-
-function BilinearForms(basis, cellquads, stiffnesses, cutmesh)
-    cellsign = cell_sign(cutmesh)
-    cellmap = cell_map(cutmesh, 1)
-    return BilinearForms(basis, cellquads, stiffnesses, cellsign, cellmap)
-end
-
-function Base.getindex(cbf::BilinearForms, s, cellid)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
-    row = s == +1 ? 1 : 2
-    return cbf.cellmatrices[cbf.celltomatrix[row, cellid]]
-end
-
-function Base.getindex(cbf::BilinearForms, s)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
-    idx = s == +1 ? 1 : 2
-    return cbf.cellmatrices[idx]
-end
-
-function Base.show(io::IO, bf::BilinearForms)
-    ncells = bf.ncells
-    nuniquematrices = length(bf.cellmatrices)
-    str = "BilinearForms\n\tNum. Cells: $ncells\n\tNum. Unique Cell Matrices: $nuniquematrices"
-    print(io, str)
-end
-
 function assemble_bilinear_form!(
     sysmatrix::SystemMatrix,
     cutmeshbfs::BilinearForms,
@@ -103,6 +33,58 @@ function assemble_bilinear_form!(
     end
 end
 
+function assemble_interface_condition!(
+    sysmatrix::SystemMatrix,
+    interfacecondition::InterfaceCondition,
+    cutmesh::CutMesh,
+)
+
+    dofspernode = dimension(cutmesh)
+    cellsign = cell_sign(cutmesh)
+
+    for (cellid, s) in enumerate(cellsign)
+        if s == 0
+            negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
+            positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
+
+            negativetractionop = traction_operator(interfacecondition, -1, cellid)
+            assemble_couple_cell_matrix!(
+                sysmatrix,
+                negativenodeids,
+                positivenodeids,
+                dofspernode,
+                vec(negativetractionop),
+            )
+            positivetractionop = traction_operator(interfacecondition, +1, cellid)
+            assemble_couple_cell_matrix!(
+                sysmatrix,
+                positivenodeids,
+                negativenodeids,
+                dofspernode,
+                vec(positivetractionop),
+            )
+
+            mass = vec(mass_operator(interfacecondition, cellid))
+            assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, mass)
+            assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, mass)
+            assemble_couple_cell_matrix!(
+                sysmatrix,
+                negativenodeids,
+                positivenodeids,
+                dofspernode,
+                -mass,
+            )
+            assemble_couple_cell_matrix!(
+                sysmatrix,
+                positivenodeids,
+                negativenodeids,
+                dofspernode,
+                -mass,
+            )
+        end
+    end
+end
+
 function assemble_cut_mesh_body_force_linear_form!(
     systemrhs,
     rhsfunc,
@@ -115,23 +97,23 @@ function assemble_cut_mesh_body_force_linear_form!(
     cellsign = cell_sign(cutmesh)
     dofspernode = dimension(cutmesh)
 
-    for cellid in 1:ncells
+    for cellid = 1:ncells
         s = cellsign[cellid]
         @assert s == -1 || s == 0 || s == 1
-        cellmap = cell_map(cutmesh,cellid)
+        cellmap = cell_map(cutmesh, cellid)
         if s == +1 || s == 0
-            pquad = cellquads[+1,cellid]
-            rhs = linear_form(rhsfunc,basis,pquad,cellmap)
-            nodeids = nodal_connectivity(cutmesh,+1,cellid)
-            edofs = element_dofs(nodeids,dofspernode)
-            assemble!(systemrhs,edofs,rhs)
+            pquad = cellquads[+1, cellid]
+            rhs = linear_form(rhsfunc, basis, pquad, cellmap)
+            nodeids = nodal_connectivity(cutmesh, +1, cellid)
+            edofs = element_dofs(nodeids, dofspernode)
+            assemble!(systemrhs, edofs, rhs)
         end
         if s == -1 || s == 0
-            nquad = cellquads[-1,cellid]
-            rhs = linear_form(rhsfunc,basis,nquad,cellmap)
-            nodeids = nodal_connectivity(cutmesh,-1,cellid)
-            edofs = element_dofs(nodeids,dofspernode)
-            assemble!(systemrhs,edofs,rhs)
+            nquad = cellquads[-1, cellid]
+            rhs = linear_form(rhsfunc, basis, nquad, cellmap)
+            nodeids = nodal_connectivity(cutmesh, -1, cellid)
+            edofs = element_dofs(nodeids, dofspernode)
+            assemble!(systemrhs, edofs, rhs)
         end
     end
 end

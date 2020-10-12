@@ -16,10 +16,11 @@ include("assembly.jl")
 include("dirichlet_bc.jl")
 include("cut_mesh.jl")
 include("cell_quadratures.jl")
-include("interface_quadratures.jl")
 include("face_quadratures.jl")
-include("cut_mesh_assembly.jl")
+include("interface_quadratures.jl")
+include("cut_mesh_bilinear_forms.jl")
 include("interface_conditions.jl")
+include("cut_mesh_assembly.jl")
 include("utilities.jl")
 
 export plane_strain_voigt_hooke_matrix
