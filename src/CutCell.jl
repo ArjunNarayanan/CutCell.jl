@@ -20,6 +20,7 @@ include("face_quadratures.jl")
 include("interface_quadratures.jl")
 include("cut_mesh_bilinear_forms.jl")
 include("interface_conditions.jl")
+include("penalty_displacement_bc.jl")
 include("cut_mesh_assembly.jl")
 include("utilities.jl")
 

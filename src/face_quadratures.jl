@@ -2,23 +2,18 @@ struct FaceQuadratures
     quads::Any
     facetoquad::Any
     ncells::Any
+    nfaces::Any
     function FaceQuadratures(quads, facetoquad)
-        nphase, nface, ncells = size(facetoquad)
-        @assert nface == 4
+        nphase, nfaces, ncells = size(facetoquad)
+        @assert nfaces == 4
         @assert nphase == 2
         @assert all(facetoquad .>= 0)
         @assert all(facetoquad .<= length(quads))
-        new(quads, facetoquad, ncells)
+        new(quads, facetoquad, ncells, nfaces)
     end
 end
 
-function FaceQuadratures(
-    cellsign,
-    levelset,
-    levelsetcoeffs,
-    nodalconnectivity,
-    numqp,
-)
+function FaceQuadratures(cellsign, levelset, levelsetcoeffs, nodalconnectivity, numqp)
 
     ncells = length(cellsign)
     @assert size(nodalconnectivity)[2] == ncells
@@ -50,20 +45,14 @@ function FaceQuadratures(
             error("Expected cellsign ∈ {-1,0,+1}, got cellsign = $s")
         end
     end
-    return FaceQuadratures(quads,facetoquad)
+    return FaceQuadratures(quads, facetoquad)
 end
 
 function FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
     cellsign = cell_sign(cutmesh)
     nodalconnectivity = nodal_connectivity(cutmesh.mesh)
-    return FaceQuadratures(
-        cellsign,
-        levelset,
-        levelsetcoeffs,
-        nodalconnectivity,
-        numqp,
-    )
+    return FaceQuadratures(cellsign, levelset, levelsetcoeffs, nodalconnectivity, numqp)
 end
 
 function Base.getindex(facequads::FaceQuadratures, s, faceid, cellid)
@@ -73,6 +62,10 @@ function Base.getindex(facequads::FaceQuadratures, s, faceid, cellid)
     return facequads.quads[facequads.facetoquad[phaseid, faceid, cellid]]
 end
 
+function reference_face_quadrature(facequads::FaceQuadratures)
+    return facequads.quads[1:facequads.nfaces]
+end
+
 function Base.show(io::IO, facequads::FaceQuadratures)
     ncells = facequads.ncells
     nuniquefacequads = length(facequads.quads)
@@ -80,11 +73,11 @@ function Base.show(io::IO, facequads::FaceQuadratures)
     print(io, str)
 end
 
-function has_quadrature(facequads::FaceQuadratures,s,faceid,cellid)
+function has_quadrature(facequads::FaceQuadratures, s, faceid, cellid)
     (s == -1 || s == +1) ||
         error("Use ±1 to index into 1st dimension of FaceQuadratures, got index = $s")
     phaseid = s == +1 ? 1 : 2
-    return facequads.facetoquad[phaseid,faceid,cellid] != 0
+    return facequads.facetoquad[phaseid, faceid, cellid] != 0
 end
 
 function extend_to_face(quad::QuadratureRule, faceid)
@@ -111,9 +104,6 @@ function face_quadrature(faceid, levelset, signcondition, quad1d)
 end
 
 function face_quadratures(levelset, signcondition, quad1d)
-    quads = [
-        face_quadrature(faceid, levelset, signcondition, quad1d)
-        for faceid = 1:4
-    ]
+    quads = [face_quadrature(faceid, levelset, signcondition, quad1d) for faceid = 1:4]
     return quads
 end
