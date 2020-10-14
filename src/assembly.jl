@@ -110,6 +110,11 @@ function assemble_bilinear_form!(sysmatrix::SystemMatrix, cellmatrix, mesh::Mesh
     assemble_bilinear_form!(sysmatrix, cellmatrix, nodalconnectivity, dofspernode)
 end
 
+function assemble_cell_rhs!(sysrhs,nodeids,dofspernode,vals)
+    rows = element_dofs(nodeids, dofspernode)
+    assemble!(sysrhs,rows,vals)
+end
+
 function assemble_body_force_linear_form!(
     systemrhs,
     rhsfunc,

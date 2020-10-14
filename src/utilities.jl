@@ -20,6 +20,14 @@ function levelset_coefficients(distancefunc,mesh)
     return distancefunc(nodalcoordinates)
 end
 
+function reference_face_normals()
+    n1 = [0.,-1.]
+    n2 = [1.,0.]
+    n3 = [0.,1.]
+    n4 = [-1.,0.]
+    return [n1,n2,n3,n4]
+end
+
 function reference_bottom_face_midpoint()
     [0.0, -1.0]
 end

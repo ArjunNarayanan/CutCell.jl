@@ -43,3 +43,38 @@ end
 function normal_from_angle(theta)
     return [cosd(theta),sind(theta)]
 end
+
+function add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
+    detjac = CutCell.determinant_jacobian(cellmap)
+    for (p, w) in quad
+        numsol = interpolater(p)
+        exsol = exactsolution(cellmap(p))
+        err .+= (numsol - exsol) .^ 2 * detjac * w
+    end
+end
+
+function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
+    err = zeros(2)
+    interpolater = InterpolatingPolynomial(2, basis)
+    ncells = CutCell.number_of_cells(cutmesh)
+    for cellid = 1:ncells
+        s = CutCell.cell_sign(cutmesh, cellid)
+        cellmap = CutCell.cell_map(cutmesh,cellid)
+        @assert s == -1 || s == 0 || s == 1
+        if s == 1 || s == 0
+            nodeids = CutCell.nodal_connectivity(cutmesh, 1, cellid)
+            elementsolution = nodalsolutions[:, nodeids]
+            update!(interpolater, elementsolution)
+            quad = cellquads[1, cellid]
+            add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
+        end
+        if s == -1 || s == 0
+            nodeids = CutCell.nodal_connectivity(cutmesh, -1, cellid)
+            elementsolution = nodalsolutions[:, nodeids]
+            update!(interpolater, elementsolution)
+            quad = cellquads[-1, cellid]
+            add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
+        end
+    end
+    return sqrt.(err)
+end
