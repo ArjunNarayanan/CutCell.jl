@@ -141,7 +141,8 @@ function boundary_displacement_rhs(bcfunc, basis, facequads, cutmesh, onboundary
     nfaces = length(facemidpoints)
     cellsign = cell_sign(cutmesh)
     facedetjac = face_determinant_jacobian(cell_map(cutmesh, 1))
-
+    ncells = length(cellsign)
+    
     vectors = []
     facetovectors = zeros(Int, 2, 4, ncells)
 
