@@ -118,6 +118,35 @@ function assemble_cut_mesh_body_force_linear_form!(
     end
 end
 
+function assemble_penalty_displacement_bc!(
+    sysmatrix,
+    sysrhs,
+    dispcondition,
+    cutmesh,
+)
+
+    ncells = number_of_cells(cutmesh)
+    dim = dimension(cutmesh)
+
+    for cellid in 1:ncells
+        for faceid in 1:4
+            for s in [-1,+1]
+                if has_operator(dispcondition,s,faceid,cellid)
+                    nodeids = nodal_connectivity(cutmesh,s,cellid)
+
+                    mop = mass_operator(dispcondition,s,faceid,cellid)
+                    top = traction_operator(dispcondition,s,faceid,cellid)
+                    op = mop - top
+                    assemble_cell_matrix!(sysmatrix,nodeids,dim,vec(op))
+
+                    rhs = displacement_rhs(dispcondition,s,faceid,cellid)
+                    assemble_cell_rhs!(sysrhs,nodeids,dim,rhs)
+                end
+            end
+        end
+    end
+end
+
 function assemble_penalty_displacement_component_bc!(
     sysmatrix,
     sysrhs,

@@ -161,14 +161,27 @@ function face_traction_component_operator(
     return matrix
 end
 
-function component_linear_form(rhsval, basis, quad, component, scale)
+function component_linear_form(rhsfunc, basis, quad, component, cellmap, detjac)
+    dim = dimension(basis)
+    @assert length(component) == dim
+    nf = number_of_basis_functions(basis)
+    rhs = zeros(dim * nf)
+    for (p, w) in quad
+        rhsval = rhsfunc(cellmap(p))
+        NI = interpolation_matrix(basis(p), dim)
+        rhs .+= rhsval * NI' * component * detjac * w
+    end
+    return rhs
+end
+
+function component_linear_form(rhsval,basis,quad,component,detjac)
     dim = dimension(basis)
     @assert length(component) == dim
     nf = number_of_basis_functions(basis)
     rhs = zeros(dim * nf)
     for (p, w) in quad
         NI = interpolation_matrix(basis(p), dim)
-        rhs .+= rhsval * NI' * component * scale * w
+        rhs .+= rhsval * NI' * component * detjac * w
     end
     return rhs
 end

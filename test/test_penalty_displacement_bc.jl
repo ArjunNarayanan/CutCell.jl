@@ -6,20 +6,20 @@ using Revise
 using CutCell
 include("useful_routines.jl")
 
-function exact_linear_solution(x,e11,e22)
-    return [x[1]*e11,x[2]*e22]
+function exact_linear_solution(x, e11, e22)
+    return [x[1] * e11, x[2] * e22]
 end
 
 polyorder = 1
 numqp = 3
-nelmts = 5
+nelmts = 3
 L = 2.0
 W = 1.0
 
 lambda, mu = 1.0, 2.0
 dx = 0.1
 penalty = 1e0
-e11 = dx/L
+e11 = dx / L
 e22 = -lambda / (lambda + 2mu) * e11
 dy = e22
 
@@ -39,22 +39,66 @@ cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+reffacequads = CutCell.reference_face_quadrature(facequads)
 
 bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
 interfacecondition =
     CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
 
-onleftboundary(x) = x[1] == 0.0 ? true : false
-leftdispop = CutCell.BoundaryComponentMassOperator(basis,facequads,cutmesh,onleftboundary,[1.,0.],penalty)
-onbottomboundary(x) = x[2] == 0.0 ? true : false
+onleftboundary(x) = x[1] ≈ 0.0 ? true : false
+onbottomboundary(x) = x[2] ≈ 0.0 ? true : false
+onrightboundary(x) = x[1] ≈ L ? true : false
+leftop = CutCell.DisplacementComponentCondition(
+    x->0.0,
+    basis,
+    facequads,
+    stiffness,
+    cutmesh,
+    onleftboundary,
+    [1.0, 0.0],
+    penalty,
+)
+bottomop = CutCell.DisplacementComponentCondition(
+    x->0.0,
+    basis,
+    facequads,
+    stiffness,
+    cutmesh,
+    onbottomboundary,
+    [0.0, 1.0],
+    penalty,
+)
+rightop = CutCell.DisplacementComponentCondition(
+    x->dx,
+    basis,
+    facequads,
+    stiffness,
+    cutmesh,
+    onrightboundary,
+    [1.0, 0.0],
+    penalty,
+)
+
+sysmatrix = CutCell.SystemMatrix()
+sysrhs = CutCell.SystemRHS()
+
+CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
+
+CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,leftop,cutmesh)
+CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,bottomop,cutmesh)
+CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,rightop,cutmesh)
+
+matrix = CutCell.make_sparse(sysmatrix,cutmesh)
+rhs = CutCell.rhs(sysrhs,cutmesh)
+
+sol = matrix\rhs
+disp = reshape(sol,2,:)
+
+err = mesh_L2_error(disp,x->exact_linear_solution(x,e11,e22),basis,cellquads,cutmesh)
 
 
-# sysmatrix = CutCell.SystemMatrix()
-# sysrhs = CutCell.SystemRHS()
-#
-# CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
-# CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
-
+# onbottomboundary(x) = x[2] ≈ 0.0 ? true : false
 # CutCell.assemble_penalty_displacement_component_bc!(
 #     sysmatrix,
 #     sysrhs,
@@ -92,11 +136,3 @@ onbottomboundary(x) = x[2] == 0.0 ? true : false
 #     dx,
 #     penalty,
 # )
-
-# matrix = CutCell.make_sparse(sysmatrix,cutmesh)
-# rhs = CutCell.rhs(sysrhs,cutmesh)
-#
-# sol = matrix\rhs
-# disp = reshape(sol,2,:)
-#
-# err = mesh_L2_error(disp,x->exact_linear_solution(x,e11,e22),basis,cellquads,cutmesh)
