@@ -13,7 +13,7 @@ end
 function quadratic_displacement(x)
     u1 = x[1]^2 + 2 * x[1] * x[2]
     u2 = x[2]^2 + 3x[1]
-    return [u1,u2]
+    return [u1, u2]
 end
 
 function quadratic_body_force(lambda, mu)
@@ -79,7 +79,13 @@ sysrhs = CutCell.SystemRHS()
 
 CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
 CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
-CutCell.assemble_cut_mesh_body_force_linear_form!(sysrhs,x->quadratic_body_force(lambda,mu),basis,cellquads,cutmesh)
+CutCell.assemble_body_force_linear_form!(
+    sysrhs,
+    x -> quadratic_body_force(lambda, mu),
+    basis,
+    cellquads,
+    cutmesh,
+)
 CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
 
 matrix = CutCell.make_sparse(sysmatrix, cutmesh)
@@ -88,7 +94,6 @@ rhs = CutCell.rhs(sysrhs, cutmesh)
 sol = matrix \ rhs
 disp = reshape(sol, 2, :)
 
-err =
-    mesh_L2_error(disp, x -> quadratic_displacement(x), basis, cellquads, cutmesh)
+err = mesh_L2_error(disp, x -> quadratic_displacement(x), basis, cellquads, cutmesh)
 
-@test isapprox(norm(err),0.0,atol=1e-13)
+@test isapprox(norm(err), 0.0, atol = 1e-13)

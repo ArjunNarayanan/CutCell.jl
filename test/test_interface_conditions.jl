@@ -123,5 +123,5 @@ function test_curved_interface_assembly()
 end
 
 
-# test_linear_cut_cell_assembly()
-# test_curved_interface_assembly()
+test_linear_cut_cell_assembly()
+test_curved_interface_assembly()

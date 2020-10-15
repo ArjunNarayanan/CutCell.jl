@@ -85,12 +85,12 @@ function assemble_interface_condition!(
     end
 end
 
-function assemble_cut_mesh_body_force_linear_form!(
+function assemble_body_force_linear_form!(
     systemrhs,
     rhsfunc,
     basis,
-    cellquads,
-    cutmesh,
+    cellquads::CellQuadratures,
+    cutmesh::CutMesh,
 )
 
     ncells = number_of_cells(cutmesh)
