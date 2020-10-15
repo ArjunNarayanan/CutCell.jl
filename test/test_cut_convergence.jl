@@ -6,18 +6,6 @@ using Revise
 using CutCell
 include("useful_routines.jl")
 
-# function quadratic_displacement(x)
-#     u1 = x[1]^2 + 2 * x[1] * x[2]
-#     u2 = x[2]^2 + 3x[1]
-#     return [u1, u2]
-# end
-#
-# function quadratic_body_force(lambda, mu)
-#     b1 = -2 * (lambda + 2mu)
-#     b2 = -(4lambda + 6mu)
-#     return [b1, b2]
-# end
-
 function nonpoly_displacement(alpha, x)
     u1 = alpha * x[2] * sin(pi * x[1])
     u2 = alpha * (x[1]^3 + cos(pi * x[2]))
@@ -98,6 +86,8 @@ function normal_from_angle(phi)
     return [cosd(phi),sind(phi)]
 end
 
+
+
 x0 = [0.7,0.0]
 phi = 10.
 normal = normal_from_angle(phi)
@@ -121,14 +111,6 @@ err = [solve_elasticity(x0,normal,ne,polyorder,numqp,theta) for ne in nelmts]
 u1err = [er[1] for er in err]
 u2err = [er[2] for er in err]
 dx = 1.0 ./ nelmts
-
-using PyPlot
-function plot_convergence(dx,er)
-    fig,ax = PyPlot.subplots()
-    ax.loglog(dx,er,"-o")
-    ax.grid()
-    fig
-end
 
 plot_convergence(dx,u1err)
 plot_convergence(dx,u2err)
