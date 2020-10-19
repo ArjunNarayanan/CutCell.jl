@@ -24,7 +24,7 @@ function onboundary(x, L, W)
     return x[2] ≈ 0.0 || x[1] ≈ L || x[2] ≈ W || x[1] ≈ 0.0
 end
 
-function solve_elasticity(x0, normal, nelmts, polyorder, numqp, penaltyfactor)
+function solve_elasticity(x0, normal, nelmts, polyorder, numqp, penaltyfactor; eta = 1.0)
     L = 1.0
     W = 1.0
     lambda, mu = 1.0, 2.0
@@ -62,7 +62,7 @@ function solve_elasticity(x0, normal, nelmts, polyorder, numqp, penaltyfactor)
     sysrhs = CutCell.SystemRHS()
 
     CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
-    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh, eta = eta)
     CutCell.assemble_body_force_linear_form!(
         sysrhs,
         x -> body_force(lambda, mu, alpha, x),
@@ -117,7 +117,7 @@ function write_convergence_data_to_file(x0, theta, nelmts, polyorder, numqp, pen
 
     foldername = "examples/cut-convergence/theta-" *
     string(round(Int, theta)) *
-    "-penalty-" * penaltystr 
+    "-penalty-" * penaltystr
 
     if !ispath(foldername)
         mkpath(foldername)
@@ -132,20 +132,21 @@ end
 
 
 
-
-x0 = [0.7, 0.0]
-theta = 30.0
+x0 = [0.5, 0.0]
+theta = 0.0
 normal = normal_from_angle(theta)
 powers = 1:7
 nelmts = [2^p + 1 for p in powers]
-polyorder = 2
-numqp = required_quadrature_order(polyorder)
-penaltyfactor = 1e0
+polyorder = 1
+numqp = required_quadrature_order(polyorder)+2
+penaltyfactor = 1e2
+eta = 1.0
 
-# errors = [solve_elasticity(x0,normal,ne,polyorder,numqp,penaltyfactor) for ne in nelmts]
+# errors = [solve_elasticity(x0,normal,ne,polyorder,numqp,penaltyfactor,eta=eta) for ne in nelmts]
 
+# dx = 1.0 ./ nelmts
+# u1err = [er[1] for er in errors]
+
+# rate = diff(log.(u1err)) ./ diff(log.(dx))
 
 write_convergence_data_to_file(x0, theta, nelmts, polyorder, numqp, penaltyfactor)
-
-# plot_convergence(dx,u1err)
-# plot_convergence(dx,u2err)
