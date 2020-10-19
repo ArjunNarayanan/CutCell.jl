@@ -52,8 +52,14 @@ function assemble_interface_condition!(
             negtop = -0.5 * vec(traction_operator(interfacecondition, -1, cellid))
             postop = -0.5 * vec(traction_operator(interfacecondition, +1, cellid))
 
-            transnegtop = -0.5 * eta * vec(transpose(traction_operator(interfacecondition, -1, cellid)))
-            transpostop = -0.5 * eta * vec(transpose(traction_operator(interfacecondition, +1, cellid)))
+            transnegtop =
+                -0.5 *
+                eta *
+                vec(transpose(traction_operator(interfacecondition, -1, cellid)))
+            transpostop =
+                -0.5 *
+                eta *
+                vec(transpose(traction_operator(interfacecondition, +1, cellid)))
 
             assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -postop)
             assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -transpostop)
@@ -172,91 +178,10 @@ end
 function assemble_penalty_displacement_component_bc!(
     sysmatrix,
     sysrhs,
-    basis,
-    facequads,
-    stiffness,
-    cutmesh,
-    onboundary,
-    component,
-    bcval,
-    penalty,
+    dispcondition,
+    cutmesh;
+    eta = 1.0,
 )
 
-    cellids = findall(is_boundary_cell(cutmesh))
-    cellconnectivity = cell_connectivity(cutmesh)
-    facemidpoints = reference_face_midpoints()
-    facenormals = reference_face_normals()
-    nfaces = length(facemidpoints)
-    cellsign = cell_sign(cutmesh)
-    facedetjac = face_determinant_jacobian(cell_map(cutmesh, 1))
-    dim = dimension(basis)
 
-    for cellid in cellids
-        cellmap = cell_map(cutmesh, cellid)
-        s = cellsign[cellid]
-        for faceid = 1:nfaces
-            if cellconnectivity[faceid, cellid] == 0 &&
-               onboundary(cellmap(facemidpoints[faceid]))
-
-                if s == 0 || s == 1
-                    pquad = facequads[+1, faceid, cellid]
-                    tractionop = face_traction_component_operator(
-                        basis,
-                        pquad,
-                        component,
-                        facenormals[faceid],
-                        stiffness[+1],
-                        facedetjac[faceid],
-                        cellmap,
-                    )
-                    displacementop =
-                        penalty *
-                        component_mass_matrix(basis, pquad, component, facedetjac[faceid])
-                    rhs =
-                        penalty * component_linear_form(
-                            bcval,
-                            basis,
-                            pquad,
-                            component,
-                            facedetjac[faceid],
-                        )
-
-                    op = displacementop - tractionop
-                    pnodeids = nodal_connectivity(cutmesh, +1, cellid)
-                    assemble_cell_matrix!(sysmatrix, pnodeids, dim, vec(op))
-                    assemble_cell_rhs!(sysrhs, pnodeids, dim, rhs)
-                end
-
-                if s == 0 || s == -1
-                    nquad = facequads[-1, faceid, cellid]
-                    tractionop = face_traction_component_operator(
-                        basis,
-                        nquad,
-                        component,
-                        facenormals[faceid],
-                        stiffness[-1],
-                        facedetjac[faceid],
-                        cellmap,
-                    )
-                    displacementop =
-                        penalty *
-                        component_mass_matrix(basis, nquad, component, facedetjac[faceid])
-                    rhs =
-                        penalty * component_linear_form(
-                            bcval,
-                            basis,
-                            nquad,
-                            component,
-                            facedetjac[faceid],
-                        )
-
-                    op = displacementop - tractionop
-                    nnodeids = nodal_connectivity(cutmesh, -1, cellid)
-                    assemble_cell_matrix!(sysmatrix, nnodeids, dim, vec(op))
-                    assemble_cell_rhs!(sysrhs, nnodeids, dim, rhs)
-                end
-
-            end
-        end
-    end
 end
