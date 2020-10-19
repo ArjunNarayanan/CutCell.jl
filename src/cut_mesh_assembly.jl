@@ -36,9 +36,11 @@ end
 function assemble_interface_condition!(
     sysmatrix::SystemMatrix,
     interfacecondition::InterfaceCondition,
-    cutmesh::CutMesh,
+    cutmesh::CutMesh;
+    eta = 1.0,
 )
 
+    @assert eta == 1.0 || eta == 0.0 || eta == -1.0
     dofspernode = dimension(cutmesh)
     cellsign = cell_sign(cutmesh)
 
@@ -47,21 +49,46 @@ function assemble_interface_condition!(
             negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
             positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
 
-            negativetractionop = traction_operator(interfacecondition, -1, cellid)
+            negtop = -0.5 * vec(traction_operator(interfacecondition, -1, cellid))
+            postop = -0.5 * vec(traction_operator(interfacecondition, +1, cellid))
+
+            transnegtop = -0.5 * eta * vec(transpose(traction_operator(interfacecondition, -1, cellid)))
+            transpostop = -0.5 * eta * vec(transpose(traction_operator(interfacecondition, +1, cellid)))
+
+            assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -postop)
+            assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -transpostop)
+
             assemble_couple_cell_matrix!(
                 sysmatrix,
-                negativenodeids,
                 positivenodeids,
+                negativenodeids,
                 dofspernode,
-                vec(negativetractionop),
+                -negtop,
             )
-            positivetractionop = traction_operator(interfacecondition, +1, cellid)
             assemble_couple_cell_matrix!(
                 sysmatrix,
                 positivenodeids,
                 negativenodeids,
                 dofspernode,
-                vec(positivetractionop),
+                transpostop,
+            )
+
+            assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, negtop)
+            assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, transnegtop)
+
+            assemble_couple_cell_matrix!(
+                sysmatrix,
+                negativenodeids,
+                positivenodeids,
+                dofspernode,
+                postop,
+            )
+            assemble_couple_cell_matrix!(
+                sysmatrix,
+                negativenodeids,
+                positivenodeids,
+                dofspernode,
+                -transnegtop,
             )
 
             mass = vec(mass_operator(interfacecondition, cellid))
@@ -118,29 +145,24 @@ function assemble_body_force_linear_form!(
     end
 end
 
-function assemble_penalty_displacement_bc!(
-    sysmatrix,
-    sysrhs,
-    dispcondition,
-    cutmesh,
-)
+function assemble_penalty_displacement_bc!(sysmatrix, sysrhs, dispcondition, cutmesh)
 
     ncells = number_of_cells(cutmesh)
     dim = dimension(cutmesh)
 
-    for cellid in 1:ncells
-        for faceid in 1:4
-            for s in [-1,+1]
-                if has_operator(dispcondition,s,faceid,cellid)
-                    nodeids = nodal_connectivity(cutmesh,s,cellid)
+    for cellid = 1:ncells
+        for faceid = 1:4
+            for s in [-1, +1]
+                if has_operator(dispcondition, s, faceid, cellid)
+                    nodeids = nodal_connectivity(cutmesh, s, cellid)
 
-                    mop = mass_operator(dispcondition,s,faceid,cellid)
-                    top = traction_operator(dispcondition,s,faceid,cellid)
+                    mop = mass_operator(dispcondition, s, faceid, cellid)
+                    top = traction_operator(dispcondition, s, faceid, cellid)
                     op = mop - top
-                    assemble_cell_matrix!(sysmatrix,nodeids,dim,vec(op))
+                    assemble_cell_matrix!(sysmatrix, nodeids, dim, vec(op))
 
-                    rhs = displacement_rhs(dispcondition,s,faceid,cellid)
-                    assemble_cell_rhs!(sysrhs,nodeids,dim,rhs)
+                    rhs = displacement_rhs(dispcondition, s, faceid, cellid)
+                    assemble_cell_rhs!(sysrhs, nodeids, dim, rhs)
                 end
             end
         end
