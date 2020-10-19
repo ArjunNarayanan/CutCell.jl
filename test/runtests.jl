@@ -55,3 +55,11 @@ end
 @safetestset "Test Interface Conditions" begin
     include("test_interface_conditions.jl")
 end
+
+@safetestset "Test Penalty Displacement BC" begin
+    include("test_penalty_displacement_bc.jl")
+end
+
+@safetestset "Test Cut Mesh Convergence" begin
+    include("test_cut_convergence.jl")
+end

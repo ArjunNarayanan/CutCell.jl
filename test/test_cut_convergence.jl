@@ -82,21 +82,6 @@ function solve_elasticity(x0, normal, nelmts, polyorder, numqp, theta)
     return err
 end
 
-function normal_from_angle(phi)
-    return [cosd(phi),sind(phi)]
-end
-
-
-
-x0 = [0.7,0.0]
-phi = 10.
-normal = normal_from_angle(phi)
-polyorder = 2
-numqp = 3
-theta = 0.1
-err = solve_elasticity(x0,normal,5,polyorder,numqp,theta)
-
-
 
 
 x0 = [0.5,0.0]
@@ -104,16 +89,33 @@ normal = [1.,0.]
 powers = 1:7
 nelmts = [2^p+1 for p in powers]
 polyorder = 1
-numqp = 5
-theta = 0.1
+numqp = 3
+theta = 1e3
 
 err = [solve_elasticity(x0,normal,ne,polyorder,numqp,theta) for ne in nelmts]
 u1err = [er[1] for er in err]
 u2err = [er[2] for er in err]
 dx = 1.0 ./ nelmts
 
-plot_convergence(dx,u1err)
-plot_convergence(dx,u2err)
+u1rate = diff(log.(u1err)) ./ diff(log.(dx))
+u2rate = diff(log.(u2err)) ./ diff(log.(dx))
 
-u1rate = sum(diff(log.(u1err)) ./ diff(log.(dx)))/(length(powers)-1)
-u2rate = sum(diff(log.(u2err)) ./ diff(log.(dx)))/(length(powers)-1)
+println("Convergence of linear elements : ", u1rate[end], "    ", u2rate[end])
+@test isapprox(u1rate[end],2.0,atol=0.05)
+@test isapprox(u2rate[end],2.0,atol=0.05)
+
+polyorder = 2
+numqp = 4
+theta = 1e2
+
+err = [solve_elasticity(x0,normal,ne,polyorder,numqp,theta) for ne in nelmts]
+u1err = [er[1] for er in err]
+u2err = [er[2] for er in err]
+dx = 1.0 ./ nelmts
+
+u1rate = diff(log.(u1err)) ./ diff(log.(dx))
+u2rate = diff(log.(u2err)) ./ diff(log.(dx))
+
+println("Convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
+@test isapprox(u1rate[end],3.0,atol=0.05)
+@test isapprox(u2rate[end],3.0,atol=0.05)
