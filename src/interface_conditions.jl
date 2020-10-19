@@ -73,13 +73,12 @@ function InterfaceTractionOperator(basis, interfacequads, stiffness, cellmap, ce
         if s == 0
             fquad = interfacequads[cellid]
             negativenormal = interface_normals(interfacequads, cellid)
-            positivenormal = -negativenormal
 
             positivetop = coherent_traction_operator(
                 basis,
                 fquad,
                 negativenormal,
-                stiffness[-1],
+                stiffness[+1],
                 cellmap,
             )
             push!(operators, positivetop)
@@ -88,8 +87,8 @@ function InterfaceTractionOperator(basis, interfacequads, stiffness, cellmap, ce
             negativetop = coherent_traction_operator(
                 basis,
                 fquad,
-                positivenormal,
-                stiffness[+1],
+                negativenormal,
+                stiffness[-1],
                 cellmap,
             )
             push!(operators, negativetop)

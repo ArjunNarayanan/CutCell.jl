@@ -61,7 +61,7 @@ function test_linear_cut_cell_assembly()
         0.0 0.0 dx dx 0.0 0.0 dx dx
         0.0 dy 0.0 dy 0.0 dy 0.0 dy
     ]
-    @test allapprox(disp, testdisp, 1e-15)
+    @test allapprox(disp, testdisp, 1e2eps())
 end
 
 
@@ -119,7 +119,7 @@ function test_curved_interface_assembly()
     ]
     testdisp = repeat(testdisp, outer = (1, 2))
 
-    @test allapprox(disp,testdisp,1e-15)
+    @test allapprox(disp,testdisp,1e2eps())
 end
 
 
