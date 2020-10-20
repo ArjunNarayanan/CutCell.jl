@@ -46,7 +46,8 @@ function nodal_connectivity(cutmesh::CutMesh, s, cellid)
         error("Use ±1 indexing for rows (i.e. phase) of CutMesh")
     ncells = cutmesh.mesh.ncells
     @assert 1 <= cellid <= ncells
-    @assert cell_sign(cutmesh, cellid) == s || cell_sign(cutmesh, cellid) == 0
+    cs = cell_sign(cutmesh,cellid)
+    @assert cs == s || cs == 0
     row = s == +1 ? 1 : 2
 
     nc = nodal_connectivity(cutmesh.mesh)
