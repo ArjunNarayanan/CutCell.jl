@@ -42,13 +42,11 @@ function Base.show(io::IO, cutmesh::CutMesh)
 end
 
 function nodal_connectivity(cutmesh::CutMesh, s, cellid)
-    (s == -1 || s == +1) ||
-        error("Use ±1 indexing for rows (i.e. phase) of CutMesh")
+    row = cell_sign_to_row(s)
     ncells = cutmesh.mesh.ncells
     @assert 1 <= cellid <= ncells
     cs = cell_sign(cutmesh,cellid)
     @assert cs == s || cs == 0
-    row = s == +1 ? 1 : 2
 
     nc = nodal_connectivity(cutmesh.mesh)
     ids = nc[:, cellid]

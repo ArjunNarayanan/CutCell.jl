@@ -48,16 +48,12 @@ function BilinearForms(basis, cellquads, stiffnesses, cutmesh)
 end
 
 function Base.getindex(cbf::BilinearForms, s, cellid)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
-    row = s == +1 ? 1 : 2
+    row = cell_sign_to_row(s)
     return cbf.cellmatrices[cbf.celltomatrix[row, cellid]]
 end
 
 function Base.getindex(cbf::BilinearForms, s)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
-    idx = s == +1 ? 1 : 2
+    idx = cell_sign_to_row(s)
     return cbf.cellmatrices[idx]
 end
 

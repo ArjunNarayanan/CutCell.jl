@@ -142,7 +142,7 @@ function boundary_displacement_rhs(bcfunc, basis, facequads, cutmesh, onboundary
     cellsign = cell_sign(cutmesh)
     facedetjac = face_determinant_jacobian(cell_map(cutmesh, 1))
     ncells = length(cellsign)
-    
+
     vectors = []
     facetovectors = zeros(Int, 2, 4, ncells)
 
@@ -415,9 +415,7 @@ function boundary_displacement_component_rhs(
 end
 
 function Base.getindex(bm::BO, s, faceid, cellid) where {BO<:AbstractBoundaryOperator}
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of $BO, got index = $s")
-    phaseid = s == +1 ? 1 : 2
+    phaseid = cell_sign_to_row(s)
     idx = bm.facetooperator[phaseid, faceid, cellid]
     idx > 0 ||
         error("Expected idx > 0, got idx = $idx. Check if [s,faceid,cellid] =[$s,$faceid,$cellid] has a valid operator")

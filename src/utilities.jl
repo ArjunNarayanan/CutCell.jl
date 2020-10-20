@@ -88,3 +88,9 @@ function scale_area(cellmap, normals)
     den = sqrt.((t .^ 2)' * (invjac .^ 2))
     return 1.0 ./ den
 end
+
+function cell_sign_to_row(s)
+    (s == -1 || s == +1) || error("Use ±1 to index into rows (i.e. phase), got index = $s")
+    row = s == +1 ? 1 : 2
+    return row
+end

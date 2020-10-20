@@ -13,9 +13,7 @@ function HookeStiffness(lambda1, mu1, lambda2, mu2)
 end
 
 function Base.getindex(hs::HookeStiffness, s)
-    (s == -1 || s == +1) ||
-        error("Use ± to index into 1st dimension of HookeStiffness, got index = $s")
-    row = s == +1 ? 1 : 2
+    row = cell_sign_to_row(s)
     return hs.stiffness[row]
 end
 

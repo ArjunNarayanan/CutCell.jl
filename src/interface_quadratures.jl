@@ -1,14 +1,15 @@
 struct InterfaceQuadratures
-    quads::Any
+    positivequads::Any
+    negativequads
     normals::Any
     celltoquad::Any
     ncells::Any
-    function InterfaceQuadratures(quads, normals, celltoquad)
-        ncells = length(celltoquad)
+    function InterfaceQuadratures(positivequads, negativequads, normals, celltoquad)
+        nphase,ncells = size(celltoquad)
         @assert all(celltoquad .>= 0)
-        @assert all(celltoquad .<= length(quads))
-        @assert length(quads) == length(normals)
-        new(quads, normals, celltoquad, ncells)
+        @assert length(positivequads) == length(negativequads) == length(normals)
+        @assert all(celltoquad .<= length(positivequads))
+        new(positivequads, negativequads, normals, celltoquad, ncells)
     end
 end
 
@@ -28,24 +29,28 @@ function InterfaceQuadratures(
     invjac = inverse_jacobian(cellmap)
     quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numqp)
 
-    quads = []
+    positivequads = []
+    negativequads = []
     normals = []
-    celltoquad = zeros(Int, numcells)
+    celltoquad = zeros(Int, 2, numcells)
 
+    counter = 0
     for cellid = 1:numcells
         if cellsign[cellid] == 0
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
             squad = surface_quadrature(levelset, box, quad1d)
-            push!(quads, squad)
             n = levelset_normal(levelset, squad.points, invjac)
+            push!(positivequads, squad)
+            push!(negativequads, squad)
             push!(normals, n)
+            counter += 1
 
-            celltoquad[cellid] = length(quads)
+            celltoquad[cellid] = counter
         end
     end
-    return InterfaceQuadratures(quads, normals, celltoquad)
+    return InterfaceQuadratures(positivequads, negativequads, normals, celltoquad)
 end
 
 function InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
@@ -62,7 +67,7 @@ function InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
     )
 end
 
-function Base.getindex(iquads::InterfaceQuadratures, cellid)
+function Base.getindex(iquads::InterfaceQuadratures, s, cellid)
     1 <= cellid <= iquads.ncells ||
         throw(BoundsError(iquads.celltoquad, [cellid]))
     idx = iquads.celltoquad[cellid]

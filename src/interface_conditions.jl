@@ -105,9 +105,7 @@ function InterfaceTractionOperator(basis, interfacequads, stiffness, cutmesh)
 end
 
 function Base.getindex(tractionoperator::InterfaceTractionOperator, s, cellid)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of InterfaceTractionOperator, got index = $s")
-    row = s == +1 ? 1 : 2
+    row = cell_sign_to_row(s)
     return tractionoperator.operators[tractionoperator.celltooperator[row, cellid]]
 end
 

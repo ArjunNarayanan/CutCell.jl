@@ -79,9 +79,7 @@ function CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 end
 
 function Base.getindex(vquads::CellQuadratures, s, cellid)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
-    row = s == +1 ? 1 : 2
+    row = cell_sign_to_row(s)
     return vquads.quads[vquads.celltoquad[row, cellid]]
 end
 

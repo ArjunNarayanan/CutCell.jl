@@ -63,8 +63,7 @@ function map_quadrature(quad,mergemapper,mapid)
 end
 
 function update_quadrature!(cellquads::CellQuadratures,s,cellid,quad)
-    (s == -1 || s == +1) || error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
-    row = s == +1 ? 1 : 2
+    row = cell_sign_to_row(s)
     idx = cellquads.celltoquad[row,cellid]
     cellquads.quads[idx] = quad
 end
@@ -90,8 +89,7 @@ function number_of_cells(mergecutmesh::MergeCutMesh)
 end
 
 function merge_cells(mergecutmesh::MergeCutMesh,s,mergeto,mergefrom)
-    (s == -1 || s == +1) || error("Use ±1 to index into 1st dimension of CellQuadratures, got index = $s")
-    row = s == +1 ? 1 : 2
+    row = cell_sign_to_row(s)
     ncells = number_of_cells(mergecutmesh)
     @assert 1 <= mergeto <= ncells
     @assert 1 <= mergefrom <= ncells
@@ -106,8 +104,7 @@ function Base.show(io::IO,mergecutmesh::MergeCutMesh)
 end
 
 function nodal_connectivity(mergecutmesh::MergeCutMesh,s,cellid)
-    (s == -1 || s == +1) || error("Use ±1 to index into the phase of MergeCutMesh")
-    row = s == +1 ? 1 : 2
+    row = cell_sign_to_row(s)
     mergecellid = mergecutmesh.mergedwithcell[row,cellid]
     return nodal_connectivity(mergecutmesh.cutmesh,s,mergecellid)
 end

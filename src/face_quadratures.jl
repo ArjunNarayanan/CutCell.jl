@@ -56,9 +56,7 @@ function FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 end
 
 function Base.getindex(facequads::FaceQuadratures, s, faceid, cellid)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of FaceQuadratures, got index = $s")
-    phaseid = s == +1 ? 1 : 2
+    phaseid = cell_sign_to_row(s)
     return facequads.quads[facequads.facetoquad[phaseid, faceid, cellid]]
 end
 
@@ -74,9 +72,7 @@ function Base.show(io::IO, facequads::FaceQuadratures)
 end
 
 function has_quadrature(facequads::FaceQuadratures, s, faceid, cellid)
-    (s == -1 || s == +1) ||
-        error("Use ±1 to index into 1st dimension of FaceQuadratures, got index = $s")
-    phaseid = s == +1 ? 1 : 2
+    phaseid = cell_sign_to_row(s)
     return facequads.facetoquad[phaseid, faceid, cellid] != 0
 end
 
