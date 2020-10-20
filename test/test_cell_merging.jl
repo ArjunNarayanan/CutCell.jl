@@ -48,12 +48,16 @@ southwest = CutCell.cell_map_to_south_west()
 x0 = [1.1, 0.0]
 normal = [1.0, 0.0]
 mesh = CutCell.Mesh([0.0, 0.0], [2.0, 1.0], [2, 1], 4)
-basis = TensorProductBasis(2,1)
+polyorder = 1
+numqp = 2
+
+basis = TensorProductBasis(2,polyorder)
 levelset = InterpolatingPolynomial(1, basis)
 levelsetcoeffs =
     CutCell.levelset_coefficients(x -> plane_distance_function(x, normal, x0), mesh)
 cutmesh = CutCell.CutMesh(levelset,levelsetcoeffs,mesh)
-cellquads = CutCell.CellQuadratures(levelset,levelsetcoeffs,cutmesh,2)
+cellquads = CutCell.CellQuadratures(levelset,levelsetcoeffs,cutmesh,numqp)
+interfacequads = CutCell.InterfaceQuadratures(levelset,levelsetcoeffs,cutmesh,numqp)
 
 mergemapper = CutCell.MergeMapper()
 
@@ -61,3 +65,13 @@ CutCell.map_and_update_cell_quadrature!(cellquads,-1,2,mergemapper,2)
 
 mergecutmesh = CutCell.MergeCutMesh(cutmesh)
 CutCell.merge_cells(mergecutmesh,-1,1,2)
+
+lambda,mu = 1.,2.
+stiffness = plane_strain_voigt_hooke_matrix(lambda,mu)
+cellmap = CutCell.cell_map(cutmesh,1)
+
+nbf1 = CutCell.bilinear_form(basis,cellquads[-1,1],stiffness,cellmap)
+nbf2 = CutCell.bilinear_form(basis,cellquads[-1,2],stiffness,cellmap)
+nbf = nbf1+nbf2
+
+pbf = CutCell.bilinear_form(basis,cellquads[+1,2],stiffness,cellmap)
