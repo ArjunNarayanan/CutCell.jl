@@ -30,11 +30,11 @@ interfacequads = CutCell.InterfaceQuadratures(
     numqp,
     cellmap,
 )
-@test length(interfacequads.quads) == 1
-@test allequal(interfacequads.celltoquad, [1, 0, 0])
-
-@test length(interfacequads.quads) == 1
-@test allequal(interfacequads.celltoquad, [1, 0, 0])
+@test size(interfacequads.quads) == (2,1)
+testcelltoquad = [1, 0, 0]
+@test allequal(interfacequads.celltoquad, testcelltoquad)
 
 testnormals = repeat(normal,inner=(1,numqp))
 @test allapprox(testnormals,CutCell.interface_normals(interfacequads,1))
+
+@test interfacequads[1,1] ≈ interfacequads[-1,1]

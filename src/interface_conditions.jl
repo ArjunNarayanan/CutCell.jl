@@ -1,123 +1,101 @@
-struct InterfaceMassOperator
+struct InterfaceOperators
     operators::Any
     celltooperator::Any
     ncells::Any
-    function InterfaceMassOperator(operators, celltooperator)
+    nops::Any
+    function InterfaceOperators(operators, celltooperator)
         ncells = length(celltooperator)
+        nphase, nops = size(operators)
+
+        @assert nphase == 2
         @assert all(celltooperator .>= 0)
-        @assert all(celltooperator .<= length(operators))
-        new(operators, celltooperator, ncells)
+        @assert all(celltooperator .<= nops)
+        new(operators, celltooperator, ncells, nops)
     end
 end
 
-function InterfaceMassOperator(basis, interfacequads, cellmap, cellsign, penalty)
+function Base.getindex(interfaceoperator::InterfaceOperators, s, cellid)
+    row = cell_sign_to_row(s)
+    idx = interfaceoperator.celltooperator[cellid]
+    idx > 0 || error("Cell $cellid with cellsign $s does not have an operator")
+    return interfaceoperator.operators[row, idx]
+end
+
+function Base.show(io::IO, interfaceoperator::InterfaceOperators)
+    ncells = number_of_cells(interfaceoperator)
+    nops = number_of_operators(interfaceoperator)
+    str = "InterfaceOperator\n\tNum. Cells: $ncells\n\tNum. Operators: $nops"
+    print(io, str)
+end
+
+function number_of_cells(interfaceoperator::InterfaceOperators)
+    return interfaceoperator.ncells
+end
+
+function number_of_operators(interfaceoperator::InterfaceOperators)
+    return interfaceoperator.nops
+end
+
+function interface_mass_operators(basis, interfacequads, cellmap, cellsign, penalty)
+
     ncells = length(cellsign)
-    operators = []
+    hasinterface = cellsign .== 0
+    numinterfaces = count(hasinterface)
+    operators = Matrix{Any}(undef, 2, numinterfaces)
     celltooperator = zeros(Int, ncells)
     dim = dimension(basis)
 
-    for (cellid, s) in enumerate(cellsign)
-        if s == 0
-            fquad = interfacequads[cellid]
-            normal = interface_normals(interfacequads, cellid)
-            facescale = scale_area(cellmap, normal)
-
-            mass = penalty * mass_matrix(basis, fquad, facescale, dim)
-            push!(operators, mass)
-            celltooperator[cellid] = length(operators)
+    cellids = findall(hasinterface)
+    counter = 1
+    for cellid in cellids
+        normal = interface_normals(interfacequads, cellid)
+        facescale = scale_area(cellmap, normal)
+        for s in [+1, -1]
+            row = cell_sign_to_row(s)
+            quad = interfacequads[s, cellid]
+            mass = penalty * mass_matrix(basis, quad, facescale, dim)
+            operators[row, counter] = mass
         end
+        celltooperator[cellid] = counter
+        counter += 1
     end
-    return InterfaceMassOperator(operators, celltooperator)
+    return InterfaceOperators(operators, celltooperator)
 end
 
-function InterfaceMassOperator(basis, interfacequads, cutmesh, penalty)
+function interface_mass_operators(basis, interfacequads, cutmesh, penalty)
     cellmap = cell_map(cutmesh, 1)
     cellsign = cell_sign(cutmesh)
-    return InterfaceMassOperator(basis, interfacequads, cellmap, cellsign, penalty)
+    return interface_mass_operators(basis, interfacequads, cellmap, cellsign, penalty)
 end
 
-function Base.getindex(massoperator::InterfaceMassOperator, cellid)
-    return massoperator.operators[massoperator.celltooperator[cellid]]
-end
+function interface_traction_operators(basis, interfacequads, stiffness, cellmap, cellsign)
 
-function Base.show(io::IO, massoperator::InterfaceMassOperator)
-    ncells = massoperator.ncells
-    nuniqueoperators = length(massoperator.operators)
-    str = "InterfaceMassOperator\n\tNum. Cells: $ncells\n\tNum. Unique Operators: $nuniqueoperators"
-    print(io, str)
-end
-
-function number_of_cells(massoperator::InterfaceMassOperator)
-    return massoperator.ncells
-end
-
-struct InterfaceTractionOperator
-    operators::Any
-    celltooperator::Any
-    ncells::Any
-    function InterfaceTractionOperator(operators, celltooperator)
-        nphase, ncells = size(celltooperator)
-        @assert nphase == 2
-        @assert all(celltooperator .>= 0)
-        @assert all(celltooperator .<= length(operators))
-        new(operators, celltooperator, ncells)
-    end
-end
-
-function InterfaceTractionOperator(basis, interfacequads, stiffness, cellmap, cellsign)
     ncells = length(cellsign)
-    operators = []
-    celltooperator = zeros(Int, 2, ncells)
+    hasinterface = cellsign .== 0
+    numinterfaces = count(hasinterface)
+    operators = Matrix{Any}(undef,2,numinterfaces)
+    celltooperator = zeros(Int, ncells)
 
+    cellids = findall(hasinterface)
+    counter = 1
     for (cellid, s) in enumerate(cellsign)
-        if s == 0
-            fquad = interfacequads[cellid]
-            negativenormal = interface_normals(interfacequads, cellid)
-
-            positivetop = coherent_traction_operator(
-                basis,
-                fquad,
-                negativenormal,
-                stiffness[+1],
-                cellmap,
-            )
-            push!(operators, positivetop)
-            celltooperator[1, cellid] = length(operators)
-
-            negativetop = coherent_traction_operator(
-                basis,
-                fquad,
-                negativenormal,
-                stiffness[-1],
-                cellmap,
-            )
-            push!(operators, negativetop)
-            celltooperator[2, cellid] = length(operators)
+        normal = interface_normals(interfacequads,cellid)
+        for s in [+1,-1]
+            row = cell_sign_to_row(s)
+            quad = interfacequads[s,cellid]
+            top = coherent_traction_operator(basis,quad,normal,stiffness[s],cellmap)
+            operators[row,counter] = top
         end
+        celltooperator[cellid] = counter
+        counter += 1
     end
-    return InterfaceTractionOperator(operators, celltooperator)
+    return InterfaceOperators(operators, celltooperator)
 end
 
-function InterfaceTractionOperator(basis, interfacequads, stiffness, cutmesh)
+function interface_traction_operators(basis, interfacequads, stiffness, cutmesh)
     cellmap = cell_map(cutmesh, 1)
     cellsign = cell_sign(cutmesh)
     return InterfaceTractionOperator(basis, interfacequads, stiffness, cellmap, cellsign)
-end
-
-function Base.getindex(tractionoperator::InterfaceTractionOperator, s, cellid)
-    row = cell_sign_to_row(s)
-    return tractionoperator.operators[tractionoperator.celltooperator[row, cellid]]
-end
-
-function Base.show(io::IO, tractionoperator::InterfaceTractionOperator)
-    ncells = tractionoperator.ncells
-    nuniqueoperators = length(tractionoperator.operators)
-    str = "InterfaceTractionOperator\n\tNum. Cells: $ncells\n\tNum. Unique Operators: $nuniqueoperators"
-    print(io, str)
-end
-
-function number_of_cells(tractionoperator::InterfaceTractionOperator)
-    return tractionoperator.ncells
 end
 
 struct InterfaceCondition
@@ -126,36 +104,36 @@ struct InterfaceCondition
     penalty::Any
     ncells::Any
     function InterfaceCondition(
-        tractionoperator::InterfaceTractionOperator,
-        massoperator::InterfaceMassOperator,
+        tractionoperator::InterfaceOperators,
+        massoperator::InterfaceOperators,
         penalty,
     )
 
         ncells = number_of_cells(massoperator)
         @assert number_of_cells(tractionoperator) == ncells
-        new(tractionoperator,massoperator,penalty,ncells)
+        new(tractionoperator, massoperator, penalty, ncells)
     end
 end
 
-function InterfaceCondition(basis,interfacequads,stiffness,cutmesh,penalty)
-    tractionoperator = InterfaceTractionOperator(basis,interfacequads,stiffness,cutmesh)
-    massoperator = InterfaceMassOperator(basis,interfacequads,cutmesh,penalty)
-    return InterfaceCondition(tractionoperator,massoperator,penalty)
+function InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+    tractionoperator = interface_traction_operators(basis, interfacequads, stiffness, cutmesh)
+    massoperator = interface_mass_operators(basis, interfacequads, cutmesh, penalty)
+    return InterfaceCondition(tractionoperator, massoperator, penalty)
 end
 
-function traction_operator(interfacecondition::InterfaceCondition,s,cellid)
-    return interfacecondition.tractionoperator[s,cellid]
+function traction_operator(interfacecondition::InterfaceCondition, s, cellid)
+    return interfacecondition.tractionoperator[s, cellid]
 end
 
-function mass_operator(interfacecondition::InterfaceCondition,cellid)
+function mass_operator(interfacecondition::InterfaceCondition, cellid)
     return interfacecondition.massoperator[cellid]
 end
 
-function Base.show(io::IO,interfacecondition::InterfaceCondition)
+function Base.show(io::IO, interfacecondition::InterfaceCondition)
     ncells = interfacecondition.ncells
     penalty = interfacecondition.penalty
     str = "InterfaceCondition\n\tNum. Cells: $ncells\n\tDisplacement Penalty: $penalty"
-    print(io,str)
+    print(io, str)
 end
 
 function coherent_traction_operator(basis, quad, normals, stiffness, cellmap)

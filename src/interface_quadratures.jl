@@ -1,15 +1,18 @@
 struct InterfaceQuadratures
-    positivequads::Any
-    negativequads
+    quads::Any
     normals::Any
     celltoquad::Any
     ncells::Any
-    function InterfaceQuadratures(positivequads, negativequads, normals, celltoquad)
-        nphase,ncells = size(celltoquad)
+    function InterfaceQuadratures(quads, normals, celltoquad)
+        ncells = length(celltoquad)
+        nphase,nquads = size(quads)
+
+        @assert nphase == 2
+        @assert length(normals) == nquads
         @assert all(celltoquad .>= 0)
-        @assert length(positivequads) == length(negativequads) == length(normals)
-        @assert all(celltoquad .<= length(positivequads))
-        new(positivequads, negativequads, normals, celltoquad, ncells)
+        @assert all(celltoquad .<= nquads)
+
+        new(quads, normals, celltoquad, ncells)
     end
 end
 
@@ -29,12 +32,13 @@ function InterfaceQuadratures(
     invjac = inverse_jacobian(cellmap)
     quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numqp)
 
-    positivequads = []
-    negativequads = []
-    normals = []
-    celltoquad = zeros(Int, 2, numcells)
+    hasinterface = cellsign .== 0
+    numinterfaces = count(hasinterface)
+    quads = Matrix{Any}(undef,2,numinterfaces)
+    normals = Vector{Any}(undef,numinterfaces)
+    celltoquad = zeros(Int, numcells)
 
-    counter = 0
+    counter = 1
     for cellid = 1:numcells
         if cellsign[cellid] == 0
             nodeids = nodalconnectivity[:, cellid]
@@ -42,18 +46,21 @@ function InterfaceQuadratures(
 
             squad = surface_quadrature(levelset, box, quad1d)
             n = levelset_normal(levelset, squad.points, invjac)
-            push!(positivequads, squad)
-            push!(negativequads, squad)
-            push!(normals, n)
-            counter += 1
+
+            quads[1,counter] = squad
+            quads[2,counter] = squad
+
+            normals[counter] = n
 
             celltoquad[cellid] = counter
+
+            counter += 1
         end
     end
-    return InterfaceQuadratures(positivequads, negativequads, normals, celltoquad)
+    return InterfaceQuadratures(quads, normals, celltoquad)
 end
 
-function InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+function InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh::CutMesh, numqp)
     cellsign = cell_sign(cutmesh)
     nodalconnectivity = nodal_connectivity(cutmesh.mesh)
     cellmap = cell_map(cutmesh, 1)
@@ -68,22 +75,20 @@ function InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 end
 
 function Base.getindex(iquads::InterfaceQuadratures, s, cellid)
-    1 <= cellid <= iquads.ncells ||
-        throw(BoundsError(iquads.celltoquad, [cellid]))
+    row = cell_sign_to_row(s)
     idx = iquads.celltoquad[cellid]
-    return iquads.quads[idx]
+    idx > 0 || error("Cell $cellid does not have an interface quadrature rule")
+    return iquads.quads[row,idx]
 end
 
 function Base.show(io::IO, interfacequads::InterfaceQuadratures)
     ncells = interfacequads.ncells
-    numinterfacequads = length(interfacequads.quads)
-    str = "InterfaceQuadratures\n\tNum. Cells: $ncells\n\tNum. Interface Quadratures: $numinterfacequads"
+    numinterfaces = length(interfacequads.normals)
+    str = "InterfaceQuadratures\n\tNum. Cells: $ncells\n\tNum. Interfaces: $numinterfaces"
     print(io, str)
 end
 
 function interface_normals(iquads::InterfaceQuadratures, cellid)
-    1 <= cellid <= iquads.ncells ||
-        throw(BoundsError(iquads.celltoquad, [cellid]))
     idx = iquads.celltoquad[cellid]
     return iquads.normals[idx]
 end
