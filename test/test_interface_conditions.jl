@@ -154,9 +154,9 @@ bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
 interfacecondition =
     CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
 
-# sysmatrix = CutCell.SystemMatrix()
-# sysrhs = CutCell.SystemRHS()
-#
+sysmatrix = CutCell.SystemMatrix()
+sysrhs = CutCell.SystemRHS()
+
 # CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
 # CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
 #

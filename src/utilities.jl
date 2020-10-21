@@ -94,3 +94,17 @@ function cell_sign_to_row(s)
     row = s == +1 ? 1 : 2
     return row
 end
+
+function cell_couple_sign_to_row(s1,s2)
+    (s1 == -1 || s1 == +1) || error("Expected sign ∈ {-1,1}, got sign $s1")
+    (s2 == -1 || s2 == +1) || error("Expected sign ∈ {-1,1}, got sign $s2")
+    if s1 == +1 && s2 == +1
+        return 1
+    elseif s1 == +1 && s2 == -1
+        return 2
+    elseif s1 == -1 && s2 == +1
+        return 3
+    elseif s1 == -1 && s2 == -1
+        return 4
+    end
+end

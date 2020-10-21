@@ -44,77 +44,78 @@ function assemble_interface_condition!(
     dofspernode = dimension(cutmesh)
     cellsign = cell_sign(cutmesh)
 
-    for (cellid, s) in enumerate(cellsign)
-        if s == 0
-            negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
-            positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
+    cellids = findall(cellsign .== 0)
+    for cellid in cellids
+        negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
+        positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
 
-            negtop = -0.5 * vec(traction_operator(interfacecondition, -1, cellid))
-            postop = -0.5 * vec(traction_operator(interfacecondition, +1, cellid))
+        negtop = -0.5 * vec(traction_operator(interfacecondition, -1, cellid))
+        postop = -0.5 * vec(traction_operator(interfacecondition, +1, cellid))
 
-            transnegtop =
-                -0.5 *
-                eta *
-                vec(transpose(traction_operator(interfacecondition, -1, cellid)))
-            transpostop =
-                -0.5 *
-                eta *
-                vec(transpose(traction_operator(interfacecondition, +1, cellid)))
+        transnegtop =
+            -0.5 *
+            eta *
+            vec(transpose(traction_operator(interfacecondition, -1, cellid)))
+        transpostop =
+            -0.5 *
+            eta *
+            vec(transpose(traction_operator(interfacecondition, +1, cellid)))
 
-            assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -postop)
-            assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -transpostop)
+        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -postop)
+        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -transpostop)
 
-            assemble_couple_cell_matrix!(
-                sysmatrix,
-                positivenodeids,
-                negativenodeids,
-                dofspernode,
-                -negtop,
-            )
-            assemble_couple_cell_matrix!(
-                sysmatrix,
-                positivenodeids,
-                negativenodeids,
-                dofspernode,
-                transpostop,
-            )
+        assemble_couple_cell_matrix!(
+            sysmatrix,
+            positivenodeids,
+            negativenodeids,
+            dofspernode,
+            -negtop,
+        )
+        assemble_couple_cell_matrix!(
+            sysmatrix,
+            positivenodeids,
+            negativenodeids,
+            dofspernode,
+            transpostop,
+        )
 
-            assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, negtop)
-            assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, transnegtop)
+        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, negtop)
+        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, transnegtop)
 
-            assemble_couple_cell_matrix!(
-                sysmatrix,
-                negativenodeids,
-                positivenodeids,
-                dofspernode,
-                postop,
-            )
-            assemble_couple_cell_matrix!(
-                sysmatrix,
-                negativenodeids,
-                positivenodeids,
-                dofspernode,
-                -transnegtop,
-            )
+        assemble_couple_cell_matrix!(
+            sysmatrix,
+            negativenodeids,
+            positivenodeids,
+            dofspernode,
+            postop,
+        )
+        assemble_couple_cell_matrix!(
+            sysmatrix,
+            negativenodeids,
+            positivenodeids,
+            dofspernode,
+            -transnegtop,
+        )
 
-            mass = vec(mass_operator(interfacecondition, cellid))
-            assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, mass)
-            assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, mass)
-            assemble_couple_cell_matrix!(
-                sysmatrix,
-                negativenodeids,
-                positivenodeids,
-                dofspernode,
-                -mass,
-            )
-            assemble_couple_cell_matrix!(
-                sysmatrix,
-                positivenodeids,
-                negativenodeids,
-                dofspernode,
-                -mass,
-            )
-        end
+        posmass = vec(mass_operator(interfacecondition, +1, cellid))
+        negmass = vec(mass_operator(interfacecondition, -1, cellid))
+
+        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, mass)
+        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, mass)
+        assemble_couple_cell_matrix!(
+            sysmatrix,
+            negativenodeids,
+            positivenodeids,
+            dofspernode,
+            -mass,
+        )
+        assemble_couple_cell_matrix!(
+            sysmatrix,
+            positivenodeids,
+            negativenodeids,
+            dofspernode,
+            -mass,
+        )
     end
 end
 
