@@ -41,23 +41,25 @@ function interface_mass_operators(basis, interfacequads, cellmap, cellsign, pena
     ncells = length(cellsign)
     hasinterface = cellsign .== 0
     numinterfaces = count(hasinterface)
-    operators = Matrix{Any}(undef, 2, numinterfaces)
+    operators = Matrix{Any}(undef, 4, numinterfaces)
     celltooperator = zeros(Int, ncells)
     dim = dimension(basis)
 
     cellids = findall(hasinterface)
-    counter = 1
-    for cellid in cellids
+
+    for (idx, cellid) in enumerate(cellids)
         normal = interface_normals(interfacequads, cellid)
         facescale = scale_area(cellmap, normal)
-        for s in [+1, -1]
-            row = cell_sign_to_row(s)
-            quad = interfacequads[s, cellid]
-            mass = penalty * mass_matrix(basis, quad, facescale, dim)
-            operators[row, counter] = mass
+        for s1 in [+1, -1]
+            quad1 = interfacequads[s1, cellid]
+            for s2 in [+1, -1]
+                row = cell_couple_sign_to_row(s1, s2)
+                quad2 = interfacequads[s2, cellid]
+                mass = penalty * interface_mass_matrix(basis, quad1, quad2, facescale)
+                operators[row, idx] = mass
+            end
         end
-        celltooperator[cellid] = counter
-        counter += 1
+        celltooperator[cellid] = idx
     end
     return InterfaceOperators(operators, celltooperator)
 end
@@ -73,7 +75,7 @@ function interface_traction_operators(basis, interfacequads, stiffness, cellmap,
     ncells = length(cellsign)
     hasinterface = cellsign .== 0
     numinterfaces = count(hasinterface)
-    operators = Matrix{Any}(undef, 2, numinterfaces)
+    operators = Matrix{Any}(undef, 4, numinterfaces)
     celltooperator = zeros(Int, ncells)
 
     cellids = findall(hasinterface)
@@ -193,12 +195,35 @@ function coherent_traction_operator(basis, quad1, quad2, normals, stiffness, cel
 
         vals = basis(p1)
         grad = transform_gradient(gradient(basis, p2), jac)
-        normal = normals[:, idx]
+        normal = normals[:, qpidx]
         NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
         N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
         NI = interpolation_matrix(vals, dim)
 
-        matrix .+= NI' * N * stiffness * NK * scalearea[idx] * w
+        matrix .+= NI' * N * stiffness * NK * scalearea[qpidx] * w1
+    end
+    return matrix
+end
+
+function interface_mass_matrix(basis, quad1, quad2, scale)
+    numqp = length(quad1)
+    @assert length(quad2) == length(scale) == numqp
+    nf = number_of_basis_functions(basis)
+    dim = dimension(basis)
+    totaldofs = dim * nf
+    matrix = zeros(totaldofs, totaldofs)
+    for qpidx = 1:numqp
+        p1, w1 = quad1[qpidx]
+        p2, w2 = quad2[qpidx]
+        @assert w1 ≈ w2
+
+        vals1 = basis(p1)
+        vals2 = basis(p2)
+
+        NI1 = interpolation_matrix(vals1, dim)
+        NI2 = interpolation_matrix(vals2, dim)
+
+        matrix .+= NI1' * NI2 * scale[qpidx] * w1
     end
     return matrix
 end
