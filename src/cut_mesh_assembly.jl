@@ -36,7 +36,7 @@ end
 function assemble_interface_condition!(
     sysmatrix::SystemMatrix,
     interfacecondition::InterfaceCondition,
-    cutmesh::CutMesh;
+    cutmesh;
     eta = 1,
 )
 
@@ -49,72 +49,72 @@ function assemble_interface_condition!(
         negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
         positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
 
-        negtop = -0.5 * vec(traction_operator(interfacecondition, -1, cellid))
-        postop = -0.5 * vec(traction_operator(interfacecondition, +1, cellid))
+        pptop = -0.5*vec(traction_operator(interfacecondition,+1,+1,cellid))
+        pntop = -0.5*vec(traction_operator(interfacecondition,+1,-1,cellid))
+        nptop = -0.5*vec(traction_operator(interfacecondition,-1,+1,cellid))
+        nntop = -0.5*vec(traction_operator(interfacecondition,-1,-1,cellid))
 
-        transnegtop =
-            -0.5 *
-            eta *
-            vec(transpose(traction_operator(interfacecondition, -1, cellid)))
-        transpostop =
-            -0.5 *
-            eta *
-            vec(transpose(traction_operator(interfacecondition, +1, cellid)))
+        pptopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,+1,+1,cellid)))
+        pntopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,+1,-1,cellid)))
+        nptopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,-1,+1,cellid)))
+        nntopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,-1,-1,cellid)))
 
-        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -postop)
-        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -transpostop)
+        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -pptop)
+        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -pptopT)
 
         assemble_couple_cell_matrix!(
             sysmatrix,
             positivenodeids,
             negativenodeids,
             dofspernode,
-            -negtop,
+            -pntop,
         )
         assemble_couple_cell_matrix!(
             sysmatrix,
             positivenodeids,
             negativenodeids,
             dofspernode,
-            transpostop,
+            nptopT,
         )
 
-        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, negtop)
-        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, transnegtop)
+        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, nntop)
+        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, nntopT)
 
         assemble_couple_cell_matrix!(
             sysmatrix,
             negativenodeids,
             positivenodeids,
             dofspernode,
-            postop,
+            nptop,
         )
         assemble_couple_cell_matrix!(
             sysmatrix,
             negativenodeids,
             positivenodeids,
             dofspernode,
-            -transnegtop,
+            -pntopT,
         )
 
-        posmass = vec(mass_operator(interfacecondition, +1, cellid))
-        negmass = vec(mass_operator(interfacecondition, -1, cellid))
+        ppmass = vec(mass_operator(interfacecondition,+1,+1,cellid))
+        pnmass = vec(mass_operator(interfacecondition,+1,-1,cellid))
+        npmass = vec(mass_operator(interfacecondition,-1,+1,cellid))
+        nnmass = vec(mass_operator(interfacecondition,-1,-1,cellid))
 
-        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, mass)
-        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, mass)
+        assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, nnmass)
+        assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, ppmass)
         assemble_couple_cell_matrix!(
             sysmatrix,
             negativenodeids,
             positivenodeids,
             dofspernode,
-            -mass,
+            -npmass,
         )
         assemble_couple_cell_matrix!(
             sysmatrix,
             positivenodeids,
             negativenodeids,
             dofspernode,
-            -mass,
+            -pnmass,
         )
     end
 end

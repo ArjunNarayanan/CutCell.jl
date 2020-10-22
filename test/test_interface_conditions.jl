@@ -164,29 +164,24 @@ sysmatrix = CutCell.SystemMatrix()
 sysrhs = CutCell.SystemRHS()
 
 CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergecutmesh)
-matrix = CutCell.make_sparse(sysmatrix,mergecutmesh)
-# CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
-#
-# matrix = CutCell.make_sparse(sysmatrix, cutmesh)
-# rhs = CutCell.rhs(sysrhs, cutmesh)
-#
-# CutCell.apply_dirichlet_bc!(matrix, rhs, 9, 0.0)
-# CutCell.apply_dirichlet_bc!(matrix, rhs, 10, 0.0)
-# CutCell.apply_dirichlet_bc!(matrix, rhs, 11, 0.0)
-#
-# CutCell.apply_dirichlet_bc!(matrix, rhs, 5, dx)
-# CutCell.apply_dirichlet_bc!(matrix, rhs, 7, dx)
-#
-# sol = matrix \ rhs
-# disp = reshape(sol, 2, :)
-#
-# testdisp = [
-#     0.0 0.0 dx dx 0.0 0.0 dx dx
-#     0.0 dy 0.0 dy 0.0 dy 0.0 dy
-# ]
-# @test allapprox(disp, testdisp, 1e2eps())
+CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergecutmesh)
 
+matrix = CutCell.make_sparse(sysmatrix, mergecutmesh)
+rhs = CutCell.rhs(sysrhs, mergecutmesh)
 
+CutCell.apply_dirichlet_bc!(matrix, rhs, 9, 0.0)
+CutCell.apply_dirichlet_bc!(matrix, rhs, 10, 0.0)
+CutCell.apply_dirichlet_bc!(matrix, rhs, 11, 0.0)
+
+CutCell.apply_dirichlet_bc!(matrix, rhs, 5, dx)
+CutCell.apply_dirichlet_bc!(matrix, rhs, 7, dx)
+
+sol = matrix \ rhs
+disp = reshape(sol, 2, :)
+
+testdisp = [dx/2  dx/2  dx  dx  0.  0.  dx/2  dx/2
+            0.    dy    0.  dy  0.  dy  0.    dy]
+@test allapprox(disp,testdisp,1e2eps())
 
 
 # test_linear_cut_cell_assembly()
