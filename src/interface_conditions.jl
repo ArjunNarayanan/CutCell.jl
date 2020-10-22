@@ -133,12 +133,12 @@ function InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
     return InterfaceCondition(tractionoperator, massoperator, penalty)
 end
 
-function traction_operator(interfacecondition::InterfaceCondition, s, cellid)
-    return interfacecondition.tractionoperator[s, cellid]
+function traction_operator(interfacecondition::InterfaceCondition, s1, s2, cellid)
+    return interfacecondition.tractionoperator[s1, s2, cellid]
 end
 
-function mass_operator(interfacecondition::InterfaceCondition, s, cellid)
-    return interfacecondition.massoperator[s, cellid]
+function mass_operator(interfacecondition::InterfaceCondition, s1, s2, cellid)
+    return interfacecondition.massoperator[s1, s2, cellid]
 end
 
 function Base.show(io::IO, interfacecondition::InterfaceCondition)

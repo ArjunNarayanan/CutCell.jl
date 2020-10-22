@@ -68,7 +68,13 @@ function update_quadrature!(cellquads::CellQuadratures,s,cellid,quad)
     cellquads.quads[idx] = quad
 end
 
-function map_and_update_cell_quadrature!(cellquads,s,cellid,mergemapper,mapid)
+function update_quadrature!(interfacequads::InterfaceQuadratures,s,cellid,quad)
+    row = cell_sign_to_row(s)
+    idx = interfacequads.celltoquad[cellid]
+    interfacequads.quads[row,idx] = quad
+end
+
+function map_and_update_quadrature!(cellquads,s,cellid,mergemapper,mapid)
     quad = cellquads[s,cellid]
     newquad = map_quadrature(quad,mergemapper,mapid)
     update_quadrature!(cellquads,s,cellid,newquad)
@@ -88,7 +94,32 @@ function number_of_cells(mergecutmesh::MergeCutMesh)
     return number_of_cells(mergecutmesh.cutmesh)
 end
 
-function merge_cells(mergecutmesh::MergeCutMesh,s,mergeto,mergefrom)
+function cell_sign(mergecutmesh::MergeCutMesh)
+    return cell_sign(mergecutmesh.cutmesh)
+end
+
+function dimension(mergecutmesh::MergeCutMesh)
+    return dimension(mergecutmesh.cutmesh)
+end
+
+function number_of_degrees_of_freedom(mergecutmesh::MergeCutMesh)
+    dim = dimension(mergecutmesh)
+    cellsign = cell_sign(mergecutmesh)
+    numnodes = 0
+    for (cellid,s) in enumerate(cellsign)
+        if s == +1 || s == 0
+            nodeids = nodal_connectivity(mergecutmesh,+1,cellid)
+            numnodes = max(numnodes,maximum(nodeids))
+        end
+        if s == -1 || s == 0
+            nodeids = nodal_connectivity(mergecutmesh,-1,cellid)
+            numnodes = max(numnodes,maximum(nodeids))
+        end
+    end
+    return dim*numnodes
+end
+
+function merge_cells!(mergecutmesh::MergeCutMesh,s,mergeto,mergefrom)
     row = cell_sign_to_row(s)
     ncells = number_of_cells(mergecutmesh)
     @assert 1 <= mergeto <= ncells

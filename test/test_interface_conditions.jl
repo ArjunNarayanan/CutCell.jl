@@ -74,12 +74,12 @@ function test_curved_interface_assembly()
     nf = CutCell.number_of_basis_functions(basis)
     mesh = CutCell.Mesh([0.0, 0.0], [2.0, 1.0], [1, 1], nf)
 
-    xc = [2., 0.5]
+    xc = [2.0, 0.5]
     rad = 1.0
     levelsetcoeffs =
         CutCell.levelset_coefficients(x -> circle_distance_function(x, xc, rad), mesh)
 
-    cutmesh = CutCell.CutMesh(levelset,levelsetcoeffs,mesh)
+    cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
     cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
     interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
@@ -106,12 +106,12 @@ function test_curved_interface_assembly()
     matrix = CutCell.make_sparse(sysmatrix, cutmesh)
     rhs = CutCell.rhs(sysrhs, cutmesh)
 
-    CutCell.apply_dirichlet_bc!(matrix,rhs,[10,11,12],1,0.,2)
-    CutCell.apply_dirichlet_bc!(matrix,rhs,[10],2,0.,2)
-    CutCell.apply_dirichlet_bc!(matrix,rhs,[7,8,9],1,dx,2)
+    CutCell.apply_dirichlet_bc!(matrix, rhs, [10, 11, 12], 1, 0.0, 2)
+    CutCell.apply_dirichlet_bc!(matrix, rhs, [10], 2, 0.0, 2)
+    CutCell.apply_dirichlet_bc!(matrix, rhs, [7, 8, 9], 1, dx, 2)
 
-    sol = matrix\rhs
-    disp = reshape(sol,2,:)
+    sol = matrix \ rhs
+    disp = reshape(sol, 2, :)
 
     testdisp = [
         0.0 0.0 0.0 dx/2 dx/2 dx/2 dx dx dx
@@ -119,7 +119,7 @@ function test_curved_interface_assembly()
     ]
     testdisp = repeat(testdisp, outer = (1, 2))
 
-    @test allapprox(disp,testdisp,1e2eps())
+    @test allapprox(disp, testdisp, 1e2eps())
 end
 
 
@@ -129,16 +129,22 @@ numqp = 2
 basis = TensorProductBasis(2, polyorder)
 levelset = InterpolatingPolynomial(1, basis)
 nf = CutCell.number_of_basis_functions(basis)
-mesh = CutCell.Mesh([0.0, 0.0], [2.0, 1.0], [1, 1], nf)
+mesh = CutCell.Mesh([0.0, 0.0], [2.0, 1.0], [2, 1], nf)
 
 normal = [1.0, 0.0]
-x0 = [0.5, 0.0]
+x0 = [1.1, 0.0]
 levelsetcoeffs =
     CutCell.levelset_coefficients(x -> plane_distance_function(x, normal, x0), mesh)
 
 cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+
+mergecutmesh = CutCell.MergeCutMesh(cutmesh)
+CutCell.merge_cells!(mergecutmesh,-1,1,2)
+mergemapper = CutCell.MergeMapper()
+CutCell.map_and_update_quadrature!(cellquads,-1,2,mergemapper,2)
+CutCell.map_and_update_quadrature!(interfacequads,-1,2,mergemapper,2)
 
 lambda, mu = (1.0, 2.0)
 penalty = 1.0
@@ -157,7 +163,8 @@ interfacecondition =
 sysmatrix = CutCell.SystemMatrix()
 sysrhs = CutCell.SystemRHS()
 
-# CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergecutmesh)
+matrix = CutCell.make_sparse(sysmatrix,mergecutmesh)
 # CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
 #
 # matrix = CutCell.make_sparse(sysmatrix, cutmesh)

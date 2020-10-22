@@ -1,7 +1,7 @@
 function assemble_bilinear_form!(
     sysmatrix::SystemMatrix,
     cutmeshbfs::BilinearForms,
-    cutmesh::CutMesh,
+    cutmesh,
 )
 
     dofspernode = dimension(cutmesh)
@@ -37,10 +37,10 @@ function assemble_interface_condition!(
     sysmatrix::SystemMatrix,
     interfacecondition::InterfaceCondition,
     cutmesh::CutMesh;
-    eta = 1.0,
+    eta = 1,
 )
 
-    @assert eta == 1.0 || eta == 0.0 || eta == -1.0
+    @assert eta == 1 || eta == 0 || eta == -1
     dofspernode = dimension(cutmesh)
     cellsign = cell_sign(cutmesh)
 
