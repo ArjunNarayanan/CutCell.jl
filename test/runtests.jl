@@ -52,8 +52,16 @@ end
     include("test_cut_mesh_bilinear_forms.jl")
 end
 
+@safetestset "Test Mean Traction Interface Condition" begin
+    include("test_mean_traction_flux.jl")
+end
+
 @safetestset "Test Interface Conditions" begin
     include("test_interface_conditions.jl")
+end
+
+@safetestset "Test Conceptual Merging" begin
+    include("test_extended_mean_flux.jl")
 end
 
 @safetestset "Test Cell Merging" begin

@@ -52,6 +52,66 @@ MM = [+mm  -mm
       -mm  +mm]
 
 K = BF+T1+T2+MM
+@test norm(K-K') > 1.0
+
+rhs = zeros(16)
+
+CutCell.apply_dirichlet_bc!(K,rhs,[5,6],1,0.,2)
+CutCell.apply_dirichlet_bc!(K,rhs,[5],2,0.,2)
+CutCell.apply_dirichlet_bc!(K,rhs,[3,4],1,dx,2)
+
+sol = K\rhs
+disp = reshape(sol,2,:)
+
+testdisp = [0.0 0.0 dx dx 0.0 0.0 dx dx
+            0.0 dy  0. dy 0.  dy  0. dy]
+
+@test allapprox(disp,testdisp,1e2*eps())
+
+
+
+
+eta = 1.0
+BF = [pbf         zeros(8,8)
+      zeros(8,8)  nbf       ]
+T1 = -0.5*[-top  -top
+           +top  +top]
+T2 = eta*T1'
+
+MM = [+mm  -mm
+      -mm  +mm]
+
+K = BF+T1+T2+MM
+@test isapprox(norm(K-K'),0.0,atol=1e1eps())
+
+rhs = zeros(16)
+
+CutCell.apply_dirichlet_bc!(K,rhs,[5,6],1,0.,2)
+CutCell.apply_dirichlet_bc!(K,rhs,[5],2,0.,2)
+CutCell.apply_dirichlet_bc!(K,rhs,[3,4],1,dx,2)
+
+sol = K\rhs
+disp = reshape(sol,2,:)
+
+testdisp = [0.0 0.0 dx dx 0.0 0.0 dx dx
+            0.0 dy  0. dy 0.  dy  0. dy]
+
+@test allapprox(disp,testdisp,1e2*eps())
+
+
+eta = 0.0
+BF = [pbf         zeros(8,8)
+      zeros(8,8)  nbf       ]
+T1 = -0.5*[-top  -top
+           +top  +top]
+T2 = eta*T1'
+
+MM = [+mm  -mm
+      -mm  +mm]
+
+K = BF+T1+T2+MM
+@test norm(K-K') > 1.0
+
 rhs = zeros(16)
 
 CutCell.apply_dirichlet_bc!(K,rhs,[5,6],1,0.,2)

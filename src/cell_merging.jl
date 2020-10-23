@@ -102,6 +102,10 @@ function dimension(mergecutmesh::MergeCutMesh)
     return dimension(mergecutmesh.cutmesh)
 end
 
+function cell_map(mergecutmesh::MergeCutMesh, idx)
+    return cell_map(mergecutmesh.cutmesh,idx)
+end
+
 function number_of_nodes(mergecutmesh::MergeCutMesh)
     cellsign = cell_sign(mergecutmesh)
     numnodes = 0
@@ -252,10 +256,32 @@ function Base.show(io::IO, mergedmesh::MergedMesh)
     print(io,str)
 end
 
+function dimension(mergedmesh::MergedMesh)
+    return dimension(mergedmesh.mergecutmesh)
+end
+
+function cell_sign(mergedmesh::MergedMesh)
+    return cell_sign(mergedmesh.mergecutmesh)
+end
+
 function nodal_connectivity(mergedmesh::MergedMesh,s,cellid)
     labels = nodal_connectivity(mergedmesh.mergecutmesh,s,cellid)
     nodeids = mergedmesh.nodelabeltonodeid[labels]
     return nodeids
+end
+
+function cell_map(mergedmesh::MergedMesh, idx)
+    return cell_map(mergedmesh.mergecutmesh,idx)
+end
+
+function number_of_nodes(mergedmesh::MergedMesh)
+    return mergedmesh.numnodes
+end
+
+function number_of_degrees_of_freedom(mergedmesh::MergedMesh)
+    dim = dimension(mergedmesh)
+    numnodes = number_of_nodes(mergedmesh)
+    return dim*numnodes
 end
 
 function active_node_labels(mergecutmesh::MergeCutMesh)

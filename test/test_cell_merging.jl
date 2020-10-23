@@ -1,4 +1,5 @@
 using Test
+using LinearAlgebra
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -68,7 +69,8 @@ function test_linear_merge_cell_assembly()
     @test CutCell.number_of_nodes(mergecutmesh) == 10
 
     CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,mergemapper)
-    @test CutCell.number_of_nodes(mergecutmesh) == 8
+    mergedmesh = CutCell.MergedMesh(mergecutmesh)
+    @test CutCell.number_of_nodes(mergedmesh) == 8
 
     lambda, mu = (1.0, 2.0)
     penalty = 1.0
@@ -80,18 +82,18 @@ function test_linear_merge_cell_assembly()
 
     stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
 
-    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
 
-    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergecutmesh)
-    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergecutmesh)
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergedmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh)
 
-    matrix = CutCell.make_sparse(sysmatrix, mergecutmesh)
-    rhs = CutCell.rhs(sysrhs, mergecutmesh)
+    matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
+    rhs = CutCell.rhs(sysrhs, mergedmesh)
 
     CutCell.apply_dirichlet_bc!(matrix, rhs, 9, 0.0)
     CutCell.apply_dirichlet_bc!(matrix, rhs, 10, 0.0)
@@ -132,7 +134,8 @@ function test_curved_merge_assembly()
     @test CutCell.number_of_nodes(mergecutmesh) == 24
 
     CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,mergemapper)
-    @test CutCell.number_of_nodes(mergecutmesh) == 18
+    mergedmesh = CutCell.MergedMesh(mergecutmesh)
+    @test CutCell.number_of_nodes(mergedmesh) == 18
 
     lambda, mu = (1.0, 2.0)
     penalty = 1.0
@@ -144,18 +147,18 @@ function test_curved_merge_assembly()
 
     stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
 
-    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
 
-    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergecutmesh)
-    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergecutmesh)
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergedmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh)
 
-    matrix = CutCell.make_sparse(sysmatrix, mergecutmesh)
-    rhs = CutCell.rhs(sysrhs, mergecutmesh)
+    matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
+    rhs = CutCell.rhs(sysrhs, mergedmesh)
 
     CutCell.apply_dirichlet_bc!(matrix, rhs, [10, 11, 12], 1, 0.0, 2)
     CutCell.apply_dirichlet_bc!(matrix, rhs, [10], 2, 0.0, 2)
@@ -169,65 +172,66 @@ function test_curved_merge_assembly()
     @test allapprox(disp,testdisp,1e2eps())
 end
 
+function test_four_cell_vertical_tension()
+    polyorder = 1
+    numqp = 3
 
-polyorder = 1
-numqp = 3
+    basis = TensorProductBasis(2, polyorder)
+    levelset = InterpolatingPolynomial(1, basis)
+    nf = CutCell.number_of_basis_functions(basis)
+    mesh = CutCell.Mesh([0.0, 0.0], [2.0, 2.0], [2, 2], nf)
 
-basis = TensorProductBasis(2, polyorder)
-levelset = InterpolatingPolynomial(1, basis)
-nf = CutCell.number_of_basis_functions(basis)
-mesh = CutCell.Mesh([0.0, 0.0], [2.0, 2.0], [2, 2], nf)
+    normal = [0.0, 1.0]
+    x0 = [0.0, 1.1]
+    levelsetcoeffs =
+        CutCell.levelset_coefficients(x -> plane_distance_function(x, normal, x0), mesh)
 
-normal = [0.0, 1.0]
-x0 = [0.0, 1.1]
-levelsetcoeffs =
-    CutCell.levelset_coefficients(x -> plane_distance_function(x, normal, x0), mesh)
+    cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
+    cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
-cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
-cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    mergemapper = CutCell.MergeMapper()
+    mergecutmesh = CutCell.MergeCutMesh(cutmesh)
 
-mergemapper = CutCell.MergeMapper()
-mergecutmesh = CutCell.MergeCutMesh(cutmesh)
+    CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,mergemapper)
+    mergedmesh = CutCell.MergedMesh(mergecutmesh)
 
-CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,mergemapper)
+    lambda, mu = (1.0, 2.0)
+    penalty = 1.0
+    dy = 0.1
+    e22 = dy / 2.0
+    e11 = -lambda / (lambda + 2mu) * e22
+    dx = e11*2.0
+
+    stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
+
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
+    interfacecondition =
+        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+
+    sysmatrix = CutCell.SystemMatrix()
+    sysrhs = CutCell.SystemRHS()
+
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergedmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh)
+
+    matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
+    rhs = CutCell.rhs(sysrhs, mergedmesh)
+
+    CutCell.apply_dirichlet_bc!(matrix, rhs, [7,9,11],2,0.0,2)
+    CutCell.apply_dirichlet_bc!(matrix, rhs, [7],1,0.0,2)
+
+    CutCell.apply_dirichlet_bc!(matrix, rhs, [2,4,6],2,dy,2)
+
+    sol = matrix \ rhs
+    disp = reshape(sol, 2, :)
+
+    testdisp = [0.   0.  dx/2  dx/2  dx    dx  0.  0.   dx/2  dx/2  dx  dx
+                dy/2 dy  dy/2  dy    dy/2  dy  0.  dy/2 0.    dy/2  0.  dy/2]
+    @test allapprox(disp,testdisp,1e2eps())
+end
 
 
-# lambda, mu = (1.0, 2.0)
-# penalty = 1.0
-# dx = 0.1
-# e11 = dx / 2.0
-# e22 = -lambda / (lambda + 2mu) * e11
-# dy = e22
-# s11 = (lambda + 2mu) * e11 + lambda * e22
-#
-# stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
-#
-# bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-# interfacecondition =
-#     CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
-#
-# sysmatrix = CutCell.SystemMatrix()
-# sysrhs = CutCell.SystemRHS()
-#
-# CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergecutmesh)
-# CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergecutmesh)
-#
-# matrix = CutCell.make_sparse(sysmatrix, mergecutmesh)
-# rhs = CutCell.rhs(sysrhs, mergecutmesh)
-#
-# CutCell.apply_dirichlet_bc!(matrix, rhs, [7,10,13],2,0.0,2)
-# CutCell.apply_dirichlet_bc!(matrix, rhs, [7],1, 0.0,2)
-#
-# CutCell.apply_dirichlet_bc!(matrix, rhs, [2,4,6],2,dx,2)
-#
-# sol = matrix \ rhs
-# disp = reshape(sol, 2, :)
-#
-# testdisp = [dx/2  dx/2  dx  dx  0.  0.  dx/2  dx/2
-#             0.    dy    0.  dy  0.  dy  0.    dy]
-# @test allapprox(disp,testdisp,1e2eps())
-#
-#
-# test_linear_merge_cell_assembly()
-# test_curved_merge_assembly()
+test_linear_merge_cell_assembly()
+test_curved_merge_assembly()
+test_four_cell_vertical_tension()
