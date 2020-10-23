@@ -20,6 +20,10 @@ function levelset_coefficients(distancefunc,mesh)
     return distancefunc(nodalcoordinates)
 end
 
+function reference_cell_area()
+    return 4.0
+end
+
 function reference_face_normals()
     n1 = [0.,-1.]
     n2 = [1.,0.]
@@ -72,6 +76,20 @@ function extend_to_face(points, faceid)
     @assert dir == 1 || dir == 2
     flipdir = dir == 1 ? 2 : 1
     return extend([coordval], flipdir, points)
+end
+
+function opposite_face(faceid)
+    if faceid == 1
+        return 3
+    elseif faceid == 2
+        return 4
+    elseif faceid == 3
+        return 1
+    elseif faceid == 4
+        return 2
+    else
+        error("Expected faceid ∈ {1,2,3,4} got faceid = $faceid")
+    end
 end
 
 function tangents(normals)

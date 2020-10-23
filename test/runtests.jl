@@ -56,6 +56,10 @@ end
     include("test_interface_conditions.jl")
 end
 
+@safetestset "Test Cell Merging" begin
+    include("test_cell_merging.jl")
+end
+
 @safetestset "Test Penalty Displacement BC" begin
     include("test_penalty_displacement_bc.jl")
 end

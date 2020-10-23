@@ -93,3 +93,12 @@ end
 function uniform_cell_quadrature(vquads::CellQuadratures)
     return vquads.quads[1]
 end
+
+function number_of_cells(cellquads::CellQuadratures)
+    return cellquads.ncells
+end
+
+function has_quadrature(cellquads::CellQuadratures,s,cellid)
+    row = cell_sign_to_row(s)
+    return cellquads.celltoquad[row,cellid] != 0
+end

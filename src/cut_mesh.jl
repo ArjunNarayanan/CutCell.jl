@@ -1,6 +1,7 @@
 struct CutMesh
     mesh::Mesh
     cellsign::Vector{Int}
+    activecells::Matrix{Bool}
     cutmeshnodeids::Matrix{Int}
     ncells::Int
     numnodes::Int
@@ -14,10 +15,22 @@ struct CutMesh
         nummeshnodes = number_of_nodes(mesh)
         @assert length(cellsign) == ncells
         @assert size(cutmeshnodeids) == (2, nummeshnodes)
+
+        activecells = active_cells(cellsign)
         numnodes = maximum(cutmeshnodeids)
-        nelmts = count_elements(cellsign)
-        new(mesh, cellsign, cutmeshnodeids, ncells, numnodes, nelmts)
+        nelmts = count(activecells)
+        new(mesh, cellsign, activecells, cutmeshnodeids, ncells, numnodes, nelmts)
     end
+end
+
+function active_cells(cellsign)
+    ncells = length(cellsign)
+    activecells = zeros(Bool,2,ncells)
+    idx1 = findall((cellsign .== +1) .| (cellsign .== 0))
+    idx2 = findall((cellsign .== -1) .| (cellsign .== 0))
+    activecells[1,idx1] .= true
+    activecells[2,idx2] .= true
+    return activecells
 end
 
 function CutMesh(levelset::InterpolatingPolynomial, levelsetcoeffs, mesh)
@@ -52,6 +65,10 @@ function nodal_connectivity(cutmesh::CutMesh, s, cellid)
     ids = nc[:, cellid]
     nodeids = cutmesh.cutmeshnodeids[row, ids]
     return nodeids
+end
+
+function active_cells(cutmesh::CutMesh)
+    return cutmesh.activecells
 end
 
 function dimension(cutmesh::CutMesh)
@@ -143,18 +160,4 @@ function cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
         counter += 1
     end
     return cutmeshnodeids
-end
-
-function count_elements(cellsign)
-    nelmts = 0
-    for s in cellsign
-        if s == +1 || s == -1
-            nelmts += 1
-        elseif s == 0
-            nelmts += 2
-        else
-            error("Expected cellsign ∈ {-1,0,+1}, got cellsign = $s")
-        end
-    end
-    return nelmts
 end
