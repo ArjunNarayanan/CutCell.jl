@@ -74,10 +74,26 @@ function update_quadrature!(interfacequads::InterfaceQuadratures, s, cellid, qua
     interfacequads.quads[row, idx] = quad
 end
 
+function update_face_quadrature!(facequads::FaceQuadratures, s, faceid, cellid, quad)
+    row = cell_sign_to_row(s)
+    idx = facequads.facetoquad[row, faceid, cellid]
+    @assert idx > 4 "Attempting to modify the uniform cell face quadrature rules"
+    facequads.quads[idx] = quad
+end
+
 function map_and_update_quadrature!(cellquads, s, cellid, mergemapper, mapid)
     quad = cellquads[s, cellid]
     newquad = map_quadrature(quad, mergemapper, mapid)
     update_quadrature!(cellquads, s, cellid, newquad)
+end
+
+function map_and_update_face_quadrature!(facequads, s, cellid, mergemapper, mapid)
+    nfaces = number_of_faces_per_cell(facequads)
+    for faceid = 1:nfaces
+        quad = facequads[s, faceid, cellid]
+        newquad = map_quadrature(quad, mergemapper, mapid)
+        update_face_quadrature!(facequads, s, faceid, cellid, newquad)
+    end
 end
 
 struct MergeCutMesh
@@ -98,12 +114,26 @@ function cell_sign(mergecutmesh::MergeCutMesh)
     return cell_sign(mergecutmesh.cutmesh)
 end
 
+function cell_sign(mergecutmesh::MergeCutMesh,cellid)
+    return cell_sign(mergecutmesh.cutmesh,cellid)
+end
+
 function dimension(mergecutmesh::MergeCutMesh)
     return dimension(mergecutmesh.cutmesh)
 end
 
-function cell_map(mergecutmesh::MergeCutMesh, idx)
-    return cell_map(mergecutmesh.cutmesh,idx)
+function cell_map(mergecutmesh::MergeCutMesh, s, cellid)
+    row = cell_sign_to_row(s)
+    mergecellid = mergecutmesh.mergedwithcell[row, cellid]
+    return cell_map(mergecutmesh.cutmesh, mergecellid)
+end
+
+function cell_map(mergecutmesh::MergeCutMesh, cellid)
+    return cell_map(mergecutmesh.cutmesh, cellid)
+end
+
+function is_interior_cell(mergecutmesh::MergeCutMesh)
+    return is_interior_cell(mergecutmesh.cutmesh)
 end
 
 function number_of_nodes(mergecutmesh::MergeCutMesh)
@@ -229,19 +259,64 @@ function merge_cells_in_mesh!(mergecutmesh, cellquads, interfacequads, mergemapp
     end
 end
 
+function merge_cells_in_mesh!(
+    mergecutmesh,
+    cellquads,
+    interfacequads,
+    facequads,
+    mergemapper,
+)
+
+    cellconnectivity = cell_connectivity(mergecutmesh)
+    activecells = active_cells(mergecutmesh)
+    ncells = number_of_cells(mergecutmesh)
+
+    quadareas = quadrature_areas(cellquads)
+    istinycell = is_tiny_cell(cellquads, quadareas)
+
+    for cellid = 1:ncells
+        for s in [+1, -1]
+            row = cell_sign_to_row(s)
+            if istinycell[row, cellid]
+                nbrcellids = cellconnectivity[:, cellid]
+                nbractive =
+                    [nbrid == 0 ? false : activecells[row, nbrid] for nbrid in nbrcellids]
+                nbrnontiny =
+                    [nbrid == 0 ? false : !istinycell[row, nbrid] for nbrid in nbrcellids]
+                faceid = findfirst(nbractive .& nbrnontiny)
+                !isnothing(faceid) ||
+                    error("Could not find appropriate merge direction for cell $cellid, cellsign $s")
+                oppositeface = opposite_face(faceid)
+                mergecellid = nbrcellids[faceid]
+
+                merge_cells!(mergecutmesh, s, mergecellid, cellid)
+                map_and_update_quadrature!(cellquads, s, cellid, mergemapper, oppositeface)
+                map_and_update_quadrature!(
+                    interfacequads,
+                    s,
+                    cellid,
+                    mergemapper,
+                    oppositeface,
+                )
+                map_and_update_face_quadrature!(facequads,s,cellid,mergemapper,oppositeface)
+            end
+        end
+    end
+end
+
 struct MergedMesh
     mergecutmesh::MergeCutMesh
-    nodelabeltonodeid
-    numnodes
+    nodelabeltonodeid::Any
+    numnodes::Any
     function MergedMesh(mergecutmesh::MergeCutMesh)
         activenodelabels = active_node_labels(mergecutmesh)
         maxlabel = maximum(activenodelabels)
-        nodelabeltonodeid = zeros(Int,maxlabel)
-        for (idx,label) in enumerate(activenodelabels)
+        nodelabeltonodeid = zeros(Int, maxlabel)
+        for (idx, label) in enumerate(activenodelabels)
             nodelabeltonodeid[label] = idx
         end
         numnodes = length(activenodelabels)
-        new(mergecutmesh,nodelabeltonodeid,numnodes)
+        new(mergecutmesh, nodelabeltonodeid, numnodes)
     end
 end
 
@@ -253,7 +328,7 @@ function Base.show(io::IO, mergedmesh::MergedMesh)
     ncells = number_of_cells(mergedmesh)
     numnodes = mergedmesh.numnodes
     str = "MergedMesh\n\tNum. Cells: $ncells\n\tNum. Nodes: $numnodes"
-    print(io,str)
+    print(io, str)
 end
 
 function dimension(mergedmesh::MergedMesh)
@@ -264,24 +339,40 @@ function cell_sign(mergedmesh::MergedMesh)
     return cell_sign(mergedmesh.mergecutmesh)
 end
 
-function nodal_connectivity(mergedmesh::MergedMesh,s,cellid)
-    labels = nodal_connectivity(mergedmesh.mergecutmesh,s,cellid)
+function cell_sign(mergedmesh::MergedMesh,cellid)
+    return cell_sign(mergedmesh.mergecutmesh,cellid)
+end
+
+function is_interior_cell(mergedmesh::MergedMesh)
+    return is_interior_cell(mergedmesh.mergecutmesh)
+end
+
+function nodal_connectivity(mergedmesh::MergedMesh, s, cellid)
+    labels = nodal_connectivity(mergedmesh.mergecutmesh, s, cellid)
     nodeids = mergedmesh.nodelabeltonodeid[labels]
     return nodeids
 end
 
-function cell_map(mergedmesh::MergedMesh, idx)
-    return cell_map(mergedmesh.mergecutmesh,idx)
+function cell_map(mergedmesh::MergedMesh, s, idx)
+    return cell_map(mergedmesh.mergecutmesh, s, idx)
+end
+
+function cell_map(mergedmesh::MergedMesh,cellid)
+    return cell_map(mergedmesh.mergecutmesh,cellid)
 end
 
 function number_of_nodes(mergedmesh::MergedMesh)
     return mergedmesh.numnodes
 end
 
+function cell_connectivity(mergedmesh::MergedMesh)
+    return cell_connectivity(mergedmesh.mergecutmesh)
+end
+
 function number_of_degrees_of_freedom(mergedmesh::MergedMesh)
     dim = dimension(mergedmesh)
     numnodes = number_of_nodes(mergedmesh)
-    return dim*numnodes
+    return dim * numnodes
 end
 
 function active_node_labels(mergecutmesh::MergeCutMesh)
@@ -292,12 +383,12 @@ function active_node_labels(mergecutmesh::MergeCutMesh)
 
     cellids = findall(x -> x == 0 || x == +1, cellsign)
     for cellid in cellids
-        append!(activenodeids,nodal_connectivity(mergecutmesh,+1,cellid))
+        append!(activenodeids, nodal_connectivity(mergecutmesh, +1, cellid))
     end
 
     cellids = findall(x -> x == 0 || x == -1, cellsign)
     for cellid in cellids
-        append!(activenodeids,nodal_connectivity(mergecutmesh,-1,cellid))
+        append!(activenodeids, nodal_connectivity(mergecutmesh, -1, cellid))
     end
 
     sort!(activenodeids)

@@ -6,11 +6,7 @@ struct CutMesh
     ncells::Int
     numnodes::Int
     nelmts::Int
-    function CutMesh(
-        mesh::Mesh,
-        cellsign::Vector{Int},
-        cutmeshnodeids::Matrix{Int},
-    )
+    function CutMesh(mesh::Mesh, cellsign::Vector{Int}, cutmeshnodeids::Matrix{Int})
         ncells = number_of_cells(mesh)
         nummeshnodes = number_of_nodes(mesh)
         @assert length(cellsign) == ncells
@@ -25,11 +21,11 @@ end
 
 function active_cells(cellsign)
     ncells = length(cellsign)
-    activecells = zeros(Bool,2,ncells)
+    activecells = zeros(Bool, 2, ncells)
     idx1 = findall((cellsign .== +1) .| (cellsign .== 0))
     idx2 = findall((cellsign .== -1) .| (cellsign .== 0))
-    activecells[1,idx1] .= true
-    activecells[2,idx2] .= true
+    activecells[1, idx1] .= true
+    activecells[2, idx2] .= true
     return activecells
 end
 
@@ -41,8 +37,7 @@ function CutMesh(levelset::InterpolatingPolynomial, levelsetcoeffs, mesh)
     negactivenodeids = active_node_ids(-1, cellsign, nodalconnectivity)
 
     totalnumnodes = number_of_nodes(mesh)
-    cutmeshnodeids =
-        cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
+    cutmeshnodeids = cut_mesh_nodeids(posactivenodeids, negactivenodeids, totalnumnodes)
     return CutMesh(mesh, cellsign, cutmeshnodeids)
 end
 
@@ -58,7 +53,7 @@ function nodal_connectivity(cutmesh::CutMesh, s, cellid)
     row = cell_sign_to_row(s)
     ncells = cutmesh.mesh.ncells
     @assert 1 <= cellid <= ncells
-    cs = cell_sign(cutmesh,cellid)
+    cs = cell_sign(cutmesh, cellid)
     @assert cs == s || cs == 0
 
     nc = nodal_connectivity(cutmesh.mesh)
@@ -103,6 +98,10 @@ end
 
 function cell_map(cutmesh::CutMesh, cellid)
     return cell_map(cutmesh.mesh, cellid)
+end
+
+function cell_map(cutmesh::CutMesh, s, cellid)
+    return cell_map(cutmesh, cellid)
 end
 
 function face_determinant_jacobian(cutmesh::CutMesh)

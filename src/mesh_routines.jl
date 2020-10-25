@@ -8,6 +8,7 @@ struct Mesh
     nfmside::Any
     totalnodes::Any
     nodesperelement::Any
+    isinteriorcell::Any
 end
 
 function Mesh(mesh, nf::Int)
@@ -22,6 +23,7 @@ function Mesh(mesh, nf::Int)
     nodalcoordinates = nodal_coordinates(x0, widths(mesh), nelements, nfmside)
     nodalconnectivity = nodal_connectivity(nfmside, nfeside, nf, nelements)
     cellconnectivity = cell_connectivity(mesh)
+    isinteriorcell = is_interior_cell(cellconnectivity)
     ncells = number_of_elements(mesh)
     Mesh(
         dim,
@@ -33,6 +35,7 @@ function Mesh(mesh, nf::Int)
         nfmside,
         totalnodes,
         nf,
+        isinteriorcell,
     )
 end
 
@@ -102,7 +105,7 @@ function cell_map(mesh::Mesh, i)
 end
 
 function face_determinant_jacobian(mesh::Mesh)
-    return face_determinant_jacobian(cell_map(mesh,1))
+    return face_determinant_jacobian(cell_map(mesh, 1))
 end
 
 function nodes_per_mesh_side(nelements, nfeside)
@@ -164,8 +167,7 @@ function nodal_connectivity(nfmside, nfeside, nodesperelement, nelements)
         rowstart = 1
         rowend = nfeside
         for row = 1:nelements[2]
-            connectivity[:, cellid] .=
-                vec(nodeids[rowstart:rowend, colstart:colend])
+            connectivity[:, cellid] .= vec(nodeids[rowstart:rowend, colstart:colend])
             cellid += 1
             rowstart = rowend
             rowend += nfeside - 1
@@ -234,8 +236,7 @@ function is_interior_cell(cellconnectivity)
 end
 
 function is_interior_cell(mesh::Mesh)
-    cellconnectivity = cell_connectivity(mesh)
-    return is_interior_cell(cellconnectivity)
+    return mesh.isinteriorcell
 end
 
 function is_boundary_cell(x)

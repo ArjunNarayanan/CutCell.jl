@@ -64,6 +64,10 @@ function reference_face_quadrature(facequads::FaceQuadratures)
     return facequads.quads[1:facequads.nfaces]
 end
 
+function number_of_faces_per_cell(facequads::FaceQuadratures)
+    return facequads.nfaces
+end
+
 function Base.show(io::IO, facequads::FaceQuadratures)
     ncells = facequads.ncells
     nuniquefacequads = length(facequads.quads)

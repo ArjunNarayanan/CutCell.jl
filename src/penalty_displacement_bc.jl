@@ -29,7 +29,7 @@ function boundary_mass_operator(basis, facequads, cutmesh, onboundary, penalty)
         penalty * mass_matrix(basis, q, detjac, dim)
         for (q, detjac) in zip(refquads, facedetjac)
     ]
-    facetooperator = zeros(Int, 2, 4, ncells)
+    facetooperator = zeros(Int, 2, nfaces, ncells)
 
     for cellid in cellids
         cellmap = cell_map(cutmesh, cellid)
@@ -88,7 +88,7 @@ function boundary_traction_operator(basis, facequads, stiffness, cutmesh, onboun
     ]
 
     operators = vcat(operators1, operators2)
-    facetooperator = zeros(Int, 2, 4, ncells)
+    facetooperator = zeros(Int, 2, nfaces, ncells)
 
     for cellid in cellids
         cellmap = cell_map(cutmesh, cellid)
@@ -144,7 +144,7 @@ function boundary_displacement_rhs(bcfunc, basis, facequads, cutmesh, onboundary
     ncells = length(cellsign)
 
     vectors = []
-    facetovectors = zeros(Int, 2, 4, ncells)
+    facetovectors = zeros(Int, 2, nfaces, ncells)
 
     for cellid in cellids
         cellmap = cell_map(cutmesh, cellid)
@@ -154,18 +154,20 @@ function boundary_displacement_rhs(bcfunc, basis, facequads, cutmesh, onboundary
                 if onboundary(cellmap(facemidpoints[faceid]))
                     @assert s == +1 || s == 0 || s == -1
                     if s == +1 || s == 0
+                        cm = cell_map(cutmesh,+1,cellid)
                         pquad = facequads[+1, faceid, cellid]
                         rhs =
                             penalty *
-                            linear_form(bcfunc, basis, pquad, cellmap, facedetjac[faceid])
+                            linear_form(bcfunc, basis, pquad, cm, facedetjac[faceid])
                         push!(vectors, rhs)
                         facetovectors[1, faceid, cellid] = length(vectors)
                     end
                     if s == -1 || s == 0
+                        cm = cell_map(cutmesh,-1,cellid)
                         nquad = facequads[-1, faceid, cellid]
                         rhs =
                             penalty *
-                            linear_form(bcfunc, basis, nquad, cellmap, facedetjac[faceid])
+                            linear_form(bcfunc, basis, nquad, cm, facedetjac[faceid])
                         push!(vectors, rhs)
                         facetovectors[2, faceid, cellid] = length(vectors)
                     end
@@ -213,7 +215,7 @@ function boundary_mass_component_operator(
         penalty * component_mass_matrix(basis, q, component, detjac)
         for (q, detjac) in zip(refquads, facedetjac)
     ]
-    facetooperator = zeros(Int, 2, 4, ncells)
+    facetooperator = zeros(Int, 2, nfaces, ncells)
 
     for cellid in cellids
         cellmap = cell_map(cutmesh, cellid)
@@ -303,7 +305,7 @@ function boundary_traction_component_operator(
     ]
 
     operators = vcat(operators1, operators2)
-    facetooperator = zeros(Int, 2, 4, ncells)
+    facetooperator = zeros(Int, 2, nfaces, ncells)
 
     for cellid in cellids
         cellmap = cell_map(cutmesh, cellid)
@@ -370,7 +372,7 @@ function boundary_displacement_component_rhs(
     ncells = length(cellsign)
 
     vectors = []
-    facetovectors = zeros(Int, 2, 4, ncells)
+    facetovectors = zeros(Int, 2, nfaces, ncells)
 
     for cellid in cellids
         cellmap = cell_map(cutmesh, cellid)

@@ -86,9 +86,9 @@ function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
     ncells = CutCell.number_of_cells(cutmesh)
     for cellid = 1:ncells
         s = CutCell.cell_sign(cutmesh, cellid)
-        cellmap = CutCell.cell_map(cutmesh, cellid)
         @assert s == -1 || s == 0 || s == 1
         if s == 1 || s == 0
+            cellmap = CutCell.cell_map(cutmesh, +1, cellid)
             nodeids = CutCell.nodal_connectivity(cutmesh, 1, cellid)
             elementsolution = nodalsolutions[:, nodeids]
             update!(interpolater, elementsolution)
@@ -96,6 +96,7 @@ function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
             add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
         end
         if s == -1 || s == 0
+            cellmap = CutCell.cell_map(cutmesh, -1, cellid)
             nodeids = CutCell.nodal_connectivity(cutmesh, -1, cellid)
             elementsolution = nodalsolutions[:, nodeids]
             update!(interpolater, elementsolution)

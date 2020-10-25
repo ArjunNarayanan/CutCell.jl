@@ -135,7 +135,7 @@ function assemble_body_force_linear_form!(
     end
 end
 
-function assemble_body_force_linear_form!(systemrhs, rhsfunc, basis, quad, mesh)
+function assemble_body_force_linear_form!(systemrhs, rhsfunc, basis, quad, mesh::Mesh)
     cellmaps = cell_maps(mesh)
     nodalconnectivity = nodal_connectivity(mesh)
     assemble_body_force_linear_form!(

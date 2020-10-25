@@ -110,7 +110,7 @@ function write_convergence_data_to_file(xc, radius, nelmts, polyorder, numqp, pe
     )
 
     penaltystr = @sprintf "%1.1f" penaltyfactor
-    radiusstr = @sprintf "%1.1f" radius
+    radiusstr = @sprintf "%1.2f" radius
 
     foldername = "examples/cut-convergence/radius-" * radiusstr * "-penalty-" * penaltystr
 
@@ -126,12 +126,12 @@ end
 
 
 xc = [1.0, 0.5]
-radius = 0.5
+radius = 0.50
 powers = 1:7
 nelmts = [2^p + 1 for p in powers]
 polyorder = 2
 numqp = required_quadrature_order(polyorder)+2
-penaltyfactor = 1e0
+penaltyfactor = 1e3
 
 # err = solve_elasticity(xc,radius,11,polyorder,numqp,penaltyfactor)
 

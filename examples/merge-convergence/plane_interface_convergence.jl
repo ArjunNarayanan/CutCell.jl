@@ -25,12 +25,12 @@ function onboundary(x, L, W)
     return x[2] ≈ 0.0 || x[1] ≈ L || x[2] ≈ W || x[1] ≈ 0.0
 end
 
-function solve_elasticity(x0, normal, nelmts, polyorder, numqp, penaltyfactor; eta = 1.0)
+function solve_elasticity(x0,normal,nelmts,polyorder,numqp,penaltyfactor; eta = 1)
     L = 1.0
     W = 1.0
     lambda, mu = 1.0, 2.0
-    dx = 1.0 / nelmts
-    penalty = penaltyfactor / dx * (lambda + mu)
+    dx = 1.0/nelmts
+    penalty = penaltyfactor/dx*(lambda+mu)
     alpha = 0.1
     stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
 
@@ -45,16 +45,21 @@ function solve_elasticity(x0, normal, nelmts, polyorder, numqp, penaltyfactor; e
     interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
     facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
-    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+    mergecutmesh = CutCell.MergeCutMesh(cutmesh)
+    mergemapper = CutCell.MergeMapper()
 
+    CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,facequads,mergemapper)
+    mergedmesh = CutCell.MergedMesh(mergecutmesh)
+
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
+    interfacecondition =
+        CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
     displacementbc = CutCell.DisplacementCondition(
-        x -> displacement(alpha, x),
+        x -> displacement(alpha,x),
         basis,
         facequads,
         stiffness,
-        cutmesh,
+        mergedmesh,
         x -> onboundary(x, L, W),
         penalty,
     )
@@ -62,35 +67,33 @@ function solve_elasticity(x0, normal, nelmts, polyorder, numqp, penaltyfactor; e
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
 
-    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
-    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh, eta = eta)
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergedmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh, eta = eta)
     CutCell.assemble_body_force_linear_form!(
         sysrhs,
         x -> body_force(lambda, mu, alpha, x),
         basis,
         cellquads,
-        cutmesh,
+        mergedmesh,
     )
-    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
+    CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,displacementbc,mergedmesh)
 
-    matrix = CutCell.make_sparse(sysmatrix, cutmesh)
-    rhs = CutCell.rhs(sysrhs, cutmesh)
+    matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
+    rhs = CutCell.rhs(sysrhs, mergedmesh)
 
     sol = matrix \ rhs
     disp = reshape(sol, 2, :)
 
-    err = mesh_L2_error(disp, x -> displacement(alpha, x), basis, cellquads, cutmesh)
-    normalizer =
-        integral_norm_on_cut_mesh(x -> displacement(alpha, x), cellquads, cutmesh, 2)
-    return err ./ normalizer
+    err = mesh_L2_error(disp, x -> displacement(alpha,x), basis, cellquads, mergedmesh)
+    return err
 end
 
-function condition_number(x0, normal, nelmts, polyorder, numqp, penaltyfactor; eta = 1.0)
+function condition_number(x0,normal,nelmts,polyorder,numqp,penaltyfactor; eta = 1)
     L = 1.0
     W = 1.0
     lambda, mu = 1.0, 2.0
-    dx = 1.0 / nelmts
-    penalty = penaltyfactor / dx * (lambda + mu)
+    dx = 1.0/nelmts
+    penalty = penaltyfactor/dx*(lambda+mu)
     alpha = 0.1
     stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
 
@@ -105,16 +108,21 @@ function condition_number(x0, normal, nelmts, polyorder, numqp, penaltyfactor; e
     interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
     facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
-    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+    mergecutmesh = CutCell.MergeCutMesh(cutmesh)
+    mergemapper = CutCell.MergeMapper()
 
+    CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,facequads,mergemapper)
+    mergedmesh = CutCell.MergedMesh(mergecutmesh)
+
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
+    interfacecondition =
+        CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
     displacementbc = CutCell.DisplacementCondition(
-        x -> displacement(alpha, x),
+        x -> displacement(alpha,x),
         basis,
         facequads,
         stiffness,
-        cutmesh,
+        mergedmesh,
         x -> onboundary(x, L, W),
         penalty,
     )
@@ -122,10 +130,10 @@ function condition_number(x0, normal, nelmts, polyorder, numqp, penaltyfactor; e
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
 
-    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
-    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh, eta = eta)
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergedmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh, eta = eta)
 
-    matrix = CutCell.make_sparse(sysmatrix, cutmesh)
+    matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
 
     lambda1, phi1 = eigs(matrix,nev=1,which=:SM)
     lambda2, phi2 = eigs(matrix,nev=1,which=:LM)
@@ -162,7 +170,7 @@ function write_convergence_data_to_file(x0, theta, nelmts, polyorder, numqp, pen
 
     penaltystr = @sprintf "%1.1f" penaltyfactor
 
-    foldername = "examples/cut-convergence/theta-" *
+    foldername = "examples/merge-convergence/theta-" *
     string(round(Int, theta)) *
     "-penalty-" * penaltystr
 
@@ -186,15 +194,7 @@ powers = 1:7
 nelmts = [2^p + 1 for p in powers]
 polyorder = 1
 numqp = required_quadrature_order(polyorder)+2
-penaltyfactor = 1e1
-eta = 1.0
+penaltyfactor = 1e3
 
-k = [condition_number(x0,normal,ne,polyorder,numqp,penaltyfactor) for ne in nelmts]
-# errors = [solve_elasticity(x0,normal,ne,polyorder,numqp,penaltyfactor,eta=eta) for ne in nelmts]
-
-# dx = 1.0 ./ nelmts
-# u1err = [er[1] for er in errors]
-
-# rate = diff(log.(u1err)) ./ diff(log.(dx))
-
-# write_convergence_data_to_file(x0, theta, nelmts, polyorder, numqp, penaltyfactor)
+# k = [condition_number(x0,normal,ne,polyorder,numqp,penaltyfactor) for ne in nelmts]
+write_convergence_data_to_file(x0, theta, nelmts, polyorder, numqp, penaltyfactor)

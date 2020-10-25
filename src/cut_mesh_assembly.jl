@@ -49,15 +49,27 @@ function assemble_interface_condition!(
         negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
         positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
 
-        pptop = -0.5*vec(traction_operator(interfacecondition,+1,+1,cellid))
-        pntop = -0.5*vec(traction_operator(interfacecondition,+1,-1,cellid))
-        nptop = -0.5*vec(traction_operator(interfacecondition,-1,+1,cellid))
-        nntop = -0.5*vec(traction_operator(interfacecondition,-1,-1,cellid))
+        pptop = -0.5 * vec(traction_operator(interfacecondition, +1, +1, cellid))
+        pntop = -0.5 * vec(traction_operator(interfacecondition, +1, -1, cellid))
+        nptop = -0.5 * vec(traction_operator(interfacecondition, -1, +1, cellid))
+        nntop = -0.5 * vec(traction_operator(interfacecondition, -1, -1, cellid))
 
-        pptopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,+1,+1,cellid)))
-        pntopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,+1,-1,cellid)))
-        nptopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,-1,+1,cellid)))
-        nntopT = -0.5*eta*vec(transpose(traction_operator(interfacecondition,-1,-1,cellid)))
+        pptopT =
+            -0.5 *
+            eta *
+            vec(transpose(traction_operator(interfacecondition, +1, +1, cellid)))
+        pntopT =
+            -0.5 *
+            eta *
+            vec(transpose(traction_operator(interfacecondition, +1, -1, cellid)))
+        nptopT =
+            -0.5 *
+            eta *
+            vec(transpose(traction_operator(interfacecondition, -1, +1, cellid)))
+        nntopT =
+            -0.5 *
+            eta *
+            vec(transpose(traction_operator(interfacecondition, -1, -1, cellid)))
 
         assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -pptop)
         assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -pptopT)
@@ -95,10 +107,10 @@ function assemble_interface_condition!(
             -pntopT,
         )
 
-        ppmass = vec(mass_operator(interfacecondition,+1,+1,cellid))
-        pnmass = vec(mass_operator(interfacecondition,+1,-1,cellid))
-        npmass = vec(mass_operator(interfacecondition,-1,+1,cellid))
-        nnmass = vec(mass_operator(interfacecondition,-1,-1,cellid))
+        ppmass = vec(mass_operator(interfacecondition, +1, +1, cellid))
+        pnmass = vec(mass_operator(interfacecondition, +1, -1, cellid))
+        npmass = vec(mass_operator(interfacecondition, -1, +1, cellid))
+        nnmass = vec(mass_operator(interfacecondition, -1, -1, cellid))
 
         assemble_cell_matrix!(sysmatrix, negativenodeids, dofspernode, nnmass)
         assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, ppmass)
@@ -119,13 +131,7 @@ function assemble_interface_condition!(
     end
 end
 
-function assemble_body_force_linear_form!(
-    systemrhs,
-    rhsfunc,
-    basis,
-    cellquads::CellQuadratures,
-    cutmesh::CutMesh,
-)
+function assemble_body_force_linear_form!(systemrhs, rhsfunc, basis, cellquads, cutmesh)
 
     ncells = number_of_cells(cutmesh)
     cellsign = cell_sign(cutmesh)
@@ -134,8 +140,8 @@ function assemble_body_force_linear_form!(
     for cellid = 1:ncells
         s = cellsign[cellid]
         @assert s == -1 || s == 0 || s == 1
-        cellmap = cell_map(cutmesh, cellid)
         if s == +1 || s == 0
+            cellmap = cell_map(cutmesh, +1, cellid)
             pquad = cellquads[+1, cellid]
             rhs = linear_form(rhsfunc, basis, pquad, cellmap)
             nodeids = nodal_connectivity(cutmesh, +1, cellid)
@@ -143,6 +149,7 @@ function assemble_body_force_linear_form!(
             assemble!(systemrhs, edofs, rhs)
         end
         if s == -1 || s == 0
+            cellmap = cell_map(cutmesh, -1, cellid)
             nquad = cellquads[-1, cellid]
             rhs = linear_form(rhsfunc, basis, nquad, cellmap)
             nodeids = nodal_connectivity(cutmesh, -1, cellid)
@@ -174,15 +181,4 @@ function assemble_penalty_displacement_bc!(sysmatrix, sysrhs, dispcondition, cut
             end
         end
     end
-end
-
-function assemble_penalty_displacement_component_bc!(
-    sysmatrix,
-    sysrhs,
-    dispcondition,
-    cutmesh;
-    eta = 1.0,
-)
-
-
 end
