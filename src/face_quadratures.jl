@@ -13,23 +13,23 @@ struct FaceQuadratures
     end
 end
 
-function FaceQuadratures(cellsign, levelset, levelsetcoeffs, nodalconnectivity, numqp)
+function FaceQuadratures(levelset, levelsetcoeffs, cutmesh::CutMesh, numqp)
 
-    ncells = length(cellsign)
-    @assert size(nodalconnectivity)[2] == ncells
+    ncells = number_of_cells(cutmesh)
+    nodalconnectivity = nodal_connectivity(cutmesh.mesh)
 
     quads = face_quadratures(numqp)
     quad1d = ReferenceQuadratureRule(numqp)
     facetoquad = zeros(Int, 2, 4, ncells)
 
     for cellid = 1:ncells
-        s = cellsign[cellid]
+        s = cell_sign(cutmesh,cellid)
         if s == +1
             facetoquad[1, :, cellid] .= 1:4
         elseif s == -1
             facetoquad[2, :, cellid] .= 1:4
         elseif s == 0
-            nodeids = nodalconnectivity[:, cellid]
+            nodeids = nodalconnectivity[:,cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
             pquad = face_quadratures(levelset, +1, quad1d)
@@ -46,13 +46,6 @@ function FaceQuadratures(cellsign, levelset, levelsetcoeffs, nodalconnectivity, 
         end
     end
     return FaceQuadratures(quads, facetoquad)
-end
-
-function FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-
-    cellsign = cell_sign(cutmesh)
-    nodalconnectivity = nodal_connectivity(cutmesh.mesh)
-    return FaceQuadratures(cellsign, levelset, levelsetcoeffs, nodalconnectivity, numqp)
 end
 
 function Base.getindex(facequads::FaceQuadratures, s, faceid, cellid)

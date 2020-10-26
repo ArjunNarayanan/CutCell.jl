@@ -107,6 +107,22 @@ function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
     return sqrt.(err)
 end
 
+function uniform_mesh_L2_error(nodalsolutions, exactsolution, basis, quad, mesh)
+    err = zeros(2)
+    interpolater = InterpolatingPolynomial(2,basis)
+    ncells = CutCell.number_of_cells(mesh)
+    nodalconnectivity = CutCell.nodal_connectivity(mesh)
+
+    for cellid = 1:ncells
+        cellmap = CutCell.cell_map(mesh,cellid)
+        nodeids = nodalconnectivity[:,cellid]
+        elementsolution = nodalsolutions[:,nodeids]
+        update!(interpolater,elementsolution)
+        add_cell_error_squared!(err,interpolater,exactsolution,cellmap,quad)
+    end
+    return sqrt.(err)
+end
+
 function required_quadrature_order(polyorder)
     ceil(Int, 0.5 * (2polyorder + 1))
 end

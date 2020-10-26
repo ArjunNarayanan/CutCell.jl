@@ -221,12 +221,13 @@ function number_of_degrees_of_freedom(mesh::Mesh)
 end
 
 function boundary_node_ids(mesh::Mesh)
-    vcat(
+    nodeids = vcat(
         bottom_boundary_node_ids(mesh),
         right_boundary_node_ids(mesh),
         top_boundary_node_ids(mesh),
         left_boundary_node_ids(mesh),
     )
+    return unique!(sort!(nodeids))
 end
 
 function is_interior_cell(cellconnectivity)
