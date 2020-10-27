@@ -126,3 +126,16 @@ function cell_couple_sign_to_row(s1,s2)
         return 4
     end
 end
+
+function dimension(basis::TensorProductBasis{dim}) where {dim}
+    return dim
+end
+
+function number_of_basis_functions(basis::TensorProductBasis{dim,T,NF}) where {dim,T,NF}
+
+    return NF
+end
+
+function interpolation_points(basis::TensorProductBasis{D,T,N}) where {D,T,N}
+    return basis.points
+end

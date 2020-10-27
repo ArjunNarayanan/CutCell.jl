@@ -24,15 +24,6 @@ function transform_gradient(gradf, jacobian)
     return gradf / Diagonal(jacobian)
 end
 
-function dimension(basis::TensorProductBasis{dim}) where {dim}
-    return dim
-end
-
-function number_of_basis_functions(basis::TensorProductBasis{dim,T,NF}) where {dim,T,NF}
-
-    return NF
-end
-
 function bilinear_form(basis, quad, stiffness, jacobian)
     dim = dimension(basis)
     nf = number_of_basis_functions(basis)

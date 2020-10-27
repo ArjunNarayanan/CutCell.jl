@@ -11,6 +11,7 @@ import ImplicitDomainQuadrature: extend
 include("cell_map.jl")
 include("elasticity.jl")
 include("mesh_routines.jl")
+include("dg_mesh.jl")
 include("weak_form.jl")
 include("assembly.jl")
 include("dirichlet_bc.jl")

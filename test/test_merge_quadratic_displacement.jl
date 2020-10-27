@@ -44,69 +44,63 @@ dx = 1.0/nelmts
 penalty = penaltyfactor/dx*(lambda+mu)
 stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
 
-# xc = [1.0,0.0]
-# radius = sqrt(2)*dx - 0.1dx
 x0 = [0.1,0.0]
 normal = [1.,-1.]/sqrt(2)
 
 
 basis = TensorProductBasis(2, polyorder)
-mesh = CutCell.Mesh([0.0, 0.0], [L, W], [nelmts, nelmts], basis)
-levelset = InterpolatingPolynomial(1, basis)
 
+# mesh = CutCell.Mesh([0.0, 0.0], [L, W], [nelmts, nelmts], basis)
+# levelset = InterpolatingPolynomial(1, basis)
+#
 # levelsetcoeffs =
-#     CutCell.levelset_coefficients(x -> circle_distance_function(x,xc,radius), mesh)
-levelsetcoeffs =
-    CutCell.levelset_coefficients(x -> plane_distance_function(x,normal,x0), mesh)
-
-
-
-
-cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
-cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-
-
-mergecutmesh = CutCell.MergeCutMesh(cutmesh)
-mergemapper = CutCell.MergeMapper()
-
-CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,facequads,mergemapper)
-mergedmesh = CutCell.MergedMesh(mergecutmesh)
-
-bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
-interfacecondition =
-    CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
-displacementbc = CutCell.DisplacementCondition(
-    x -> displacement(x),
-    basis,
-    facequads,
-    stiffness,
-    mergedmesh,
-    x -> onboundary(x, L, W),
-    penalty,
-)
-
-sysmatrix = CutCell.SystemMatrix()
-sysrhs = CutCell.SystemRHS()
-
-CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergedmesh)
-CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh)
-CutCell.assemble_body_force_linear_form!(
-    sysrhs,
-    x -> body_force(lambda, mu, x),
-    basis,
-    cellquads,
-    mergedmesh,
-)
-CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,displacementbc,mergedmesh)
-
-matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
-rhs = CutCell.rhs(sysrhs, mergedmesh)
-
-sol = matrix \ rhs
-disp = reshape(sol, 2, :)
-
-err = mesh_L2_error(disp, x -> displacement(x), basis, cellquads, mergedmesh)
-
-println("Merged Error = ", err)
+#     CutCell.levelset_coefficients(x -> plane_distance_function(x,normal,x0), mesh)
+#
+# cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
+# cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+# interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+# facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+#
+#
+# mergecutmesh = CutCell.MergeCutMesh(cutmesh)
+# mergemapper = CutCell.MergeMapper()
+#
+# CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,facequads,mergemapper)
+# mergedmesh = CutCell.MergedMesh(mergecutmesh)
+#
+# bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
+# interfacecondition =
+#     CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
+# displacementbc = CutCell.DisplacementCondition(
+#     x -> displacement(x),
+#     basis,
+#     facequads,
+#     stiffness,
+#     mergedmesh,
+#     x -> onboundary(x, L, W),
+#     penalty,
+# )
+#
+# sysmatrix = CutCell.SystemMatrix()
+# sysrhs = CutCell.SystemRHS()
+#
+# CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, mergedmesh)
+# CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh)
+# CutCell.assemble_body_force_linear_form!(
+#     sysrhs,
+#     x -> body_force(lambda, mu, x),
+#     basis,
+#     cellquads,
+#     mergedmesh,
+# )
+# CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,displacementbc,mergedmesh)
+#
+# matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
+# rhs = CutCell.rhs(sysrhs, mergedmesh)
+#
+# sol = matrix \ rhs
+# disp = reshape(sol, 2, :)
+#
+# err = mesh_L2_error(disp, x -> displacement(x), basis, cellquads, mergedmesh)
+#
+# println("Merged Error = ", err)
