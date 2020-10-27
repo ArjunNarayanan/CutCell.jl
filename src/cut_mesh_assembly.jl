@@ -182,3 +182,29 @@ function assemble_penalty_displacement_bc!(sysmatrix, sysrhs, dispcondition, cut
         end
     end
 end
+
+function assemble_bulk_transformation_linear_form!(
+    systemrhs,
+    transfstress,
+    basis,
+    cellquads,
+    cutmesh,
+)
+
+    ncells = number_of_cells(cutmesh)
+    cellsign = cell_sign(cutmesh)
+    dofspernode = dimension(cutmesh)
+    jac = jacobian(cutmesh)
+
+    for cellid = 1:ncells
+        s = cellsign[cellid]
+        @assert s == -1 || s == 0 || s == +1
+        if s == +1 || s == 0
+            pquad = cellquads[+1, cellid]
+            rhs = bulk_transformation_rhs(basis, pquad, transfstress, jac)
+            nodeids = nodal_connectivity(cutmesh, +1, cellid)
+            edofs = element_dofs(nodeids, dofspernode)
+            assemble!(systemrhs, edofs, rhs)
+        end
+    end
+end

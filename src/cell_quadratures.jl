@@ -80,6 +80,8 @@ end
 
 function Base.getindex(vquads::CellQuadratures, s, cellid)
     row = cell_sign_to_row(s)
+    idx = vquads.celltoquad[row,cellid]
+    idx > 0 || error("Cell $cellid, cellsign $s, does not have a cell quadrature")
     return vquads.quads[vquads.celltoquad[row, cellid]]
 end
 

@@ -2,7 +2,7 @@ using Test
 using LinearAlgebra
 using PolynomialBasis
 using ImplicitDomainQuadrature
-# using Revise
+using Revise
 using CutCell
 include("useful_routines.jl")
 
@@ -21,6 +21,7 @@ function quadratic_body_force(lambda, mu)
     b2 = -(4lambda + 6mu)
     return [b1, b2]
 end
+
 
 polyorder = 2
 numqp = 3

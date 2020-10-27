@@ -100,8 +100,16 @@ function cell_map(cutmesh::CutMesh, cellid)
     return cell_map(cutmesh.mesh, cellid)
 end
 
+function cell_map(cutmesh::CutMesh)
+    return cell_map(cutmesh,1)
+end
+
 function cell_map(cutmesh::CutMesh, s, cellid)
     return cell_map(cutmesh, cellid)
+end
+
+function jacobian(cutmesh::CutMesh)
+    return jacobian(cell_map(cutmesh))
 end
 
 function face_determinant_jacobian(cutmesh::CutMesh)
