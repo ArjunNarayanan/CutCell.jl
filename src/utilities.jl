@@ -139,3 +139,11 @@ end
 function interpolation_points(basis::TensorProductBasis{D,T,N}) where {D,T,N}
     return basis.points
 end
+
+function number_of_symmetric_degrees_of_freedom(dim)
+    if dim == 2
+        return 3
+    else
+        error("Current support for dim = 2, got dim = $dim")
+    end
+end

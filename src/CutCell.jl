@@ -24,6 +24,7 @@ include("cut_mesh_bilinear_forms.jl")
 include("transformation_strain.jl")
 include("interface_conditions.jl")
 include("penalty_displacement_bc.jl")
+include("stress.jl")
 include("cut_mesh_assembly.jl")
 include("utilities.jl")
 

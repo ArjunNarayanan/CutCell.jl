@@ -201,3 +201,24 @@ u2rate = diff(log.(u2err)) ./ diff(log.(dx))
 println("Curved interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
 @test isapprox(mean(u1rate), 3.0, atol = 0.05)
 @test isapprox(mean(u2rate), 3.0, atol = 0.05)
+
+
+
+xc = [0.5, 0.5]
+radius = 0.25
+polyorder = 2
+penaltyfactor = 1e2
+numqp = required_quadrature_order(polyorder) + 2
+nelmts = [2^p + 1 for p in powers]
+
+err = [solve_curved_interface(xc, radius, ne, polyorder, numqp, penaltyfactor) for ne in nelmts]
+u1err = [er[1] for er in err]
+u2err = [er[2] for er in err]
+dx = 1.0 ./ nelmts
+
+u1rate = diff(log.(u1err)) ./ diff(log.(dx))
+u2rate = diff(log.(u2err)) ./ diff(log.(dx))
+
+println("Curved interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
+@test isapprox(mean(u1rate[2:end]), 3.0, atol = 0.05)
+@test isapprox(mean(u2rate[2:end]), 3.0, atol = 0.05)
