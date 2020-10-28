@@ -104,6 +104,14 @@ function cell_map(mesh::Mesh, i)
     return mesh.cellmaps[i]
 end
 
+function determinant_jacobian(mesh::Mesh)
+    return determinant_jacobian(cell_map(mesh,1))
+end
+
+function jacobian(mesh::Mesh)
+    return jacobian(cell_map(mesh,1))
+end
+
 function face_determinant_jacobian(mesh::Mesh)
     return face_determinant_jacobian(cell_map(mesh, 1))
 end

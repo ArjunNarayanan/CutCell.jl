@@ -21,4 +21,5 @@ function stress_cell_rhs(basis, quad, stiffness, celldisp, jacobian)
 
         rhs .+= NI' * stiffness * NK * celldisp * detjac * w
     end
+    return rhs
 end

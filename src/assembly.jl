@@ -110,9 +110,9 @@ function assemble_bilinear_form!(sysmatrix::SystemMatrix, cellmatrix, mesh::Mesh
     assemble_bilinear_form!(sysmatrix, cellmatrix, nodalconnectivity, dofspernode)
 end
 
-function assemble_cell_rhs!(sysrhs,nodeids,dofspernode,vals)
+function assemble_cell_rhs!(sysrhs, nodeids, dofspernode, vals)
     rows = element_dofs(nodeids, dofspernode)
-    assemble!(sysrhs,rows,vals)
+    assemble!(sysrhs, rows, vals)
 end
 
 function assemble_body_force_linear_form!(
@@ -184,6 +184,31 @@ function assemble_traction_force_linear_form!(
     end
 end
 
+function assemble_stress_linear_form!(
+    systemrhs,
+    basis,
+    quad,
+    stiffness,
+    nodaldisplacement,
+    nodalconnectivity,
+    jacobian,
+)
+
+    dim = dimension(basis)
+    sdim = number_of_symmetric_degrees_of_freedom(dim)
+    nf,ncells = size(nodalconnectivity)
+
+    for cellid in 1:ncells
+        nodeids = nodalconnectivity[:,cellid]
+        elementdofs = element_dofs(nodeids,dim)
+        celldisp = nodaldisplacement[elementdofs]
+        rhs = stress_cell_rhs(basis,quad,stiffness,celldisp,jacobian)
+
+        stressdofs = element_dofs(nodeids,sdim)
+        assemble!(systemrhs,stressdofs,rhs)
+    end
+end
+
 function make_sparse(sysmatrix::SystemMatrix, ndofs::Int)
     return dropzeros!(sparse(sysmatrix.rows, sysmatrix.cols, sysmatrix.vals, ndofs, ndofs))
 end
@@ -193,6 +218,14 @@ function make_sparse(sysmatrix::SystemMatrix, mesh)
     return make_sparse(sysmatrix, totaldofs)
 end
 
+function make_sparse_stress_operator(sysmatrix,mesh)
+    dim = dimension(mesh)
+    sdim = number_of_symmetric_degrees_of_freedom(dim)
+    numnodes = number_of_nodes(mesh)
+    totaldofs = sdim*numnodes
+    return make_sparse(sysmatrix,totaldofs)
+end
+
 function rhs(sysrhs::SystemRHS, ndofs::Int)
     return Array(sparsevec(sysrhs.rows, sysrhs.vals, ndofs))
 end
@@ -200,4 +233,12 @@ end
 function rhs(sysrhs::SystemRHS, mesh)
     totaldofs = number_of_degrees_of_freedom(mesh)
     return rhs(sysrhs, totaldofs)
+end
+
+function stress_rhs(sysrhs,mesh)
+    dim = dimension(mesh)
+    sdim = number_of_symmetric_degrees_of_freedom(dim)
+    numnodes = number_of_nodes(mesh)
+    totaldofs = sdim*numnodes
+    return rhs(sysrhs,totaldofs)
 end
