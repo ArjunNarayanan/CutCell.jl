@@ -75,3 +75,7 @@ end
 @safetestset "Test Cut Mesh Convergence" begin
     include("test_cut_convergence.jl")
 end
+
+@safetestset "Test Cut Mesh Stress Convergence" begin
+    include("test_cut_stress_convergence.jl")
+end

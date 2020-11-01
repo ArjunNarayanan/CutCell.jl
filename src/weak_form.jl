@@ -165,7 +165,7 @@ function component_linear_form(rhsfunc, basis, quad, component, cellmap, detjac)
     return rhs
 end
 
-function component_linear_form(rhsval,basis,quad,component,detjac)
+function component_linear_form(rhsval, basis, quad, component, detjac)
     dim = dimension(basis)
     @assert length(component) == dim
     nf = number_of_basis_functions(basis)
@@ -198,6 +198,18 @@ function linear_form(rhsfunc, basis, quad, cellmap, detjac)
         vals = rhsfunc(cellmap(p))
         N = interpolation_matrix(basis(p), dim)
         rhs .+= N' * vals * detjac * w
+    end
+    return rhs
+end
+
+function constant_linear_form(rhsval, basis, quad, detjac)
+    ndofs = length(rhsval)
+    nf = number_of_basis_functions(basis)
+    rhs = zeros(ndofs * nf)
+    for (p, w) in quad
+        vals = basis(p)
+        NI = interpolation_matrix(basis(p), ndofs)
+        rhs .+= NI' * rhsval * detjac * w
     end
     return rhs
 end

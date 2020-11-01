@@ -208,3 +208,147 @@ function assemble_bulk_transformation_linear_form!(
         end
     end
 end
+
+function assemble_interface_transformation_rhs!(
+    systemrhs,
+    transfstress,
+    basis,
+    interfacequads,
+    cutmesh,
+)
+
+    cellsign = cell_sign(cutmesh)
+    dofspernode = dimension(cutmesh)
+
+    cellids = findall(cellsign .== 0)
+    for cellid in cellids
+        cellmap = cell_map(cutmesh, cellid)
+        normals = interface_normals(interfacequads, cellid)
+
+        for s in [+1, -1]
+            quad = interfacequads[s, cellid]
+            rhs =
+                s *
+                0.5 *
+                interface_transformation_rhs(basis, quad, normals, transfstress, cellmap)
+            nodeids = nodal_connectivity(cutmesh, s, cellid)
+            assemble_cell_rhs!(systemrhs, nodeids, dofspernode, rhs)
+        end
+
+    end
+end
+
+function assemble_stress_mass_matrix!(sysmatrix, basis, cellquads, mesh)
+    ncells = number_of_cells(mesh)
+    detjac = determinant_jacobian(mesh)
+    dim = dimension(basis)
+    sdim = number_of_symmetric_degrees_of_freedom(dim)
+
+    uniformquad = uniform_cell_quadrature(cellquads)
+    uniformcellvals = vec(stress_cell_mass_matrix(basis, uniformquad, detjac))
+
+    for cellid = 1:ncells
+        s = cell_sign(mesh, cellid)
+        @assert s == -1 || s == 0 || s == +1
+        if s == -1 || s == +1
+            nodeids = nodal_connectivity(mesh, s, cellid)
+            assemble_cell_matrix!(sysmatrix, nodeids, sdim, uniformcellvals)
+        else
+            pquad = cellquads[+1, cellid]
+            pvals = vec(stress_cell_mass_matrix(basis, pquad, detjac))
+            pnodeids = nodal_connectivity(mesh, +1, cellid)
+            assemble_cell_matrix!(sysmatrix, pnodeids, sdim, pvals)
+
+            nquad = cellquads[-1, cellid]
+            nvals = vec(stress_cell_mass_matrix(basis, nquad, detjac))
+            nnodeids = nodal_connectivity(mesh, -1, cellid)
+            assemble_cell_matrix!(sysmatrix, nnodeids, sdim, nvals)
+        end
+    end
+end
+
+function assemble_stress_linear_form!(
+    sysrhs,
+    basis,
+    cellquads::CellQuadratures,
+    stiffness,
+    nodaldisplacement,
+    mesh,
+)
+
+    dim = dimension(basis)
+    sdim = number_of_symmetric_degrees_of_freedom(dim)
+    ncells = number_of_cells(mesh)
+    jac = jacobian(mesh)
+    uniformquad = uniform_cell_quadrature(cellquads)
+
+    uniformop =
+        [stress_cell_rhs_operator(basis, uniformquad, stiffness[s], jac) for s in [+1, -1]]
+
+    for cellid = 1:ncells
+        s = cell_sign(mesh, cellid)
+        @assert s == -1 || s == 0 || s == +1
+        if s == -1 || s == +1
+            nodeids = nodal_connectivity(mesh, s, cellid)
+            dispdofs = element_dofs(nodeids, dim)
+
+            idx = cell_sign_to_row(s)
+            op = uniformop[idx]
+            vals = op * nodaldisplacement[dispdofs]
+
+            stressdofs = element_dofs(nodeids, sdim)
+            assemble!(sysrhs, stressdofs, vals)
+        else
+            pnodeids = nodal_connectivity(mesh, +1, cellid)
+            pdispdofs = element_dofs(pnodeids, dim)
+            pdisp = nodaldisplacement[pdispdofs]
+            pquad = cellquads[+1, cellid]
+            pvals = stress_cell_rhs(basis, pquad, stiffness[+1], pdisp, jac)
+            pstressdofs = element_dofs(pnodeids, sdim)
+            assemble!(sysrhs, pstressdofs, pvals)
+
+            nnodeids = nodal_connectivity(mesh, -1, cellid)
+            ndispdofs = element_dofs(nnodeids, dim)
+            ndisp = nodaldisplacement[ndispdofs]
+            nquad = cellquads[-1, cellid]
+            nvals = stress_cell_rhs(basis, nquad, stiffness[-1], ndisp, jac)
+            nstressdofs = element_dofs(nnodeids, sdim)
+            assemble!(sysrhs, nstressdofs, nvals)
+        end
+    end
+end
+
+function assemble_transformation_stress_linear_form!(
+    sysrhs,
+    transfstress,
+    basis,
+    cellquads::CellQuadratures,
+    mesh,
+)
+
+    error("Not finished yet")
+    dim = dimension(basis)
+    sdim = number_of_symmetric_degrees_of_freedom(dim)
+    ncells = number_of_cells(mesh)
+    detjac = determinant_jacobian(mesh)
+
+    uniformquad = uniform_cell_quadrature(cellquads)
+    uniformtransfrhs = constant_linear_form(transfstress)
+
+
+    for cellid = 1:ncells
+        s = cell_sign(mesh, cellid)
+        @assert s == -1 || s == 0 || s == +1
+        if s == 0 || s == +1
+            nodeids = nodal_connectivity(mesh, s, cellid)
+            dispdofs = element_dofs(nodeids, dim)
+
+            idx = cell_sign_to_row(s)
+            op = uniformop[idx]
+            vals = op * nodaldisplacement[dispdofs]
+
+            stressdofs = element_dofs(nodeids, sdim)
+            assemble!(sysrhs, stressdofs, vals)
+        end
+    end
+end

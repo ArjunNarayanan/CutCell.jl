@@ -4,12 +4,11 @@ function stress_cell_mass_matrix(basis, quad, detjac)
     return mass_matrix(basis, quad, detjac, sdim)
 end
 
-function stress_cell_rhs(basis, quad, stiffness, celldisp, jacobian)
+function stress_cell_rhs_operator(basis, quad, stiffness, jacobian)
     dim = dimension(basis)
     sdim = number_of_symmetric_degrees_of_freedom(dim)
     nf = number_of_basis_functions(basis)
-    ndofs = sdim * nf
-    rhs = zeros(ndofs)
+    op = zeros(sdim * nf, dim * nf)
     vectosymmconverter = vector_to_symmetric_matrix_converter()
     detjac = prod(jacobian)
 
@@ -19,7 +18,13 @@ function stress_cell_rhs(basis, quad, stiffness, celldisp, jacobian)
         vals = basis(p)
         NI = interpolation_matrix(vals, sdim)
 
-        rhs .+= NI' * stiffness * NK * celldisp * detjac * w
+        op .+= NI' * stiffness * NK * detjac * w
     end
-    return rhs
+    return op
+end
+
+function stress_cell_rhs(basis, quad, stiffness, celldisp, jacobian)
+
+    op = stress_cell_rhs_operator(basis, quad, stiffness, jacobian)
+    return op * celldisp
 end

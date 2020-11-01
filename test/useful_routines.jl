@@ -81,8 +81,9 @@ function integral_norm_on_cut_mesh(func, cellquads, cutmesh, ndofs)
 end
 
 function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
-    err = zeros(2)
-    interpolater = InterpolatingPolynomial(2, basis)
+    ndofs = size(nodalsolutions)[1]
+    err = zeros(ndofs)
+    interpolater = InterpolatingPolynomial(ndofs, basis)
     ncells = CutCell.number_of_cells(cutmesh)
     for cellid = 1:ncells
         s = CutCell.cell_sign(cutmesh, cellid)
