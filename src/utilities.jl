@@ -100,11 +100,15 @@ function tangents(normals)
     return rot * normals
 end
 
-function scale_area(cellmap, normals)
+function scale_area(normals,invjac)
     t = tangents(normals)
-    invjac = inverse_jacobian(cellmap)
     den = sqrt.((t .^ 2)' * (invjac .^ 2))
     return 1.0 ./ den
+end
+
+function scale_area(cellmap::CellMap, normals)
+    invjac = inverse_jacobian(cellmap)
+    return scale_area(normals,invjac)
 end
 
 function cell_sign_to_row(s)

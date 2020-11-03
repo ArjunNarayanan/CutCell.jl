@@ -326,29 +326,29 @@ function assemble_transformation_stress_linear_form!(
     mesh,
 )
 
-    error("Not finished yet")
     dim = dimension(basis)
     sdim = number_of_symmetric_degrees_of_freedom(dim)
     ncells = number_of_cells(mesh)
     detjac = determinant_jacobian(mesh)
 
     uniformquad = uniform_cell_quadrature(cellquads)
-    uniformtransfrhs = constant_linear_form(transfstress)
-
+    uniformtransfrhs = constant_linear_form(transfstress, basis, uniformquad, detjac)
 
     for cellid = 1:ncells
         s = cell_sign(mesh, cellid)
         @assert s == -1 || s == 0 || s == +1
-        if s == 0 || s == +1
-            nodeids = nodal_connectivity(mesh, s, cellid)
-            dispdofs = element_dofs(nodeids, dim)
-
-            idx = cell_sign_to_row(s)
-            op = uniformop[idx]
-            vals = op * nodaldisplacement[dispdofs]
-
+        if s == +1
+            nodeids = nodal_connectivity(mesh, +1, cellid)
             stressdofs = element_dofs(nodeids, sdim)
-            assemble!(sysrhs, stressdofs, vals)
+
+            assemble!(sysrhs, stressdofs, -uniformtransfrhs)
+        elseif s == 0
+            pquad = cellquads[+1, cellid]
+            transfrhs = constant_linear_form(transfstress, basis, pquad, detjac)
+            nodeids = nodal_connectivity(mesh, +1, cellid)
+            stressdofs = element_dofs(nodeids, sdim)
+
+            assemble!(sysrhs, stressdofs, -transfrhs)
         end
     end
 end
