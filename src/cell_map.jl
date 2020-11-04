@@ -45,3 +45,8 @@ function (C::CellMap)(x)
     dim = dimension(C)
     return C.yL .+ (jacobian(C) .* (x .+ ones(dim)))
 end
+
+function inverse(c::CellMap,x)
+    jac = jacobian(c)
+    return ((x .- c.yL) ./ jac) .- 1.0
+end

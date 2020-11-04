@@ -1,5 +1,9 @@
 struct Mesh
     dim::Any
+    nelements::Any
+    widths
+    x0
+    elementsize
     cellmaps::Any
     nodalcoordinates::Any
     nodalconnectivity::Any
@@ -15,7 +19,9 @@ function Mesh(mesh, nf::Int)
     dim = dimension(mesh)
     cellmaps = cell_maps(mesh)
     x0 = reference_corner(mesh)
+    w = widths(mesh)
     nelements = elements_per_mesh_side(mesh)
+    elementsize = w ./ nelements
     nfeside = nodes_per_element_side(nf)
     nfmside = nodes_per_mesh_side(nelements, nfeside)
     totalnodes = prod(nfmside)
@@ -27,6 +33,10 @@ function Mesh(mesh, nf::Int)
     ncells = number_of_elements(mesh)
     Mesh(
         dim,
+        nelements,
+        w,
+        x0,
+        elementsize,
         cellmaps,
         nodalcoordinates,
         nodalconnectivity,
@@ -54,6 +64,18 @@ function Mesh(x0, widths, nelements, basis)
     return Mesh(x0, widths, nelements, nf)
 end
 
+function cell_id(mesh::Mesh, x)
+    dim = dimension(mesh)
+    @assert length(x) == dim == 2
+    elementsize = element_size(mesh)
+    nelements = elements_per_mesh_side(mesh)
+    x0 = reference_corner(mesh)
+    @assert all(x .>= x0)
+    cartesiancellid = [ceil(Int,i) for i in (x-x0) ./ elementsize]
+    cellid = (cartesiancellid[1]-1)*nelements[2] + cartesiancellid[2]
+    return cellid
+end
+
 function Base.show(io::IO, mesh::Mesh)
     ncells = number_of_cells(mesh)
     numnodes = number_of_nodes(mesh)
@@ -69,6 +91,14 @@ end
 
 function nodes_per_mesh_side(mesh::Mesh)
     return mesh.nfmside
+end
+
+function element_size(mesh::Mesh)
+    return mesh.elementsize
+end
+
+function reference_corner(mesh::Mesh)
+    return mesh.x0
 end
 
 function number_of_nodes(mesh::Mesh)
@@ -87,7 +117,7 @@ function widths(mesh::UniformMesh)
     return mesh.widths
 end
 
-function elements_per_mesh_side(mesh::UniformMesh)
+function elements_per_mesh_side(mesh)
     return mesh.nelements
 end
 
@@ -105,11 +135,11 @@ function cell_map(mesh::Mesh, i)
 end
 
 function determinant_jacobian(mesh::Mesh)
-    return determinant_jacobian(cell_map(mesh,1))
+    return determinant_jacobian(cell_map(mesh, 1))
 end
 
 function jacobian(mesh::Mesh)
-    return jacobian(cell_map(mesh,1))
+    return jacobian(cell_map(mesh, 1))
 end
 
 function face_determinant_jacobian(mesh::Mesh)
@@ -143,6 +173,10 @@ end
 
 function nodal_connectivity(mesh::Mesh)
     return mesh.nodalconnectivity
+end
+
+function nodal_connectivity(mesh::Mesh,cellid)
+    return mesh.nodalconnectivity[:,cellid]
 end
 
 function dimension(mesh::Mesh)

@@ -84,12 +84,20 @@ function number_of_cells(cutmesh::CutMesh)
     return cutmesh.ncells
 end
 
+function background_mesh(cutmesh::CutMesh)
+    return cutmesh.mesh
+end
+
 function number_of_elements(cutmesh::CutMesh)
     return cutmesh.nelmts
 end
 
 function cell_sign(cutmesh::CutMesh)
     return cutmesh.cellsign
+end
+
+function cell_id(cutmesh::CutMesh,x)
+    return cell_id(cutmesh.mesh,x)
 end
 
 function cell_sign(cutmesh::CutMesh, cellid)

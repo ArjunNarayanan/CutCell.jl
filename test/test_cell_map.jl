@@ -24,3 +24,8 @@ cm = CutCell.CellMap([0.,0.],[1.,1.])
 
 cm = CutCell.CellMap([1.,1.],[5.,8.])
 @test CutCell.determinant_jacobian(cm) ≈ 7.0
+
+cm = CutCell.CellMap([2.,1.],[4.,2.])
+@test allapprox(CutCell.inverse(cm,[3,1.5]),[0.,0.])
+@test allapprox(CutCell.inverse(cm,[4,2.]),[1.,1.])
+@test allapprox(CutCell.inverse(cm,[2,1]),[-1.,-1.])

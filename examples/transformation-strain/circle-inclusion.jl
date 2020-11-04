@@ -1,5 +1,6 @@
 using Triangulate
 using WriteVTK
+using PyPlot
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -206,36 +207,81 @@ function traction_jump_error(nodalstress, basis, interfacequads, mesh)
     return sqrt.(err) ./ sqrt.(normalizer)
 end
 
-function bulk_modulus(lambda, mu)
-    return lambda + 2mu / 3
+function bulk_modulus(l, m)
+    return l + 2m / 3
 end
 
-function analytical_coefficients_matrix(R, ls, ms, lc, mc)
-    a = zeros(2, 2)
-    a[1, 1] = 1
-    a[1, 2] = -1 / R^2
-    a[2, 1] = 2(lc + mc)
-    a[2, 2] = 2ms / R^2
+function analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
+    a = zeros(3, 3)
+    a[1, 1] = inradius
+    a[1, 2] = -inradius
+    a[1, 3] = -1.0 / inradius
+    a[2, 1] = 2 * (lc + mc)
+    a[2, 2] = -2 * (ls + ms)
+    a[2, 3] = 2ms / inradius^2
+    a[3, 2] = 2(ls + ms)
+    a[3, 3] = -2ms / outradius^2
     return a
 end
 
-function analytical_coefficients_rhs(R, ls, ms, lc, mc, theta0)
+function analytical_coefficient_rhs(ls, ms, theta0)
+    r = zeros(3)
     Ks = bulk_modulus(ls, ms)
-    r = zeros(2)
-    r[1] = Ks * theta0 / (2 * (ls + ms))
-    r[2] = 0.0
+    r[2] = -Ks * theta0
+    r[3] = Ks * theta0
     return r
 end
 
-function analytical_coefficients(R, ls, ms, lc, mc, theta0)
-    a = analytical_coefficients_matrix(R, ls, ms, lc, mc)
-    r = analytical_coefficients_rhs(R, ls, ms, lc, mc, theta0)
-    return a \ r
+struct AnalyticalSolution
+    inradius::Any
+    outradius::Any
+    center::Any
+    A1c::Any
+    A1s::Any
+    A2s::Any
+    function AnalyticalSolution(inradius, outradius, center, ls, ms, lc, mc, theta0)
+        a = analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
+        r = analytical_coefficient_rhs(ls, ms, theta0)
+        coeffs = a \ r
+        new(inradius, outradius, center, coeffs[1], coeffs[2], coeffs[3])
+    end
 end
 
-function normal_stress_in_core(R, ls, ms, lc, mc, theta0)
-    coeffs = analytical_coefficients(R, ls, ms, lc, mc, theta0)
-    return 2 * (lc + mc) * coeffs[1]
+function radial_displacement(A::AnalyticalSolution,r)
+    if r <= A.inradius
+        return A.A1c * r
+    else
+        return A.A1s * r + A.A2s / r
+    end
+end
+
+function (A::AnalyticalSolution)(x)
+    relpos = x - A.center
+    r = sqrt(relpos' * relpos)
+    ur = radial_displacement(A,r)
+    costheta = (x[1] - A.center[1])/r
+    sintheta = (x[2] - A.center[2])/r
+    u1 = ur*costheta
+    u2 = ur*sintheta
+    return [u1,u2]
+end
+
+function onboundary(x, L, W)
+    return x[2] ≈ 0.0 || x[1] ≈ L || x[2] ≈ W || x[1] ≈ 0.0
+end
+
+function plot_on_midsection(xrange,vals,exactvals;title="",filename="")
+    fig,ax = PyPlot.subplots()
+    ax.plot(xrange,vals,linewidth = 2,label = "numerical")
+    ax.plot(xrange,exactvals,linewidth=2,"--",label="analytical")
+    ax.grid()
+    ax.legend()
+    ax.set_title(title)
+    if length(filename) > 0
+        fig.savefig(filename)
+    else
+        return fig
+    end
 end
 
 lambda1, mu1 = 100.0, 80.0
@@ -246,7 +292,7 @@ transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 
 L = 1.0
 penaltyfactor = 1e2
-nelmts = 23
+nelmts = 5
 dx = L / nelmts
 penalty = penaltyfactor / dx * (lambda1 + mu1)
 
@@ -254,12 +300,17 @@ polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 
 center = [L / 2, L / 2]
-radius = L / 20
+inradius = L / 4
+outradius = L
+
+analyticalsolution =
+    AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
+
 basis = TensorProductBasis(2, polyorder)
 mesh = CutCell.Mesh([0.0, 0.0], [L, L], [nelmts, nelmts], basis)
 levelset = InterpolatingPolynomial(1, basis)
 levelsetcoeffs =
-    CutCell.levelset_coefficients(x -> -circle_distance_function(x, center, radius), mesh)
+    CutCell.levelset_coefficients(x -> -circle_distance_function(x, center, inradius), mesh)
 
 cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
@@ -270,6 +321,15 @@ bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
 interfacecondition =
     CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
 
+displacementbc = CutCell.DisplacementCondition(
+    analyticalsolution,
+    basis,
+    facequads,
+    stiffness,
+    cutmesh,
+    x -> onboundary(x, L, L),
+    penalty,
+)
 
 sysmatrix = CutCell.SystemMatrix()
 sysrhs = CutCell.SystemRHS()
@@ -290,70 +350,65 @@ CutCell.assemble_interface_transformation_rhs!(
     interfacequads,
     cutmesh,
 )
+CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,displacementbc,cutmesh)
 
 matrix = CutCell.make_sparse(sysmatrix, cutmesh)
 rhs = CutCell.rhs(sysrhs, cutmesh)
 
-topleftnodeid = CutCell.nodes_per_mesh_side(mesh)[2]
-CutCell.apply_dirichlet_bc!(matrix, rhs, [1, topleftnodeid], 1, 0.0, 2)
-CutCell.apply_dirichlet_bc!(matrix, rhs, [1], 2, 0.0, 2)
+# topleftnodeid = CutCell.nodes_per_mesh_side(mesh)[2]
+# CutCell.apply_dirichlet_bc!(matrix, rhs, [1, topleftnodeid], 1, 0.0, 2)
+# CutCell.apply_dirichlet_bc!(matrix, rhs, [1], 2, 0.0, 2)
 
 sol = matrix \ rhs
 disp = reshape(sol, 2, :)
 
 
-sysmatrix = CutCell.SystemMatrix()
-sysrhs = CutCell.SystemRHS()
+xrange = 1e-3:1e-3:(1-1e-3)
+coords = vcat(xrange',0.5*ones(length(xrange))')
+interpdisp = CutCell.interpolate(coords,disp,basis,levelset,levelsetcoeffs,cutmesh)
+exactdisp = mapslices(analyticalsolution,coords,dims=1)
 
-CutCell.assemble_stress_mass_matrix!(sysmatrix, basis, cellquads, cutmesh)
-CutCell.assemble_stress_linear_form!(sysrhs, basis, cellquads, stiffness, sol, cutmesh)
-CutCell.assemble_transformation_stress_linear_form!(
-    sysrhs,
-    transfstress,
-    basis,
-    cellquads,
-    cutmesh,
-)
+plot_on_midsection(xrange,interpdisp[1,:],exactdisp[1,:])
 
-matrix = CutCell.make_sparse_stress_operator(sysmatrix, cutmesh)
-rhs = CutCell.stress_rhs(sysrhs, cutmesh)
-
-stressvec = matrix \ rhs
-stress = reshape(stressvec, 3, :)
-
-quadcoords = compute_quadrature_points(cellquads, cutmesh)
-dispquadvals = compute_field_at_quadrature_points(disp, basis, cellquads, cutmesh)
-stressquadvals = compute_field_at_quadrature_points(stress, basis, cellquads, cutmesh)
-
-triin = Triangulate.TriangulateIO()
-triin.pointlist = quadcoords
-(triout, vorout) = triangulate("", triin)
-connectivity = triout.trianglelist
-cells = [
-    MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
-]
-vtkfile = vtk_grid(
-    "examples/transformation-strain/circle-inclusion-R20",
-    quadcoords[1, :],
-    quadcoords[2, :],
-    cells,
-)
-vtkfile["displacement"] = (quadvals[1, :], quadvals[2, :])
-vtkfile["s11"] = stressquadvals[1, :]
-vtkfile["s22"] = stressquadvals[2, :]
-vtkfile["s12"] = stressquadvals[3, :]
-outfiles = vtk_save(vtkfile)
-
-
-core_s11 = normal_stress_in_core(radius,lambda1,mu1,lambda2,mu2,theta0)
-# tractionjumperr = traction_jump_error(stress, basis, interfacequads, cutmesh)
-
-# quadvals = compute_field_at_quadrature_points(stress, basis, cellquads, cutmesh)
+# sysmatrix = CutCell.SystemMatrix()
+# sysrhs = CutCell.SystemRHS()
+#
+# CutCell.assemble_stress_mass_matrix!(sysmatrix, basis, cellquads, cutmesh)
+# CutCell.assemble_stress_linear_form!(sysrhs, basis, cellquads, stiffness, sol, cutmesh)
+# CutCell.assemble_transformation_stress_linear_form!(
+#     sysrhs,
+#     transfstress,
+#     basis,
+#     cellquads,
+#     cutmesh,
+# )
+#
+# matrix = CutCell.make_sparse_stress_operator(sysmatrix, cutmesh)
+# rhs = CutCell.stress_rhs(sysrhs, cutmesh)
+#
+# stressvec = matrix \ rhs
+# stress = reshape(stressvec, 3, :)
+#
+#
 # quadcoords = compute_quadrature_points(cellquads, cutmesh)
-# pressure = -(quadvals[1, :] + quadvals[2, :])
-
-# fig,ax = PyPlot.subplots()
-# cmap = ax.tricontourf(quadcoords[1,:],quadcoords[2,:],quadvals[1,:])
-# ax.set_aspect("equal")
-# fig.colorbar(cmap)
-# fig
+# dispquadvals = compute_field_at_quadrature_points(disp, basis, cellquads, cutmesh)
+# stressquadvals = compute_field_at_quadrature_points(stress, basis, cellquads, cutmesh)
+# #
+# triin = Triangulate.TriangulateIO()
+# triin.pointlist = quadcoords
+# (triout, vorout) = triangulate("", triin)
+# connectivity = triout.trianglelist
+# cells = [
+#     MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
+# ]
+# vtkfile = vtk_grid(
+#     "examples/transformation-strain/exact-bc-R4",
+#     quadcoords[1, :],
+#     quadcoords[2, :],
+#     cells,
+# )
+# vtkfile["displacement"] = (dispquadvals[1, :], dispquadvals[2, :])
+# vtkfile["s11"] = stressquadvals[1, :]
+# vtkfile["s22"] = stressquadvals[2, :]
+# vtkfile["s12"] = stressquadvals[3, :]
+# outfiles = vtk_save(vtkfile)

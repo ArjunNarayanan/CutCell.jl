@@ -71,3 +71,7 @@ testboundarycell[5] = testboundarycell[8] = 0
 
 isboundarycell = CutCell.is_boundary_cell(mesh.cellconnectivity)
 @test allequal(isboundarycell,testboundarycell)
+
+mesh = CutCell.Mesh([2.,1.],[2.,1.],[3,2],4)
+@test CutCell.cell_id(mesh,[3.,1.25]) == 3
+@test CutCell.cell_id(mesh,[10/3+eps(),1.5+eps()]) == 6
