@@ -352,3 +352,55 @@ function assemble_transformation_stress_linear_form!(
         end
     end
 end
+
+function assemble_penalty_displacement_transformation_rhs!(
+    sysrhs,
+    transfstress,
+    basis,
+    facequads,
+    cutmesh,
+    onboundary,
+)
+
+    cellids = findall(is_boundary_cell(cutmesh))
+    cellconnectivity = cell_connectivity(cutmesh)
+    facemidpoints = reference_face_midpoints()
+    nfaces = length(facemidpoints)
+    facedetjac = face_determinant_jacobian(cutmesh)
+
+    dim = dimension(cutmesh)
+    refnormals = reference_face_normals()
+    refquads = reference_face_quadrature(facequads)
+
+    uniformrhs = [
+        face_traction_transformation_rhs(basis, q, n, transfstress, s)
+        for (q, n, s) in zip(refquads, refnormals, facedetjac)
+    ]
+
+    for cellid in cellids
+        cellmap = cell_map(cutmesh, cellid)
+        s = cell_sign(cutmesh, cellid)
+        for faceid = 1:nfaces
+            if cellconnectivity[faceid, cellid] == 0
+                if onboundary(cellmap(facemidpoints[faceid]))
+                    if s == 1
+                        rhs = uniformrhs[faceid]
+                        nodeids = nodal_connectivity(cutmesh, +1, cellid)
+                        assemble_cell_rhs!(sysrhs, nodeids, dim, -rhs)
+                    elseif s == 0
+                        pquad = facequads[+1, faceid, cellid]
+                        rhs = face_traction_transformation_rhs(
+                            basis,
+                            pquad,
+                            refnormals[faceid],
+                            transfstress,
+                            facedetjac[faceid],
+                        )
+                        nodeids = nodal_connectivity(cutmesh, +1, cellid)
+                        assemble_cell_rhs!(sysrhs, nodeids, dim, -rhs)
+                    end
+                end
+            end
+        end
+    end
+end

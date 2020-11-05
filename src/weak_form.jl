@@ -152,6 +152,25 @@ function face_traction_component_operator(
     return matrix
 end
 
+function face_traction_transformation_rhs(basis,quad,normal,transfstress,facescale)
+    dim = dimension(basis)
+    @assert length(normal) == dim
+    nf = number_of_basis_functions(basis)
+    ndofs = dim*nf
+    rhs = zeros(ndofs)
+
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+    NK = sum([normal[k]*vectosymmconverter[k]' for k = 1:dim])
+
+    for (p,w) in quad
+        vals = basis(p)
+        NI = interpolation_matrix(vals,dim)
+
+        rhs .+= NI' * NK * transfstress * facescale * w
+    end
+    return rhs
+end
+
 function component_linear_form(rhsfunc, basis, quad, component, cellmap, detjac)
     dim = dimension(basis)
     @assert length(component) == dim

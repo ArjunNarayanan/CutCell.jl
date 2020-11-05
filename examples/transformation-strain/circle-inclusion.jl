@@ -1,6 +1,7 @@
-using Triangulate
-using WriteVTK
-using PyPlot
+# using Triangulate
+# using WriteVTK
+# using PyPlot
+using CSV, DataFrames
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -239,15 +240,19 @@ struct AnalyticalSolution
     A1c::Any
     A1s::Any
     A2s::Any
+    ls::Any
+    ms::Any
+    lc::Any
+    mc::Any
     function AnalyticalSolution(inradius, outradius, center, ls, ms, lc, mc, theta0)
         a = analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
         r = analytical_coefficient_rhs(ls, ms, theta0)
         coeffs = a \ r
-        new(inradius, outradius, center, coeffs[1], coeffs[2], coeffs[3])
+        new(inradius, outradius, center, coeffs[1], coeffs[2], coeffs[3], ls, ms, lc, mc)
     end
 end
 
-function radial_displacement(A::AnalyticalSolution,r)
+function radial_displacement(A::AnalyticalSolution, r)
     if r <= A.inradius
         return A.A1c * r
     else
@@ -258,22 +263,48 @@ end
 function (A::AnalyticalSolution)(x)
     relpos = x - A.center
     r = sqrt(relpos' * relpos)
-    ur = radial_displacement(A,r)
-    costheta = (x[1] - A.center[1])/r
-    sintheta = (x[2] - A.center[2])/r
-    u1 = ur*costheta
-    u2 = ur*sintheta
-    return [u1,u2]
+    ur = radial_displacement(A, r)
+    if ur ≈ 0.0
+        [0.0, 0.0]
+    else
+        costheta = (x[1] - A.center[1]) / r
+        sintheta = (x[2] - A.center[2]) / r
+        u1 = ur * costheta
+        u2 = ur * sintheta
+        return [u1, u2]
+    end
+end
+
+function shell_radial_stress(ls, ms, theta0, A1, A2, r)
+    return (ls + 2ms) * (A1 - A2 / r^2) + ls * (A1 + A2 / r^2) - (ls + 2ms / 3) * theta0
+end
+
+function shell_circumferential_stress(ls, ms, theta0, A1, A2, r)
+    return ls * (A1 - A2 / r^2) + (ls + 2ms) * (A1 + A2 / r^2) - (ls + 2ms / 3) * theta0
+end
+
+function core_in_plane_stress(lc, mc, A1)
+    return (lc + 2mc) * A1 + lc * A1
+end
+
+function stress_in_plane_trace(A::AnalyticalSolution, x)
+    relpos = x - A.center
+    r = sqrt(relpos' * relpos)
+    if r <= A.inradius
+        return 2 * core_in_plane_stress(A.lc, A.mc, A.A1c)
+    else
+
+    end
 end
 
 function onboundary(x, L, W)
     return x[2] ≈ 0.0 || x[1] ≈ L || x[2] ≈ W || x[1] ≈ 0.0
 end
 
-function plot_on_midsection(xrange,vals,exactvals;title="",filename="")
-    fig,ax = PyPlot.subplots()
-    ax.plot(xrange,vals,linewidth = 2,label = "numerical")
-    ax.plot(xrange,exactvals,linewidth=2,"--",label="analytical")
+function plot_on_midsection(xrange, vals, exactvals; title = "", filename = "")
+    fig, ax = PyPlot.subplots()
+    ax.plot(xrange, vals, linewidth = 2, label = "numerical")
+    ax.plot(xrange, exactvals, linewidth = 2, "--", label = "analytical")
     ax.grid()
     ax.legend()
     ax.set_title(title)
@@ -284,91 +315,259 @@ function plot_on_midsection(xrange,vals,exactvals;title="",filename="")
     end
 end
 
+function displacement_error(
+    width,
+    center,
+    inradius,
+    outradius,
+    stiffness,
+    theta0,
+    nelmts,
+    polyorder,
+    numqp,
+    penaltyfactor,
+)
+
+    lambda1, mu1 = CutCell.lame_coefficients(stiffness, +1)
+    lambda2, mu2 = CutCell.lame_coefficients(stiffness, -1)
+    transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
+
+    dx = width / nelmts
+    meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
+    penalty = penaltyfactor / dx * meanmoduli
+
+    analyticalsolution =
+        AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
+
+    basis = TensorProductBasis(2, polyorder)
+    mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
+    levelset = InterpolatingPolynomial(1, basis)
+    levelsetcoeffs = CutCell.levelset_coefficients(
+        x -> -circle_distance_function(x, center, inradius),
+        mesh,
+    )
+
+    cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
+    cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
+    interfacecondition =
+        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+
+    displacementbc = CutCell.DisplacementCondition(
+        analyticalsolution,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        x -> onboundary(x, width, width),
+        penalty,
+    )
+
+    sysmatrix = CutCell.SystemMatrix()
+    sysrhs = CutCell.SystemRHS()
+
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
+    CutCell.assemble_bulk_transformation_linear_form!(
+        sysrhs,
+        transfstress,
+        basis,
+        cellquads,
+        cutmesh,
+    )
+    CutCell.assemble_interface_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        interfacequads,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
+    CutCell.assemble_penalty_displacement_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onboundary(x, width, width),
+    )
+
+    matrix = CutCell.make_sparse(sysmatrix, cutmesh)
+    rhs = CutCell.rhs(sysrhs, cutmesh)
+
+    sol = matrix \ rhs
+    disp = reshape(sol, 2, :)
+
+    err = mesh_L2_error(disp, analyticalsolution, basis, cellquads, cutmesh)
+    den = integral_norm_on_cut_mesh(analyticalsolution, cellquads, cutmesh, 2)
+
+    return err ./ den
+end
+
+function stress_error(
+    width,
+    center,
+    inradius,
+    outradius,
+    stiffness,
+    theta0,
+    nelmts,
+    polyorder,
+    numqp,
+    penaltyfactor,
+)
+
+    lambda1, mu1 = CutCell.lame_coefficients(stiffness, +1)
+    lambda2, mu2 = CutCell.lame_coefficients(stiffness, -1)
+    transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
+
+    dx = width / nelmts
+    meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
+    penalty = penaltyfactor / dx * meanmoduli
+
+    analyticalsolution =
+        AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
+
+    basis = TensorProductBasis(2, polyorder)
+    mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
+    levelset = InterpolatingPolynomial(1, basis)
+    levelsetcoeffs = CutCell.levelset_coefficients(
+        x -> -circle_distance_function(x, center, inradius),
+        mesh,
+    )
+
+    cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
+    cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
+    interfacecondition =
+        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+
+    displacementbc = CutCell.DisplacementCondition(
+        analyticalsolution,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        x -> onboundary(x, width, width),
+        penalty,
+    )
+
+    sysmatrix = CutCell.SystemMatrix()
+    sysrhs = CutCell.SystemRHS()
+
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
+    CutCell.assemble_bulk_transformation_linear_form!(
+        sysrhs,
+        transfstress,
+        basis,
+        cellquads,
+        cutmesh,
+    )
+    CutCell.assemble_interface_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        interfacequads,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
+    CutCell.assemble_penalty_displacement_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onboundary(x, width, width),
+    )
+
+    matrix = CutCell.make_sparse(sysmatrix, cutmesh)
+    rhs = CutCell.rhs(sysrhs, cutmesh)
+
+    sol = matrix \ rhs
+
+    sysmatrix = CutCell.SystemMatrix()
+    sysrhs = CutCell.SystemRHS()
+
+    CutCell.assemble_stress_mass_matrix!(sysmatrix, basis, cellquads, cutmesh)
+    CutCell.assemble_stress_linear_form!(sysrhs, basis, cellquads, stiffness, sol, cutmesh)
+    CutCell.assemble_transformation_stress_linear_form!(
+        sysrhs,
+        transfstress,
+        basis,
+        cellquads,
+        cutmesh,
+    )
+
+    matrix = CutCell.make_sparse_stress_operator(sysmatrix, cutmesh)
+    rhs = CutCell.stress_rhs(sysrhs, cutmesh)
+
+    stressvec = matrix \ rhs
+    stress = reshape(stressvec, 3, :)
+
+    inplanetrace = stress[1, :] + stress[2, :]
+
+end
+
+
+function mean(v)
+    return sum(v) / length(v)
+end
+
+function convergence_rate(dx, err)
+    return diff(log.(err)) ./ diff(log.(dx))
+end
+
 lambda1, mu1 = 100.0, 80.0
 lambda2, mu2 = 80.0, 60.0
 theta0 = -0.067
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
-transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 
-L = 1.0
+width = 1.0
 penaltyfactor = 1e2
-nelmts = 5
-dx = L / nelmts
-penalty = penaltyfactor / dx * (lambda1 + mu1)
 
 polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 
-center = [L / 2, L / 2]
-inradius = L / 4
-outradius = L
+center = [width / 2, width / 2]
+inradius = width / 4
+outradius = width
 
-analyticalsolution =
-    AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
-
-basis = TensorProductBasis(2, polyorder)
-mesh = CutCell.Mesh([0.0, 0.0], [L, L], [nelmts, nelmts], basis)
-levelset = InterpolatingPolynomial(1, basis)
-levelsetcoeffs =
-    CutCell.levelset_coefficients(x -> -circle_distance_function(x, center, inradius), mesh)
-
-cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
-cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-
-bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-interfacecondition =
-    CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
-
-displacementbc = CutCell.DisplacementCondition(
-    analyticalsolution,
-    basis,
-    facequads,
-    stiffness,
-    cutmesh,
-    x -> onboundary(x, L, L),
-    penalty,
-)
-
-sysmatrix = CutCell.SystemMatrix()
-sysrhs = CutCell.SystemRHS()
-
-CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
-CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
-CutCell.assemble_bulk_transformation_linear_form!(
-    sysrhs,
-    transfstress,
-    basis,
-    cellquads,
-    cutmesh,
-)
-CutCell.assemble_interface_transformation_rhs!(
-    sysrhs,
-    transfstress,
-    basis,
-    interfacequads,
-    cutmesh,
-)
-CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,displacementbc,cutmesh)
-
-matrix = CutCell.make_sparse(sysmatrix, cutmesh)
-rhs = CutCell.rhs(sysrhs, cutmesh)
-
-# topleftnodeid = CutCell.nodes_per_mesh_side(mesh)[2]
-# CutCell.apply_dirichlet_bc!(matrix, rhs, [1, topleftnodeid], 1, 0.0, 2)
-# CutCell.apply_dirichlet_bc!(matrix, rhs, [1], 2, 0.0, 2)
-
-sol = matrix \ rhs
-disp = reshape(sol, 2, :)
+powers = 1:7
+nelmts = [2^p + 1 for p in powers]
 
 
-xrange = 1e-3:1e-3:(1-1e-3)
-coords = vcat(xrange',0.5*ones(length(xrange))')
-interpdisp = CutCell.interpolate(coords,disp,basis,levelset,levelsetcoeffs,cutmesh)
-exactdisp = mapslices(analyticalsolution,coords,dims=1)
+err = [
+    displacement_error(
+        width,
+        center,
+        inradius,
+        outradius,
+        stiffness,
+        theta0,
+        ne,
+        polyorder,
+        numqp,
+        penaltyfactor,
+    ) for ne in nelmts
+]
 
-plot_on_midsection(xrange,interpdisp[1,:],exactdisp[1,:])
+dx = 1.0 ./ nelmts
+
+u1err = [er[1] for er in err]
+u2err = [er[2] for er in err]
+
+u1rate = convergence_rate(dx, u1err)
+u2rate = convergence_rate(dx, u2err)
+
+df = DataFrame("Element Size" => dx, "U1 Error" => u1err, "U2 Error" => u2err)
+CSV.write("examples/transformation-strain/convergence.csv", df)
 
 # sysmatrix = CutCell.SystemMatrix()
 # sysrhs = CutCell.SystemRHS()
