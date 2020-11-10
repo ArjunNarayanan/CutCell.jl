@@ -1,3 +1,7 @@
+function plane_transformation_strain(theta)
+    return [theta/3.0,theta/3.0,0.0]
+end
+
 function plane_strain_transformation_stress(lambda, mu, theta)
     pt = (lambda + 2mu / 3) * theta
     transfstress = [pt, pt, 0.0]

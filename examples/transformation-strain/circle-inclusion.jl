@@ -1,7 +1,7 @@
 # using Triangulate
 # using WriteVTK
 # using PyPlot
-using CSV, DataFrames
+# using CSV, DataFrames
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -58,156 +58,6 @@ function compute_quadrature_points(cellquads, cutmesh)
     return coords
 end
 
-function add_cell_jump_squared!(err, interp1, quad1, interp2, quad2, scalearea)
-    numqp = length(quad1)
-    @assert length(quad2) == length(scalearea)
-    for qpidx = 1:numqp
-        p1, w1 = quad1[qpidx]
-        p2, w2 = quad2[qpidx]
-        @assert w1 ≈ w2
-
-        err .+= (interp1(p1) - interp2(p2)) .^ 2 * scalearea[qpidx] * w1
-    end
-end
-
-function displacement_jump_error(nodaldisp, basis, interfacequads, mesh)
-
-    dim, nnodes = size(nodaldisp)
-    err = zeros(dim)
-    cellmap = CutCell.cell_map(mesh)
-
-    pinterp = InterpolatingPolynomial(dim, basis)
-    ninterp = InterpolatingPolynomial(dim, basis)
-
-    cellsign = CutCell.cell_sign(mesh)
-    cellids = findall(cellsign .== 0)
-
-    for cellid in cellids
-        pquad = interfacequads[+1, cellid]
-        nquad = interfacequads[-1, cellid]
-        normals = CutCell.interface_normals(interfacequads, cellid)
-        scalearea = CutCell.scale_area(cellmap, normals)
-
-        pnodeids = CutCell.nodal_connectivity(mesh, +1, cellid)
-        pdisp = nodaldisp[:, pnodeids]
-        update!(pinterp, pdisp)
-
-        nnodeids = CutCell.nodal_connectivity(mesh, -1, cellid)
-        ndisp = nodaldisp[:, nnodeids]
-        update!(ninterp, ndisp)
-
-        add_cell_jump_squared!(err, pinterp, pquad, ninterp, nquad, scalearea)
-    end
-    return sqrt.(err)
-end
-
-function add_cell_traction_jump_squared!(
-    err,
-    interp1,
-    quad1,
-    interp2,
-    quad2,
-    normals,
-    scalearea,
-    vectosymmconverter,
-)
-
-    numqp = length(quad1)
-    @assert length(quad2) == length(scalearea)
-    @assert size(normals)[2] == numqp
-    dim = length(vectosymmconverter)
-    for qpidx = 1:numqp
-        p1, w1 = quad1[qpidx]
-        p2, w2 = quad2[qpidx]
-        @assert w1 ≈ w2
-
-        normal = normals[:, qpidx]
-        NK = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
-
-        err .+= (NK * (interp1(p1) - interp2(p2))) .^ 2 * scalearea[qpidx] * w1
-    end
-end
-
-function add_cell_mean_traction_squared!(
-    err,
-    interp1,
-    quad1,
-    interp2,
-    quad2,
-    normals,
-    scalearea,
-    vectosymmconverter,
-)
-
-    numqp = length(quad1)
-    @assert length(quad2) == length(scalearea)
-    @assert size(normals)[2] == numqp
-    dim = length(vectosymmconverter)
-    for qpidx = 1:numqp
-        p1, w1 = quad1[qpidx]
-        p2, w2 = quad2[qpidx]
-        @assert w1 ≈ w2
-
-        normal = normals[:, qpidx]
-        NK = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
-
-        err .+= (NK * (interp1(p1) + interp2(p2))) .^ 2 * scalearea[qpidx] * w1
-    end
-end
-
-function traction_jump_error(nodalstress, basis, interfacequads, mesh)
-    dim = CutCell.dimension(mesh)
-    sdim, nnodes = size(nodalstress)
-    err = zeros(dim)
-    normalizer = zeros(dim)
-    cellmap = CutCell.cell_map(mesh)
-
-    pinterp = InterpolatingPolynomial(sdim, basis)
-    ninterp = InterpolatingPolynomial(sdim, basis)
-
-    cellsign = CutCell.cell_sign(mesh)
-    cellids = findall(cellsign .== 0)
-
-    vectosymmconverter = CutCell.vector_to_symmetric_matrix_converter()
-
-    for cellid in cellids
-        pquad = interfacequads[+1, cellid]
-        nquad = interfacequads[-1, cellid]
-        normals = CutCell.interface_normals(interfacequads, cellid)
-        scalearea = CutCell.scale_area(cellmap, normals)
-
-        pnodeids = CutCell.nodal_connectivity(mesh, +1, cellid)
-        pstress = nodalstress[:, pnodeids]
-        update!(pinterp, pstress)
-
-        nnodeids = CutCell.nodal_connectivity(mesh, -1, cellid)
-        nstress = nodalstress[:, nnodeids]
-        update!(ninterp, nstress)
-
-        add_cell_traction_jump_squared!(
-            err,
-            pinterp,
-            pquad,
-            ninterp,
-            nquad,
-            normals,
-            scalearea,
-            vectosymmconverter,
-        )
-        add_cell_mean_traction_squared!(
-            normalizer,
-            pinterp,
-            pquad,
-            ninterp,
-            nquad,
-            normals,
-            scalearea,
-            vectosymmconverter,
-        )
-    end
-    return sqrt.(err) ./ sqrt.(normalizer)
-end
-
 function bulk_modulus(l, m)
     return l + 2m / 3
 end
@@ -244,11 +94,24 @@ struct AnalyticalSolution
     ms::Any
     lc::Any
     mc::Any
+    theta0::Any
     function AnalyticalSolution(inradius, outradius, center, ls, ms, lc, mc, theta0)
         a = analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
         r = analytical_coefficient_rhs(ls, ms, theta0)
         coeffs = a \ r
-        new(inradius, outradius, center, coeffs[1], coeffs[2], coeffs[3], ls, ms, lc, mc)
+        new(
+            inradius,
+            outradius,
+            center,
+            coeffs[1],
+            coeffs[2],
+            coeffs[3],
+            ls,
+            ms,
+            lc,
+            mc,
+            theta0,
+        )
     end
 end
 
@@ -293,26 +156,14 @@ function stress_in_plane_trace(A::AnalyticalSolution, x)
     if r <= A.inradius
         return 2 * core_in_plane_stress(A.lc, A.mc, A.A1c)
     else
-
+        srr = shell_radial_stress(A.ls, A.ms, A.theta0, A.A1s, A.A2s, r)
+        stt = shell_circumferential_stress(A.ls, A.ms, A.theta0, A.A1s, A.A2s, r)
+        return srr + stt
     end
 end
 
 function onboundary(x, L, W)
     return x[2] ≈ 0.0 || x[1] ≈ L || x[2] ≈ W || x[1] ≈ 0.0
-end
-
-function plot_on_midsection(xrange, vals, exactvals; title = "", filename = "")
-    fig, ax = PyPlot.subplots()
-    ax.plot(xrange, vals, linewidth = 2, label = "numerical")
-    ax.plot(xrange, exactvals, linewidth = 2, "--", label = "analytical")
-    ax.grid()
-    ax.legend()
-    ax.set_title(title)
-    if length(filename) > 0
-        fig.savefig(filename)
-    else
-        return fig
-    end
 end
 
 function displacement_error(
@@ -511,10 +362,23 @@ function stress_error(
     stressvec = matrix \ rhs
     stress = reshape(stressvec, 3, :)
 
-    inplanetrace = stress[1, :] + stress[2, :]
+    inplanetrace = (stress[1, :] + stress[2, :])'
 
+    err = mesh_L2_error(
+        inplanetrace,
+        x -> stress_in_plane_trace(analyticalsolution, x),
+        basis,
+        cellquads,
+        cutmesh,
+    )
+    den = integral_norm_on_cut_mesh(
+        x -> stress_in_plane_trace(analyticalsolution, x),
+        cellquads,
+        cutmesh,
+        1,
+    )
+    return err[1]/den[1]
 end
-
 
 function mean(v)
     return sum(v) / length(v)
@@ -532,7 +396,7 @@ stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 width = 1.0
 penaltyfactor = 1e2
 
-polyorder = 2
+polyorder = 3
 numqp = required_quadrature_order(polyorder) + 2
 
 center = [width / 2, width / 2]
@@ -544,7 +408,7 @@ nelmts = [2^p + 1 for p in powers]
 
 
 err = [
-    displacement_error(
+    stress_error(
         width,
         center,
         inradius,
@@ -560,14 +424,33 @@ err = [
 
 dx = 1.0 ./ nelmts
 
-u1err = [er[1] for er in err]
-u2err = [er[2] for er in err]
+rate = convergence_rate(dx, err)
 
-u1rate = convergence_rate(dx, u1err)
-u2rate = convergence_rate(dx, u2err)
-
-df = DataFrame("Element Size" => dx, "U1 Error" => u1err, "U2 Error" => u2err)
-CSV.write("examples/transformation-strain/convergence.csv", df)
+# err = [
+#     displacement_error(
+#         width,
+#         center,
+#         inradius,
+#         outradius,
+#         stiffness,
+#         theta0,
+#         ne,
+#         polyorder,
+#         numqp,
+#         penaltyfactor,
+#     ) for ne in nelmts
+# ]
+#
+# dx = 1.0 ./ nelmts
+#
+# u1err = [er[1] for er in err]
+# u2err = [er[2] for er in err]
+#
+# u1rate = convergence_rate(dx, u1err)
+# u2rate = convergence_rate(dx, u2err)
+#
+# df = DataFrame("Element Size" => dx, "U1 Error" => u1err, "U2 Error" => u2err)
+# CSV.write("examples/transformation-strain/convergence.csv", df)
 
 # sysmatrix = CutCell.SystemMatrix()
 # sysrhs = CutCell.SystemRHS()
