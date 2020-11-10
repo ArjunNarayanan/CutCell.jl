@@ -94,8 +94,8 @@ end
 
 function tangents(normals)
     rot = [
-        0.0 1.0
-        -1.0 0.0
+        0.0 -1.0
+        1.0 0.0
     ]
     return rot * normals
 end

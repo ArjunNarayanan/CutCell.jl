@@ -121,7 +121,7 @@ end
 function shell_stress(A::AnalyticalSolution, x)
     relpos = x - A.center
     r = sqrt(relpos' * relpos)
-    Q = rotation_matrix(x, r)
+    Q = rotation_matrix(relpos, r)
 
     srr = shell_radial_stress(A.ls, A.ms, A.theta0, A.A1s, A.A2s, r)
     stt = shell_circumferential_stress(A.ls, A.ms, A.theta0, A.A1s, A.A2s, r)
@@ -150,7 +150,7 @@ function onboundary(x, L, W)
     return x[2] ≈ 0.0 || x[1] ≈ L || x[2] ≈ W || x[1] ≈ 0.0
 end
 
-function update_core_stress_error(
+function update_core_stress_error!(
     err,
     basis,
     stiffness,
@@ -201,7 +201,7 @@ function compute_core_stress_error(
         celldisp = displacement[celldofs]
         quad = interfacequads[-1, cellid]
 
-        update_core_stress_error(
+        update_core_stress_error!(
             err,
             basis,
             stiffness,
@@ -218,12 +218,47 @@ function compute_core_stress_error(
     return sqrt.(err) / den
 end
 
+function update_shell_stress_error!(
+    err,
+    basis,
+    stiffness,
+    transfstress,
+    celldisp,
+    quad,
+    jac,
+    detjac,
+    cellmap,
+    vectosymmconverter,
+    analyticalsolution,
+)
+
+    dim = CutCell.dimension(basis)
+    lambda, mu = CutCell.lame_coefficients(stiffness, +1)
+    theta0 = analyticalsolution.theta0
+    for (p, w) in quad
+        grad = CutCell.transform_gradient(gradient(basis, p), jac)
+        NK = sum([CutCell.make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        symmdispgrad = NK * celldisp
+
+        inplanestress = (stiffness[+1] * symmdispgrad) - transfstress
+        s33 =
+            lambda * (symmdispgrad[1] + symmdispgrad[2]) -
+            (lambda + 2mu / 3) * theta0
+
+        numericalstress = vcat(inplanestress, s33)
+        exactstress = shell_stress(analyticalsolution, cellmap(p))
+
+        err .+= (numericalstress - exactstress) .^ 2 * detjac * w
+    end
+end
+
+
 function compute_shell_stress_error(
     displacement,
     basis,
     interfacequads,
     stiffness,
-    transfstrain,
+    transfstress,
     cutmesh,
     analyticalsolution,
 )
@@ -241,12 +276,26 @@ function compute_shell_stress_error(
         celldofs = CutCell.element_dofs(nodeids, dim)
         celldisp = displacement[celldofs]
         quad = interfacequads[+1, cellid]
+        cellmap = CutCell.cell_map(cutmesh, cellid)
 
-
+        update_shell_stress_error!(
+            err,
+            basis,
+            stiffness,
+            transfstress,
+            celldisp,
+            quad,
+            jac,
+            detjac,
+            cellmap,
+            vectosymmconverter,
+            analyticalsolution,
+        )
     end
+    return sqrt.(err)
 end
 
-function core_stress_error(
+function stress_error(
     width,
     center,
     inradius,
@@ -262,6 +311,7 @@ function core_stress_error(
     lambda1, mu1 = CutCell.lame_coefficients(stiffness, +1)
     lambda2, mu2 = CutCell.lame_coefficients(stiffness, -1)
     transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
+    transfstrain = CutCell.plane_transformation_strain(theta0)
 
     analyticalsolution =
         AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
@@ -342,8 +392,16 @@ function core_stress_error(
         cutmesh,
         analyticalsolution,
     )
-
-    return corestresserr
+    shellstresserr = compute_shell_stress_error(
+        sol,
+        basis,
+        interfacequads,
+        stiffness,
+        transfstress,
+        cutmesh,
+        analyticalsolution,
+    )
+    return corestresserr,shellstresserr
 end
 
 function convergence_rate(dx, err)
@@ -365,18 +423,20 @@ stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 width = 1.0
 penaltyfactor = 1e2
 
-polyorder = 3
+polyorder = 2
 numqp = required_quadrature_order(polyorder) + 4
 center = [width / 2, width / 2]
 inradius = width / 4
 outradius = width
 
+
 powers = 1:7
 nelmts = [2^p + 1 for p in powers]
+dx = 1.0 ./ nelmts
 
 
-err = [
-    core_stress_error(
+stresserr = [
+    stress_error(
         width,
         center,
         inradius,
@@ -390,17 +450,18 @@ err = [
     ) for ne in nelmts
 ]
 
-dx = 1.0 ./ nelmts
 
-s11err = [er[1] for er in err]
-s11rate = convergence_rate(dx, s11err)
+coreerr = [st[1] for st in stresserr]
+shellerr = [st[2] for st in stresserr]
 
+shells11err = [sh[1] for sh in shellerr]
+shells33err = [sh[4] for sh in shellerr]
 
+shells11rate = convergence_rate(dx,shells11err)
+shells33rate = convergence_rate(dx,shells33err)
 
-
-
-
-
+# s11err = [er[1] for er in err]
+# s11rate = convergence_rate(dx, s11err)
 # lambda1, mu1 = CutCell.lame_coefficients(stiffness, +1)
 # lambda2, mu2 = CutCell.lame_coefficients(stiffness, -1)
 # transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
