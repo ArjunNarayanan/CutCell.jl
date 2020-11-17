@@ -62,6 +62,33 @@ function interface_quadrature_points(interfacequads, cutmesh)
     return points
 end
 
+function interface_normals(interfacequads, cutmesh)
+    cellsign = CutCell.cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+    numcellqps = length(interfacequads.quads[1])
+    numqps = numcellqps * length(cellids)
+    normals = zeros(2, numqps)
+    counter = 1
+    for cellid in cellids
+        n = CutCell.interface_normals(interfacequads, cellid)
+        normals[:, counter:(counter+numcellqps-1)] .= n
+        counter += numcellqps
+    end
+    return normals
+end
+
+function stress_projected_on_normal(stress, normals)
+    nump = size(stress)[2]
+    @assert size(normals)[2] == nump
+
+    vals = [
+        stress[1, i] * normals[1, i]^2 +
+        stress[2, i] * normals[2, i]^2 +
+        2stress[3, i] * normals[1, i] * normals[2, i] for i = 1:nump
+    ]
+    return vals
+end
+
 function angular_position(points)
     cpoints = points[1, :] + im * points[2, :]
     return rad2deg.(angle.(cpoints))
@@ -113,11 +140,11 @@ theta0 = -0.067
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
 width = 1.0
-penaltyfactor = 1e3
+penaltyfactor = 1e2
 
 polyorder = 3
 numqp = required_quadrature_order(polyorder) + 4
-nelmts = 65
+nelmts = 33
 center = [width / 2, width / 2]
 inradius = width / 4
 outradius = width
@@ -183,6 +210,7 @@ angularposition = angular_position(relquadpoints)
 sortidx = sortperm(angularposition)
 angularposition = angularposition[sortidx]
 
+normals = interface_normals(interfacequads,cutmesh)[:,sortidx]
 
 parentsymmdispgrad =
     symmetric_displacement_gradient(sol, basis, interfacequads, cutmesh, -1)[:, sortidx]
@@ -195,11 +223,16 @@ productstress = product_stress(productsymmdispgrad, stiffness, theta0)
 parentpressure = pressure(parentstress)
 productpressure = pressure(productstress)
 
-parentspvol = V2*(1.0 .- parentpressure/K2)
-productspvol = V1*(1.0 .- productpressure/K1)
+parentspvol = V2 * (1.0 .- parentpressure / K2)
+productspvol = V1 * (1.0 .- productpressure / K1)
 
-parentstrainenergy = parent_strain_energy(parentsymmdispgrad,parentstress) .* parentspvol
-productstrainenergy = product_strain_energy(productsymmdispgrad,productstress,theta0) .* productspvol
+parentstrainenergy = parent_strain_energy(parentsymmdispgrad, parentstress)
+productstrainenergy =
+    product_strain_energy(productsymmdispgrad, productstress, theta0)
+
+productnormalstress = stress_projected_on_normal(productstress,normals)
+parentnormalstress = stress_projected_on_normal(parentstress,normals)
+
 
 include("plot_utils.jl")
 plot_all_stress_strain(
@@ -214,26 +247,39 @@ plot_all_stress_strain(
     parentsymmdispgrad,
     "examples/transformation-strain/figures/parent-stress-strain",
 )
-fig = plot_on_circumference(angularposition,parentpressure,ylims=[2.5,3.5],ylabel="pressure")
+fig = plot_on_circumference(
+    angularposition,
+    parentpressure,
+    ylims = [2.5, 3.5],
+    ylabel = "pressure",
+)
 fig.savefig("examples/transformation-strain/figures/parent-pressure.png")
 
-fig = plot_on_circumference(angularposition,productpressure,ylims=[-4,-3],ylabel="pressure")
+fig = plot_on_circumference(
+    angularposition,
+    productpressure,
+    ylims = [-4, -3],
+    ylabel = "pressure",
+)
 fig.savefig("examples/transformation-strain/figures/product-pressure.png")
 
 
-fig = plot_on_circumference(angularposition,parentstrainenergy,ylabel="strain energy (GJ/Kg)")
-fig.savefig("parent-strain-energy.png")
-
-fig = plot_on_circumference(angularposition,productstrainenergy,ylabel="strain energy (GJ/Kg)")
-fig.savefig("product-strain-energy.png")
-
-
-
-
-
-# plot_stress_strain(
-#     angularposition,
-#     productstress[1, :],
-#     productsymmdispgrad[1, :],
-#     ylabels = [L"\sigma_{11}", L"\epsilon_{11}"],
-# )
+fig = plot_on_circumference(
+    angularposition,
+    parentstrainenergy,
+    ylabel = "strain energy (GJ/Kg)",
+)
+fig.savefig("examples/transformation-strain/figures/parent-strain-energy.png")
+# #
+fig = plot_on_circumference(
+    angularposition,
+    productstrainenergy,
+    ylabel = "strain energy (GJ/Kg)",
+)
+fig.savefig("examples/transformation-strain/figures/product-strain-energy.png")
+# #
+fig = plot_on_circumference(angularposition,productnormalstress,ylabel=L"\sigma_{nn}")
+fig.savefig("examples/transformation-strain/figures/product-compression-work.png")
+# #
+fig = plot_on_circumference(angularposition,parentnormalstress,ylabel=L"\sigma_{nn}")
+fig.savefig("examples/transformation-strain/figures/parent-compression-work.png")
