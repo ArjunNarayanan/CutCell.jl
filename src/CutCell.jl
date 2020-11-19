@@ -2,7 +2,6 @@ module CutCell
 
 using LinearAlgebra
 using SparseArrays
-using IntervalArithmetic
 using CartesianMesh
 using PolynomialBasis
 using ImplicitDomainQuadrature
