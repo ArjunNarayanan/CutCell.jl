@@ -28,7 +28,7 @@ function CellQuadratures(
     quads = [tpq]
 
     celltoquad = zeros(Int, 2, numcells)
-    box = IntervalBox(-1..1, 2)
+    xL, xR = [-1.0, -1.0], [1.0, 1.0]
 
     for cellid = 1:numcells
         s = cellsign[cellid]
@@ -40,11 +40,11 @@ function CellQuadratures(
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
-            pquad = area_quadrature(levelset, +1, box, quad1d)
+            pquad = area_quadrature(levelset, +1, xL, xR, quad1d)
             push!(quads, pquad)
             celltoquad[1, cellid] = length(quads)
 
-            nquad = area_quadrature(levelset, -1, box, quad1d)
+            nquad = area_quadrature(levelset, -1, xL, xR, quad1d)
             push!(quads, nquad)
             celltoquad[2, cellid] = length(quads)
         else
@@ -54,13 +54,7 @@ function CellQuadratures(
     return CellQuadratures(quads, celltoquad)
 end
 
-function CellQuadratures(
-    levelset,
-    levelsetcoeffs,
-    cutmesh,
-    numuniformqp,
-    numcutqp,
-)
+function CellQuadratures(levelset, levelsetcoeffs, cutmesh, numuniformqp, numcutqp)
 
     cellsign = cell_sign(cutmesh)
     nodalconnectivity = nodal_connectivity(cutmesh.mesh)
@@ -80,7 +74,7 @@ end
 
 function Base.getindex(vquads::CellQuadratures, s, cellid)
     row = cell_sign_to_row(s)
-    idx = vquads.celltoquad[row,cellid]
+    idx = vquads.celltoquad[row, cellid]
     idx > 0 || error("Cell $cellid, cellsign $s, does not have a cell quadrature")
     return vquads.quads[vquads.celltoquad[row, cellid]]
 end
@@ -100,7 +94,7 @@ function number_of_cells(cellquads::CellQuadratures)
     return cellquads.ncells
 end
 
-function has_quadrature(cellquads::CellQuadratures,s,cellid)
+function has_quadrature(cellquads::CellQuadratures, s, cellid)
     row = cell_sign_to_row(s)
-    return cellquads.celltoquad[row,cellid] != 0
+    return cellquads.celltoquad[row, cellid] != 0
 end
