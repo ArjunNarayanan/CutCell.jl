@@ -20,13 +20,13 @@ coeffs = circle_distance_function(poly.basis.points,xc,rad)
 update!(poly,coeffs)
 
 
-xq = [0.,0.]
-x0 = [1.,1.]
+xq = [0.,0.25]
+x0 = [0.5,0.]
 
 xk,iter = CutCell.saye_newton_iterate(x0,xq,poly,1e-5,1.5sqrt(2))
 
 xrange = -1:1e-2:1
-contour(xrange,xrange,(x,y)->poly(x,y),levels=[0.],aspect_ratio=:equal)
+contour(xrange,xrange,(x,y)->poly(x,y),levels=[0.],aspect_ratio=:equal,legend=false)
 xlims!(-1.2,1.2)
 ylims!(-1.2,1.2)
 scatter!([x0[1]],[x0[2]])

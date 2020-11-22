@@ -54,7 +54,7 @@ function saye_newton_iterate(xguess, xq, poly, tol, r; maxiter = 20, condtol = 1
         else
             δ1 = -vp / (gp' * gp) * gp
             l1 = gp' * (xq - x0) / (gp' * gp)
-            δ2 = xq - xk - l1 * gp
+            δ2 = xq - x0 - l1 * gp
             normδ2 = norm(δ2)
             if normδ2 > 0.1r
                 δ2 *= 0.1r/normδ2
