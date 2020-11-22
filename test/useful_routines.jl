@@ -36,7 +36,7 @@ end
 
 function circle_distance_function(coords, center, radius)
     difference = (coords .- center) .^ 2
-    distance = radius .- sqrt.(mapslices(sum, difference, dims = 1)')
+    distance = radius .- sqrt.(vec(mapslices(sum, difference, dims = 1)))
     return distance
 end
 
