@@ -1,6 +1,6 @@
 using Test
 using LinearAlgebra
-using Plots
+using PyPlot
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -12,59 +12,41 @@ function radial_vector(r,theta)
     return r*[cosd(theta),sind(theta)]
 end
 
+xL = [0.,0.]
+xR = [2.,1.]
+cellmap = CutCell.CellMap(xL,xR)
+refcellmap = CutCell.CellMap([-1.,-1.],[1.,1.])
 
-xc = [0.0,0.0]
+# cellmap = refcellmap
+
+xc = [1,0.5]
 rad = 0.5
 poly = InterpolatingPolynomial(1,2,3)
-coeffs = circle_distance_function(poly.basis.points,xc,rad)
+points = cellmap(poly.basis.points)
+coeffs = circle_distance_function(points,xc,rad)
 update!(poly,coeffs)
 
 
-xq = [0.,0.25]
-x0 = [0.5,0.]
+xq = [1.0,0.5]
+x0 = CutCell.inverse(cellmap,xc+radial_vector(rad,45))
 
-xk,iter = CutCell.saye_newton_iterate(x0,xq,poly,1e-5,1.5sqrt(2))
+# xk,iter = CutCell.saye_newton_iterate(x0,xq,poly,1e-10,1.5sqrt(2))
+xk,iter = CutCell.saye_newton_iterate_with_cellmap(x0,xq,poly,cellmap,1e-5,1.5sqrt(2))
 
-xrange = -1:1e-2:1
-contour(xrange,xrange,(x,y)->poly(x,y),levels=[0.],aspect_ratio=:equal,legend=false)
-xlims!(-1.2,1.2)
-ylims!(-1.2,1.2)
-scatter!([x0[1]],[x0[2]])
-scatter!([xk[1]],[xk[2]])
-scatter!([xq[1]],[xq[2]])
+sx0 = cellmap(x0)
+sxk = cellmap(xk)
 
-# vp = poly(x0)
-# gp = vec(gradient(poly,x0))
-# h = hessian(poly,x0)
-# hp = [h[1]  h[2]
-#       h[2]  h[3]]
-#
-# l0 = gp'*(xq-x0)/(gp'*gp)
-#
-# gf = vcat(x0-xq+l0*gp,vp)
-# hf = [I+l0*hp  gp
-#       gp'      0.0]
-#
-# δ = hf\gf
-#
-# x1 = x0 - δ[1:2]
-# l1 = l0 - δ[3]
-#
-# vp = poly(x1)
-# gp = vec(gradient(poly,x1))
-# h = hessian(poly,x1)
-# hp = [h[1]  h[2]
-#       h[2]  h[3]]
-#
-# gf = vcat(x1-xq+l1*gp,vp)
-# hf = [I+l1*hp  gp
-#       gp'      0.0]
-#
-# δ = hf\gf
-#
-# x2 = x1 - δ[1:2]
-# l2 = l1 - δ[3]
+xrange = -1:1e-1:1
 
+referencepoints = vcat(repeat(xrange,inner=length(xrange))',repeat(xrange,outer=length(xrange))')
+spatialpoints = cellmap(referencepoints)
+vals = vec(mapslices(poly,referencepoints,dims=1))
 
-
-# xk = CutCell.newton_iterate(cubic_func,cubic_grad,[0.5,1.5],1e-10)
+fig,ax = PyPlot.subplots()
+ax.tricontour(spatialpoints[1,:],spatialpoints[2,:],vals,levels=[0.0])
+ax.scatter([sx0[1]],[sx0[2]],label="guess")
+ax.scatter([xq[1]],[xq[2]],label="query")
+ax.scatter([sxk[1]],[sxk[2]],label="soln")
+ax.legend()
+ax.set_aspect("equal")
+fig
