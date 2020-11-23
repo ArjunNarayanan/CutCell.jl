@@ -44,7 +44,7 @@ cutmesh = CutCell.CutMesh(levelset,levelsetcoeffs,mesh)
 update!(levelset,levelsetcoeffs[CutCell.nodal_connectivity(cutmesh.mesh,1)])
 
 refpoints = CutCell.reference_seed_points(2)
-seedpoints = CutCell.seed_zero_levelset(2,levelset,levelsetcoeffs,cutmesh)
+seedpoints,seedcellids = CutCell.seed_zero_levelset(2,levelset,levelsetcoeffs,cutmesh)
 
 nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
 fig, ax = PyPlot.subplots()

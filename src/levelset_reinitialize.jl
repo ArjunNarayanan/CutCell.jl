@@ -172,6 +172,7 @@ end
 function seed_zero_levelset(nump,levelset,levelsetcoeffs,cutmesh)
     refpoints = reference_seed_points(nump)
     seedpoints = []
+    seedcellids = Int[]
     cellsign = cell_sign(cutmesh)
     cellids = findall(cellsign .== 0)
     for cellid in cellids
@@ -180,7 +181,13 @@ function seed_zero_levelset(nump,levelset,levelsetcoeffs,cutmesh)
         update!(levelset,levelsetcoeffs[nodeids])
 
         xk = cellmap(seed_cell_zero_levelset(refpoints,levelset,x->vec(gradient(levelset,x))))
+        numseedpoints = size(xk)[2]
+        append!(seedcellids,repeat([cellid],numseedpoints))
         push!(seedpoints,xk)
     end
-    return hcat(seedpoints...)
+    return hcat(seedpoints...),seedcellids
+end
+
+function reinitialize_levelset()
+
 end
