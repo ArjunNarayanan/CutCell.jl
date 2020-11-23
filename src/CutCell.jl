@@ -2,7 +2,7 @@ module CutCell
 
 using LinearAlgebra
 using SparseArrays
-# using NearestNeighbors
+using NearestNeighbors
 using CartesianMesh
 using PolynomialBasis
 using ImplicitDomainQuadrature
