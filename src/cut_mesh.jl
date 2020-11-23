@@ -132,6 +132,10 @@ function cell_connectivity(cutmesh::CutMesh)
     return cell_connectivity(cutmesh.mesh)
 end
 
+function nodal_coordinates(cutmesh::CutMesh)
+    return nodal_coordinates(cutmesh.mesh)
+end
+
 function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
     ncells = size(nodalconnectivity)[2]
     cellsign = zeros(Int, ncells)

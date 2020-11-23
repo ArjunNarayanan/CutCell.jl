@@ -60,7 +60,9 @@ end
 function saye_newton_iterate_with_cellmap(
     xguess,
     xq,
-    poly,
+    func,
+    grad,
+    hess,
     cellmap,
     tol,
     r;
@@ -71,16 +73,16 @@ function saye_newton_iterate_with_cellmap(
     jac = jacobian(cellmap)
 
     x0 = copy(xguess)
-    gp = vec(gradient(poly, x0))
+    gp = grad(x0)
     l0 = gp' * ((xq - cellmap(x0)) .* jac) / (gp' * gp)
 
     x1 = copy(x0)
     l1 = l0
 
     for counter = 1:maxiter
-        gp = vec(gradient(poly, x0))
-        vp = poly(x0)
-        hp = hessian_matrix(poly, x0)
+        vp = func(x0)
+        gp = grad(x0)
+        hp = hess(x0)
 
         gf = vcat(((cellmap(x0) - xq) .* jac) + l0 * gp, vp)
         hf = [
@@ -112,19 +114,73 @@ function saye_newton_iterate_with_cellmap(
     error("Did not converge in $maxiter iterations")
 end
 
-function project_on_zero_levelset(xguess,func,grad,tol;maxiter=20)
+function project_on_zero_levelset(
+    xguess,
+    func,
+    grad,
+    tol,
+    r;
+    maxiter = 20,
+    normtol = 1e-8,
+    perturbation = 0.1,
+)
     x0 = copy(xguess)
     x1 = copy(x0)
+    dim = length(xguess)
+
     for counter = 1:maxiter
         vf = func(x0)
         gf = grad(x0)
 
-        x1 = x0 - vf/(gf'*gf)*gf
-        if abs(func(x1)) < tol
-            return x1
+        if norm(gf) < normtol
+            x0 = x0 + perturbation * (rand(dim) .- 0.5)
         else
-            x0 = x1
+            δ = vf / (gf' * gf) * gf
+            normδ = norm(δ)
+            if normδ > 0.5r
+                δ *= 0.5r / normδ
+            end
+
+            x1 = x0 - δ
+
+            if abs(func(x1)) < tol
+                flag = norm(x1-xguess) < r
+                return x1, flag
+            else
+                x0 = x1
+            end
         end
     end
     error("Did not converge after $maxiter iterations")
+end
+
+function reference_seed_points(n)
+    @assert n > 0
+    xrange = range(-1.0, stop = 1.0, length = n + 2)
+    points = ImplicitDomainQuadrature.tensor_product_points(xrange[2:n+1]', xrange[2:n+1]')
+end
+
+function seed_cell_zero_levelset(xguess,func,grad;tol=1e-8,r=2.5)
+    dim,nump = size(xguess)
+    pf = [project_on_zero_levelset(xguess[:,i],func,grad,tol,r) for i = 1:nump]
+    flags = [p[2] for p in pf]
+    valididx = findall(flags)
+    validpoints = [p[1] for p in pf[valididx]]
+    return hcat(validpoints...)
+end
+
+function seed_zero_levelset(nump,levelset,levelsetcoeffs,cutmesh)
+    refpoints = reference_seed_points(nump)
+    seedpoints = []
+    cellsign = cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+    for cellid in cellids
+        cellmap = cell_map(cutmesh,cellid)
+        nodeids = nodal_connectivity(cutmesh.mesh,cellid)
+        update!(levelset,levelsetcoeffs[nodeids])
+
+        xk = cellmap(seed_cell_zero_levelset(refpoints,levelset,x->vec(gradient(levelset,x))))
+        push!(seedpoints,xk)
+    end
+    return hcat(seedpoints...)
 end
