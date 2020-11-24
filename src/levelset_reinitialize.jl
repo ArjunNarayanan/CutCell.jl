@@ -144,7 +144,7 @@ function project_on_zero_levelset(
             x1 = x0 - δ
 
             if abs(func(x1)) < tol
-                flag = norm(x1-xguess) < r
+                flag = norm(x1 - xguess) < r
                 return x1, flag
             else
                 x0 = x1
@@ -160,34 +160,82 @@ function reference_seed_points(n)
     points = ImplicitDomainQuadrature.tensor_product_points(xrange[2:n+1]', xrange[2:n+1]')
 end
 
-function seed_cell_zero_levelset(xguess,func,grad;tol=1e-8,r=2.5)
-    dim,nump = size(xguess)
-    pf = [project_on_zero_levelset(xguess[:,i],func,grad,tol,r) for i = 1:nump]
+function seed_cell_zero_levelset(xguess, func, grad; tol = 1e-12, r = 2.5)
+    dim, nump = size(xguess)
+    pf = [project_on_zero_levelset(xguess[:, i], func, grad, tol, r) for i = 1:nump]
     flags = [p[2] for p in pf]
     valididx = findall(flags)
     validpoints = [p[1] for p in pf[valididx]]
     return hcat(validpoints...)
 end
 
-function seed_zero_levelset(nump,levelset,levelsetcoeffs,cutmesh)
+function seed_zero_levelset(nump, levelset, levelsetcoeffs, cutmesh)
     refpoints = reference_seed_points(nump)
-    seedpoints = []
+    refseedpoints = []
+    spatialseedpoints = []
     seedcellids = Int[]
     cellsign = cell_sign(cutmesh)
     cellids = findall(cellsign .== 0)
     for cellid in cellids
-        cellmap = cell_map(cutmesh,cellid)
-        nodeids = nodal_connectivity(cutmesh.mesh,cellid)
-        update!(levelset,levelsetcoeffs[nodeids])
+        cellmap = cell_map(cutmesh, cellid)
+        nodeids = nodal_connectivity(cutmesh.mesh, cellid)
+        update!(levelset, levelsetcoeffs[nodeids])
 
-        xk = cellmap(seed_cell_zero_levelset(refpoints,levelset,x->vec(gradient(levelset,x))))
+        xk = seed_cell_zero_levelset(refpoints, levelset, x -> vec(gradient(levelset, x)))
+
         numseedpoints = size(xk)[2]
-        append!(seedcellids,repeat([cellid],numseedpoints))
-        push!(seedpoints,xk)
+
+        append!(seedcellids, repeat([cellid], numseedpoints))
+        push!(refseedpoints, xk)
+        push!(spatialseedpoints, cellmap(xk))
     end
-    return hcat(seedpoints...),seedcellids
+
+    refseedpoints = hcat(refseedpoints...)
+    spatialseedpoints = hcat(spatialseedpoints...)
+    return refseedpoints, spatialseedpoints, seedcellids
 end
 
-function reinitialize_levelset()
+function reinitialize_levelset(
+    refseedpoints,
+    spatialseedpoints,
+    seedcellids,
+    levelset,
+    levelsetcoeffs,
+    cutmesh,
+    tol;
+    boundingradius = 2.5,
+)
+    signeddistance = similar(levelsetcoeffs)
+    nodalcoordinates = nodal_coordinates(cutmesh)
+    tree = KDTree(spatialseedpoints)
+    seedidx, seeddists = nn(tree, nodalcoordinates)
 
+    for (idx, sidx) in enumerate(seedidx)
+        xguess = refseedpoints[:, sidx]
+        xquery = nodalcoordinates[:, idx]
+        guesscellid = seedcellids[sidx]
+        cellmap = cell_map(cutmesh, guesscellid)
+        update!(levelset, levelsetcoeffs[nodal_connectivity(cutmesh.mesh, guesscellid)])
+
+        # try
+            xn, iter = saye_newton_iterate_with_cellmap(
+                xguess,
+                xquery,
+                levelset,
+                x -> vec(gradient(levelset, x)),
+                x -> hessian_matrix(levelset, x),
+                cellmap,
+                tol,
+                boundingradius,
+            )
+        # catch e
+        #     println("query node id = $idx")
+        #     println("x guess = $xguess")
+        #     println("x query = $xquery")
+        #     println("guess cellid = $guesscellid\n")
+        # end
+
+        signeddistance[idx] = sign(levelsetcoeffs[idx])*norm(cellmap(xn) - xquery)
+    end
+    return signeddistance
 end

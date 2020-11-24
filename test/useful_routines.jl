@@ -80,6 +80,14 @@ function integral_norm_on_cut_mesh(func, cellquads, cutmesh, ndofs)
     return sqrt.(vals)
 end
 
+function integral_norm_on_uniform_mesh(func,quad,cellmaps,ndofs)
+    vals = zeros(ndofs)
+    for cellmap in cellmaps
+        add_cell_norm_squared!(vals,func,cellmap,quad)
+    end
+    return sqrt.(vals)
+end
+
 function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
     ndofs = size(nodalsolutions)[1]
     err = zeros(ndofs)
@@ -109,8 +117,9 @@ function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
 end
 
 function uniform_mesh_L2_error(nodalsolutions, exactsolution, basis, quad, mesh)
-    err = zeros(2)
-    interpolater = InterpolatingPolynomial(2,basis)
+    ndofs,nnodes = size(nodalsolutions)
+    err = zeros(ndofs)
+    interpolater = InterpolatingPolynomial(ndofs,basis)
     ncells = CutCell.number_of_cells(mesh)
     nodalconnectivity = CutCell.nodal_connectivity(mesh)
 
