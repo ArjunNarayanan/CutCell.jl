@@ -1,6 +1,5 @@
 using Test
 using LinearAlgebra
-using IntervalArithmetic
 using PolynomialBasis
 using ImplicitDomainQuadrature
 # using Revise
@@ -16,14 +15,14 @@ levelset = InterpolatingPolynomial(1,basis)
 levelsetcoeffs = [-0.1,-0.1,0.9,0.9]
 update!(levelset,levelsetcoeffs)
 
-box = IntervalBox(-1..1,2)
 
+xL,xR = [-1.,-1.],[1.,1.]
 tpq = tensor_product_quadrature(2,numqp)
 quad1d = ReferenceQuadratureRule(numqp)
-pquad = area_quadrature(levelset,+1,box,quad1d)
-nquad = area_quadrature(levelset,-1,box,quad1d)
+pquad = area_quadrature(levelset,+1,xL,xR,quad1d)
+nquad = area_quadrature(levelset,-1,xL,xR,quad1d)
 nquad = QuadratureRule(nquad.points .+ [2.0,0.0],nquad.weights)
-psquad = surface_quadrature(levelset,box,quad1d)
+psquad = surface_quadrature(levelset,xL,xR,quad1d)
 nsquad = QuadratureRule(psquad.points .+ [2.,0.],psquad.weights)
 
 lambda,mu = 1.,2.

@@ -132,14 +132,18 @@ function cell_connectivity(cutmesh::CutMesh)
     return cell_connectivity(cutmesh.mesh)
 end
 
+function nodal_coordinates(cutmesh::CutMesh)
+    return nodal_coordinates(cutmesh.mesh)
+end
+
 function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
     ncells = size(nodalconnectivity)[2]
     cellsign = zeros(Int, ncells)
-    box = IntervalBox(-1..1, 2)
+    xL,xR = [-1.,-1.],[1.,1.]
     for cellid = 1:ncells
         nodeids = nodalconnectivity[:, cellid]
         update!(levelset, levelsetcoeffs[nodeids])
-        s = sign_allow_perturbations(levelset, box)
+        s = sign_allow_perturbations(levelset, xL,xR)
         if (s == +1 || s == -1)
             cellsign[cellid] = s
         else

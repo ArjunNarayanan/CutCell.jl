@@ -2,7 +2,7 @@ module CutCell
 
 using LinearAlgebra
 using SparseArrays
-using IntervalArithmetic
+using NearestNeighbors
 using CartesianMesh
 using PolynomialBasis
 using ImplicitDomainQuadrature
@@ -27,6 +27,7 @@ include("penalty_displacement_bc.jl")
 include("stress.jl")
 include("cut_mesh_assembly.jl")
 include("postprocess.jl")
+include("levelset_reinitialize.jl")
 include("utilities.jl")
 
 export plane_strain_voigt_hooke_matrix
