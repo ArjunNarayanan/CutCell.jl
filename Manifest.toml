@@ -87,7 +87,7 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[ImplicitDomainQuadrature]]
 deps = ["FastGaussQuadrature", "IntervalArithmetic", "LinearAlgebra", "PolynomialBasis", "Roots"]
-git-tree-sha1 = "1af35b3922e7cbb801b2e68ee0220d82b96311d0"
+git-tree-sha1 = "a6c6e714732cd9f554b3a0f6f2f3932e9ddc2be1"
 repo-rev = "master"
 repo-url = "https://github.com/ArjunNarayanan/ImplicitDomainQuadrature.git"
 uuid = "215a9a07-c97b-423e-a99e-05c6f7357eae"
@@ -143,9 +143,9 @@ version = "0.2.12"
 
 [[NearestNeighbors]]
 deps = ["Distances", "StaticArrays"]
-git-tree-sha1 = "da77adc83db31176804ce8307e61ef5bedca2e58"
+git-tree-sha1 = "9afd724797039125e8e2cc362098f01dab60bc3a"
 uuid = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
-version = "0.4.7"
+version = "0.4.8"
 
 [[OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
@@ -195,9 +195,9 @@ version = "0.2.0"
 
 [[Roots]]
 deps = ["Printf"]
-git-tree-sha1 = "1211c7c1928c1ed29cdcef65979b7a791e3b9fbe"
+git-tree-sha1 = "166958a00dfbb0573778f5250365b00f13dc8144"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "1.0.5"
+version = "1.0.6"
 
 [[RoundingEmulator]]
 git-tree-sha1 = "40b9edad2e5287e05bd413a38f61a8ff55b9557b"
