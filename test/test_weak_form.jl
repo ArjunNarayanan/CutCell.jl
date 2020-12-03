@@ -62,7 +62,7 @@ R = CutCell.linear_form(rhsfunc, basis, quad, cellmap)
 sol = reshape(M \ R, 2, :)
 coords = hcat([cellmap(basis.points[:, i]) for i = 1:9]...)
 exactsol = hcat([rhsfunc(coords[:, i]) for i = 1:9]...)
-@test allapprox(sol, exactsol, 1e-10)
+@test allapprox(sol, exactsol, 1e3eps())
 
 
 K = CutCell.bilinear_form(basis, quad, stiffness, CutCell.jacobian(cellmap))
@@ -74,7 +74,7 @@ bcvals = exactsol[:, boundarynodeids]
 CutCell.apply_dirichlet_bc!(K, R, boundarynodeids, bcvals)
 
 sol = reshape(K \ R, 2, :)
-@test allapprox(sol, exactsol, 1e-15)
+@test allapprox(sol, exactsol, 1e3eps())
 
 K = CutCell.bilinear_form(basis, quad, stiffness, cellmap)
 bodyforce(x) = -4 * (l + 2m) * [1.0, 0.0]
@@ -85,7 +85,7 @@ bcvals = exactsol[:, boundarynodeids]
 CutCell.apply_dirichlet_bc!(K, R, boundarynodeids, bcvals)
 
 sol = reshape(K \ R, 2, :)
-@test allapprox(sol, exactsol, 1e-15)
+@test allapprox(sol, exactsol, 1e3eps())
 
 
 polyorder = 1
@@ -145,4 +145,4 @@ sol = K\rhs
 disp = reshape(sol,2,:)
 testdisp = [0. 0. dx dx
             0. dy 0. dy]
-@test allapprox(disp,testdisp,1e-15)
+@test allapprox(disp,testdisp,1e3eps())
