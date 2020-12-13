@@ -20,7 +20,9 @@ function reinitialization_error(distancefunction, nelmts, polyorder)
     refseedpoints, spatialseedpoints, seedcellids =
         CutCell.seed_zero_levelset(2, levelset, levelsetcoeffs, cutmesh)
 
+    nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
     signeddistance = CutCell.reinitialize_levelset(
+        nodalcoordinates,
         refseedpoints,
         spatialseedpoints,
         seedcellids,
@@ -61,7 +63,6 @@ err = [
     for ne in nelmts
 ]
 rate = convergence_rate(err,dx)
-pushfirst!(rate,0.0)
 
 # foldername = "examples/reinitialize-levelset/"
 # filename = "polyorder-"*string(polyorder)*".csv"

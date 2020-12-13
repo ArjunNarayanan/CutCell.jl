@@ -146,28 +146,29 @@ function seed_zero_levelset(nump, levelset, levelsetcoeffs, cutmesh)
 end
 
 function reinitialize_levelset(
+    querypoints,
     refseedpoints,
     spatialseedpoints,
     seedcellids,
     levelset,
     levelsetcoeffs,
-    cutmesh,
+    mesh,
     tol;
     boundingradius = 2.5,
 )
+
     signeddistance = similar(levelsetcoeffs)
-    nodalcoordinates = nodal_coordinates(cutmesh)
     tree = KDTree(spatialseedpoints)
-    seedidx, seeddists = nn(tree, nodalcoordinates)
+    seedidx, seeddists = nn(tree, querypoints)
 
     for (idx, sidx) in enumerate(seedidx)
         xguess = refseedpoints[:, sidx]
-        xquery = nodalcoordinates[:, idx]
+        xquery = querypoints[:, idx]
         guesscellid = seedcellids[sidx]
-        cellmap = cell_map(cutmesh, guesscellid)
-        update!(levelset, levelsetcoeffs[nodal_connectivity(cutmesh.mesh, guesscellid)])
+        cellmap = cell_map(mesh, guesscellid)
+        update!(levelset, levelsetcoeffs[nodal_connectivity(mesh, guesscellid)])
 
-        xn, iter = saye_newton_iterate(
+        refclosestpt, iter = saye_newton_iterate(
             xguess,
             xquery,
             levelset,
@@ -178,7 +179,12 @@ function reinitialize_levelset(
             boundingradius,
         )
 
-        signeddistance[idx] = sign(levelsetcoeffs[idx])*norm(cellmap(xn) - xquery)
+        spatialclosestpt = cellmap(refclosestpt)
+
+        g = vec(transform_gradient(gradient(levelset,refclosestpt),jacobian(cellmap)))
+        s = sign(g'*(xquery - spatialclosestpt))
+
+        signeddistance[idx] = s*norm(spatialclosestpt - xquery)
     end
     return signeddistance
 end

@@ -62,6 +62,10 @@ function nodal_connectivity(cutmesh::CutMesh, s, cellid)
     return nodeids
 end
 
+function nodal_connectivity(cutmesh::CutMesh,cellid)
+    return nodal_connectivity(cutmesh.mesh,cellid)
+end
+
 function active_cells(cutmesh::CutMesh)
     return cutmesh.activecells
 end
