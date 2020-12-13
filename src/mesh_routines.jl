@@ -117,6 +117,10 @@ function widths(mesh::UniformMesh)
     return mesh.widths
 end
 
+function widths(mesh::Mesh)
+    return mesh.widths
+end
+
 function elements_per_mesh_side(mesh)
     return mesh.nelements
 end

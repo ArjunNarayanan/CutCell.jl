@@ -28,6 +28,7 @@ include("stress.jl")
 include("cut_mesh_assembly.jl")
 include("postprocess.jl")
 include("levelset_reinitialize.jl")
+include("levelset_propagate.jl")
 include("utilities.jl")
 
 export plane_strain_voigt_hooke_matrix

@@ -217,24 +217,17 @@ function reinitialize_levelset(
         cellmap = cell_map(cutmesh, guesscellid)
         update!(levelset, levelsetcoeffs[nodal_connectivity(cutmesh.mesh, guesscellid)])
 
-        # try
-            xn, iter = saye_newton_iterate_with_cellmap(
-                xguess,
-                xquery,
-                levelset,
-                x -> vec(gradient(levelset, x)),
-                x -> hessian_matrix(levelset, x),
-                cellmap,
-                tol,
-                boundingradius,
-            )
-        # catch e
-        #     println("query node id = $idx")
-        #     println("x guess = $xguess")
-        #     println("x query = $xquery")
-        #     println("guess cellid = $guesscellid\n")
-        # end
-
+        xn, iter = saye_newton_iterate_with_cellmap(
+            xguess,
+            xquery,
+            levelset,
+            x -> vec(gradient(levelset, x)),
+            x -> hessian_matrix(levelset, x),
+            cellmap,
+            tol,
+            boundingradius,
+        )
+        
         signeddistance[idx] = sign(levelsetcoeffs[idx])*norm(cellmap(xn) - xquery)
     end
     return signeddistance

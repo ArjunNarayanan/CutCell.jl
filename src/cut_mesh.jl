@@ -74,6 +74,18 @@ function number_of_nodes(cutmesh::CutMesh)
     return cutmesh.numnodes
 end
 
+function reference_corner(cutmesh::CutMesh)
+    return reference_corner(cutmesh.mesh)
+end
+
+function nodes_per_mesh_side(cutmesh::CutMesh)
+    return nodes_per_mesh_side(cutmesh.mesh)
+end
+
+function widths(cutmesh::CutMesh)
+    return widths(cutmesh.mesh)
+end
+
 function number_of_degrees_of_freedom(cutmesh::CutMesh)
     dim = dimension(cutmesh)
     numnodes = number_of_nodes(cutmesh)
