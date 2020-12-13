@@ -20,7 +20,7 @@ function reinitialization_error(distancefunction, nelmts, polyorder)
         CutCell.seed_zero_levelset(2, levelset, levelsetcoeffs, cutmesh)
 
     nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
-    signeddistance = CutCell.reinitialize_levelset(
+    signeddistance = CutCell.distance_to_zero_levelset(
         nodalcoordinates,
         refseedpoints,
         spatialseedpoints,

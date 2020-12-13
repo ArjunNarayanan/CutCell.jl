@@ -145,7 +145,7 @@ function seed_zero_levelset(nump, levelset, levelsetcoeffs, cutmesh)
     return refseedpoints, spatialseedpoints, seedcellids
 end
 
-function reinitialize_levelset(
+function distance_to_zero_levelset(
     querypoints,
     refseedpoints,
     spatialseedpoints,
@@ -157,7 +157,8 @@ function reinitialize_levelset(
     boundingradius = 2.5,
 )
 
-    signeddistance = similar(levelsetcoeffs)
+    dim,numquerypoints = size(querypoints)
+    signeddistance = zeros(numquerypoints)
     tree = KDTree(spatialseedpoints)
     seedidx, seeddists = nn(tree, querypoints)
 

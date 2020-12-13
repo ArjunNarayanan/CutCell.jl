@@ -1,6 +1,7 @@
 struct BoundaryPaddedMesh
     mesh::Any
     gridsize::Any
+    nfmside::Any
     numghostlayers::Any
     bottomghostcoords::Any
     rightghostcoords::Any
@@ -73,10 +74,80 @@ function BoundaryPaddedMesh(mesh, numghostlayers)
     return BoundaryPaddedMesh(
         mesh,
         gridsize,
+        nfmside,
         numghostlayers,
         bottomghostcoords,
         rightghostcoords,
         topghostcoords,
         leftghostcoords,
+    )
+end
+
+struct BoundaryPaddedLevelset
+    paddedmesh::Any
+    bottomghostdist::Any
+    rightghostdist::Any
+    topghostdist::Any
+    leftghostdist::Any
+end
+
+function BoundaryPaddedLevelset(
+    paddedmesh,
+    refseedpoints,
+    spatialseedpoints,
+    seedcellids,
+    levelset,
+    levelsetcoeffs,
+    cutmesh,
+    tol,
+)
+
+    bottomghostdist = distance_to_zero_levelset(
+        paddedmesh.bottomghostcoords,
+        refseedpoints,
+        spatialseedpoints,
+        seedcellids,
+        levelset,
+        levelsetcoeffs,
+        cutmesh,
+        tol,
+    )
+    rightghostdist = distance_to_zero_levelset(
+        paddedmesh.rightghostcoords,
+        refseedpoints,
+        spatialseedpoints,
+        seedcellids,
+        levelset,
+        levelsetcoeffs,
+        cutmesh,
+        tol,
+    )
+    topghostdist = distance_to_zero_levelset(
+        paddedmesh.topghostcoords,
+        refseedpoints,
+        spatialseedpoints,
+        seedcellids,
+        levelset,
+        levelsetcoeffs,
+        cutmesh,
+        tol,
+    )
+    leftghostdist = distance_to_zero_levelset(
+        paddedmesh.leftghostcoords,
+        refseedpoints,
+        spatialseedpoints,
+        seedcellids,
+        levelset,
+        levelsetcoeffs,
+        cutmesh,
+        tol,
+    )
+
+    return BoundaryPaddedLevelset(
+        paddedmesh,
+        bottomghostdist,
+        rightghostdist,
+        topghostdist,
+        leftghostdist,
     )
 end
