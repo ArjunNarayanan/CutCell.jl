@@ -63,7 +63,7 @@ err = [
 rate = convergence_rate(err,dx)
 pushfirst!(rate,0.0)
 
-foldername = "examples/reinitialize-levelset/"
-filename = "polyorder-"*string(polyorder)*".csv"
-df = DataFrame([dx,err,rate],["Element Size", "Error", "Rate"])
-CSV.write(foldername*filename,df)
+# foldername = "examples/reinitialize-levelset/"
+# filename = "polyorder-"*string(polyorder)*".csv"
+# df = DataFrame([dx,err,rate],["Element Size", "Error", "Rate"])
+# CSV.write(foldername*filename,df)
