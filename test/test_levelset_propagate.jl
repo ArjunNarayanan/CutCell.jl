@@ -40,16 +40,14 @@ testleftcoords = [
 @test allapprox(paddedmesh.topghostcoords, testtopcoords)
 @test allapprox(paddedmesh.leftghostcoords, testleftcoords)
 
-
-
 x0 = [0.0, 0.0]
-L, W = 1.0, 1.0
-nelmtsx, nelmtsy = 2, 2
+L, W = 2.0, 1.0
+nelmtsx, nelmtsy = 2, 1
 numghostlayers = 1
 polyorder = 2
 
-xc = [0.5, 0.5]
-radius = 0.25
+xI = [0.0,0.5]
+normal = [0.0,1.0]
 tol = 1e-8
 
 basis = TensorProductBasis(2, polyorder)
@@ -57,14 +55,13 @@ mesh = CutCell.Mesh(x0, [L, W], [nelmtsx, nelmtsy], basis)
 
 levelset = InterpolatingPolynomial(1, basis)
 levelsetcoeffs =
-    CutCell.levelset_coefficients(x -> circle_distance_function(x, xc, radius), mesh)
+    CutCell.levelset_coefficients(x -> plane_distance_function(x,normal,xI), mesh)
 
 cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 paddedmesh = CutCell.BoundaryPaddedMesh(cutmesh, numghostlayers)
 
 refseedpoints, spatialseedpoints, seedcellids =
     CutCell.seed_zero_levelset(2, levelset, levelsetcoeffs, cutmesh)
-
 
 paddedlevelset = CutCell.BoundaryPaddedLevelset(
     paddedmesh,
@@ -76,3 +73,59 @@ paddedlevelset = CutCell.BoundaryPaddedLevelset(
     cutmesh,
     tol,
 )
+
+Dmx = CutCell.first_order_horizontal_backward_difference(paddedlevelset)
+Dpx = CutCell.first_order_horizontal_forward_difference(paddedlevelset)
+Dmy = CutCell.first_order_vertical_backward_difference(paddedlevelset)
+Dpy = CutCell.first_order_vertical_forward_difference(paddedlevelset)
+
+@test allapprox(Dmy,ones(length(levelsetcoeffs)))
+@test allapprox(Dpy,ones(length(levelsetcoeffs)))
+@test allapprox(Dmx,zeros(length(levelsetcoeffs)))
+@test allapprox(Dpx,zeros(length(levelsetcoeffs)))
+
+
+
+x0 = [0.0, 0.0]
+L, W = 2.0, 1.0
+nelmtsx, nelmtsy = 2, 1
+numghostlayers = 1
+polyorder = 2
+
+xI = [0.5,0.0]
+normal = [1.0,0.0]
+tol = 1e-8
+
+basis = TensorProductBasis(2, polyorder)
+mesh = CutCell.Mesh(x0, [L, W], [nelmtsx, nelmtsy], basis)
+
+levelset = InterpolatingPolynomial(1, basis)
+levelsetcoeffs =
+    CutCell.levelset_coefficients(x -> plane_distance_function(x,normal,xI), mesh)
+
+cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
+paddedmesh = CutCell.BoundaryPaddedMesh(cutmesh, numghostlayers)
+
+refseedpoints, spatialseedpoints, seedcellids =
+    CutCell.seed_zero_levelset(2, levelset, levelsetcoeffs, cutmesh)
+
+paddedlevelset = CutCell.BoundaryPaddedLevelset(
+    paddedmesh,
+    refseedpoints,
+    spatialseedpoints,
+    seedcellids,
+    levelset,
+    levelsetcoeffs,
+    cutmesh,
+    tol,
+)
+
+Dmx = CutCell.first_order_horizontal_backward_difference(paddedlevelset)
+Dpx = CutCell.first_order_horizontal_forward_difference(paddedlevelset)
+Dmy = CutCell.first_order_vertical_backward_difference(paddedlevelset)
+Dpy = CutCell.first_order_vertical_forward_difference(paddedlevelset)
+
+@test allapprox(Dmx,ones(length(levelsetcoeffs)))
+@test allapprox(Dpx,ones(length(levelsetcoeffs)))
+@test allapprox(Dmy,zeros(length(levelsetcoeffs)))
+@test allapprox(Dpy,zeros(length(levelsetcoeffs)))

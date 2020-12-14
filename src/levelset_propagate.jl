@@ -84,15 +84,18 @@ function BoundaryPaddedMesh(mesh, numghostlayers)
 end
 
 struct BoundaryPaddedLevelset
-    paddedmesh::Any
+    interiordist::Any
     bottomghostdist::Any
     rightghostdist::Any
     topghostdist::Any
     leftghostdist::Any
+    nfmside::Any
+    gridsize::Any
+    numghostlayers::Any
 end
 
 function BoundaryPaddedLevelset(
-    paddedmesh,
+    paddedmesh::BoundaryPaddedMesh,
     refseedpoints,
     spatialseedpoints,
     seedcellids,
@@ -144,10 +147,134 @@ function BoundaryPaddedLevelset(
     )
 
     return BoundaryPaddedLevelset(
-        paddedmesh,
+        levelsetcoeffs,
         bottomghostdist,
         rightghostdist,
         topghostdist,
         leftghostdist,
+        paddedmesh.nfmside,
+        paddedmesh.gridsize,
+        paddedmesh.numghostlayers,
     )
+end
+
+function first_order_horizontal_backward_difference(paddedlevelset)
+    interior = paddedlevelset.interiordist
+    left = paddedlevelset.leftghostdist
+    cols, rows = paddedlevelset.nfmside
+    dx = paddedlevelset.gridsize[1]
+
+    npts = length(interior)
+    derivative = zeros(npts)
+
+    derivative[1:rows] = (interior[1:rows] - left) / dx
+
+    for col = 2:cols
+        prevstart = (col - 2) * rows + 1
+        prevstop = prevstart + rows - 1
+
+        start = (col - 1) * rows + 1
+        stop = start + rows - 1
+
+        derivative[start:stop] = (interior[start:stop] - interior[prevstart:prevstop]) / dx
+    end
+
+    return derivative
+end
+
+function first_order_horizontal_forward_difference(paddedlevelset)
+    interior = paddedlevelset.interiordist
+    right = paddedlevelset.rightghostdist
+    cols, rows = paddedlevelset.nfmside
+    dx = paddedlevelset.gridsize[1]
+
+    npts = length(interior)
+    derivative = zeros(npts)
+
+    for col = 1:cols-1
+        start = (col - 1) * rows + 1
+        stop = start + rows - 1
+        nextstart = stop + 1
+        nextstop = nextstart + rows - 1
+
+        derivative[start:stop] = (interior[nextstart:nextstop] - interior[start:stop]) / dx
+    end
+
+    start = (cols - 1) * rows + 1
+    stop = start + rows - 1
+    derivative[start:stop] = (right - interior[start:stop]) / dx
+
+    return derivative
+end
+
+function first_order_vertical_backward_difference(paddedlevelset)
+    interior = paddedlevelset.interiordist
+    bottom = paddedlevelset.bottomghostdist
+    cols, rows = paddedlevelset.nfmside
+    dy = paddedlevelset.gridsize[2]
+    numghostlayers = paddedlevelset.numghostlayers
+
+    npts = length(interior)
+    derivative = zeros(npts)
+
+    interioridx = range(1, step = rows, length = cols)
+    ghostidx = range(numghostlayers, step = numghostlayers, length = cols)
+
+    derivative[interioridx] = (interior[interioridx] - bottom[ghostidx]) / dy
+
+    for row = 2:rows
+        interioridx = range(row, step = rows, length = cols)
+        previnterioridx = range(row - 1, step = rows, length = cols)
+
+        derivative[interioridx] = (interior[interioridx] - interior[previnterioridx]) / dy
+    end
+
+    return derivative
+end
+
+function first_order_vertical_forward_difference(paddedlevelset)
+    interior = paddedlevelset.interiordist
+    top = paddedlevelset.topghostdist
+    cols, rows = paddedlevelset.nfmside
+    dy = paddedlevelset.gridsize[2]
+    numghostlayers = paddedlevelset.numghostlayers
+
+    npts = length(interior)
+    derivative = zeros(npts)
+
+    for row = 1:rows-1
+        interioridx = range(row, step = rows, length = cols)
+        nextinterioridx = range(row + 1, step = rows, length = cols)
+
+        derivative[interioridx] = (interior[nextinterioridx] - interior[interioridx]) / dy
+    end
+
+    interioridx = range(rows, step = rows, length = cols)
+    ghostidx = range(1, step = numghostlayers, length = cols)
+
+    derivative[interioridx] = (top[ghostidx] - interior[interioridx]) / dy
+
+    return derivative
+end
+
+function first_order_nabla(u1, u2, v1, v2)
+    return sqrt.(
+        (max.(u1, 0.0)) .^ 2 +
+        (min.(u2, 0.0)) .^ 2 +
+        (max.(v1, 0.0)) .^ 2 +
+        (min.(v2, 0.0)) .^ 2,
+    )
+end
+
+function step_first_order_levelset(paddedlevelset, speed, dt)
+    Dmx = first_order_horizontal_backward_difference(paddedlevelset)
+    Dpx = first_order_horizontal_forward_difference(paddedlevelset)
+    Dmy = first_order_vertical_backward_difference(paddedlevelset)
+    Dpy = first_order_vertical_forward_difference(paddedlevelset)
+
+    delplus = first_order_nabla(Dmx, Dpx, Dmy, Dpy)
+    delminus = first_order_nabla(Dpx, Dmx, Dpy, Dmy)
+
+    return paddedlevelset.interiordist -
+           dt * (max.(speed, 0.0) .* delplus + min.(speed, 0.0) .* delminus)
 end
