@@ -40,6 +40,23 @@ function circle_distance_function(coords, center, radius)
     return distance
 end
 
+function corner_distance_function(x::V,xc) where {V<:AbstractVector}
+    v = xc - x
+    if all(x .<= xc)
+        minimum(v)
+    elseif all(x.> xc)
+        return -sqrt(v'*v)
+    elseif x[2] > xc[2]
+        return v[2]
+    else
+        return v[1]
+    end
+end
+
+function corner_distance_function(points::M,xc) where {M<:AbstractMatrix}
+    return vec(mapslices(x->corner_distance_function(x,xc),points,dims=1))
+end
+
 function normal_from_angle(theta)
     return [cosd(theta), sind(theta)]
 end
