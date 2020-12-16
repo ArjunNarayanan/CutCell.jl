@@ -6,13 +6,17 @@ end
 
 function levelset_normal(levelset, points::M, invjac) where {M<:AbstractMatrix}
     npts = size(points)[2]
-    g = hcat([gradient(levelset, points[:, i])' for i = 1:npts]...)
-    normals = diagm(invjac) * g
-    for i = 1:npts
-        n = normals[:, i]
-        normals[:, i] = n / norm(n)
+    if npts == 0
+        return []
+    else
+        g = hcat([gradient(levelset, points[:, i])' for i = 1:npts]...)
+        normals = diagm(invjac) * g
+        for i = 1:npts
+            n = normals[:, i]
+            normals[:, i] = n / norm(n)
+        end
+        return normals
     end
-    return normals
 end
 
 function levelset_coefficients(distancefunc,mesh)
