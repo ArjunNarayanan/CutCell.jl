@@ -59,7 +59,7 @@ rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 
 x0 = [0.0, 0.0]
 L, W = 1.0, 1.0
-nelmts = 80
+nelmts = 40
 numghostlayers = 1
 polyorder = 2
 
@@ -77,15 +77,16 @@ initiallevelset =
 levelsetspeed = speed*ones(length(initiallevelset))
 dt = time_step_size(levelsetspeed,mesh)
 @assert isinteger(stoptime/dt)
-# nsteps = round(Int,stoptime/dt)
-nsteps = 107
+nsteps = round(Int,stoptime/dt)
+# nsteps = 107
 
 levelsetcoeffs = run_time_steps(levelset,initiallevelset,mesh,levelsetspeed,dt,nsteps)
 
 
 
 using Plots
-# x,y = grid_range(mesh)
+x,y = grid_range(mesh)
+
 # Z1 = reshape(levelsetcoeffs[1],length(y),:)
 # Z2 = reshape(levelsetcoeffs[end],length(y),:)
 # fig = plot(legend=false,aspect_ratio=:equal)
@@ -93,12 +94,13 @@ using Plots
 # contour!(fig,x,y,Z1,levels=[0.0],color="black",linewidth=2)
 # contour!(fig,x,y,Z2,levels=[0.0],color="red",linewidth=2)
 #
-l = range(-sqrt(2),stop=sqrt(2),length=10)
+
 anim = @animate for i = 1:length(levelsetcoeffs)
     Z = reshape(levelsetcoeffs[i],length(y),:)
     fig = plot(legend=false,aspect_ratio=:equal)
     plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,fillcolor="blue")
-    contour!(fig,x,y,Z,levels=l,linewidth=2)
+    contour!(fig,x,y,Z,levels=[0.0],linewidth=2,color="red")
 end
 
+gif(anim,fps=10)
 gif(anim,"examples/levelset-propagate/corner.gif",fps=10)

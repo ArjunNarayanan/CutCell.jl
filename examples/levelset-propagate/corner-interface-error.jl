@@ -54,8 +54,6 @@ function final_interface_error(
     levelsetspeed = speed * ones(length(levelsetcoeffs))
 
     for t = 1:nsteps
-        println(t)
-
         paddedmesh = CutCell.BoundaryPaddedMesh(cutmesh, 1)
         refseedpoints, spatialseedpoints, seedcellids =
             CutCell.seed_zero_levelset(2, levelset, levelsetcoeffs, cutmesh)
@@ -111,7 +109,7 @@ function error_for_numelmts(nelmts)
     L, W = 1.0, 1.0
     numghostlayers = 1
     polyorder = 2
-    numqp = 3
+    numqp = 5
 
     xc = [0.87, 0.87]
     speed = 1.0
@@ -135,6 +133,11 @@ function error_for_numelmts(nelmts)
     )
 end
 
-# nelmts = [5,10,20,40,80]
-err = error_for_numelmts(80)
-# err = [error_for_numelmts(ne) for ne in nelmts]
+nelmts = [5,10,20,40,80]
+# err = error_for_numelmts(80)
+dx = 1.0 ./ nelmts
+err = [error_for_numelmts(ne) for ne in nelmts]
+
+# using CSV,DataFrames
+# df = DataFrame([dx,err],["Element Size", "Error"])
+# CSV.write("examples/levelset-propagate/corner-convergence.csv",df)

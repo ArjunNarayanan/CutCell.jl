@@ -46,7 +46,7 @@ end
 
 x0 = [0.0, 0.0]
 L, W = 1.0, 1.0
-nelmts = 5
+nelmts = 40
 numghostlayers = 1
 polyorder = 2
 
@@ -88,18 +88,20 @@ rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 
 using Plots
 x,y = grid_range(mesh)
-Z1 = reshape(levelsetcoeffs[1],length(y),:)
-Z2 = reshape(levelsetcoeffs[end],length(y),:)
-fig = plot(legend=false,aspect_ratio=:equal)
-plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,strokecolor="black")
-contour!(fig,x,y,Z1,color="black",linewidth=2,levels=[0.0])
-contour!(fig,x,y,Z2,color="red",linewidth=2,levels=[0.0])
 
-# anim = @animate for i = 1:length(levelsetcoeffs)
-#     Z = reshape(levelsetcoeffs[i],length(y),:)
-#     fig = plot(legend=false,aspect_ratio=:equal)
-#     plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,fillcolor="blue")
-#     contour!(fig,x,y,Z,levels=[0.0],color="red",linewidth=2)
-# end
-#
-# gif(anim,"examples/levelset-propagate/shrinking-circle.gif",fps=5)
+# Z1 = reshape(levelsetcoeffs[1],length(y),:)
+# Z2 = reshape(levelsetcoeffs[end],length(y),:)
+# fig = plot(legend=false,aspect_ratio=:equal)
+# plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,strokecolor="black")
+# contour!(fig,x,y,Z1,color="black",linewidth=2,levels=[0.0])
+# contour!(fig,x,y,Z2,color="red",linewidth=2,levels=[0.0])
+
+anim = @animate for i = 1:length(levelsetcoeffs)
+    Z = reshape(levelsetcoeffs[i],length(y),:)
+    fig = plot(legend=false,aspect_ratio=:equal)
+    plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,fillcolor="blue")
+    contour!(fig,x,y,Z,levels=[0.0],color="red",linewidth=2)
+end
+
+gif(anim,fps=10)
+gif(anim,"examples/levelset-propagate/shrinking-circle.gif",fps=5)
