@@ -29,7 +29,7 @@ function grid_size(mesh)
     return w ./ (nn .- 1)
 end
 
-function time_step_size(levelsetspeed,mesh;CFL=0.9)
+function time_step_size(levelsetspeed,mesh;CFL=0.5)
     dx = minimum(grid_size(mesh))
     s = maximum(abs.(levelsetspeed))
     return CFL*dx/s
@@ -46,14 +46,14 @@ end
 
 x0 = [0.0, 0.0]
 L, W = 1.0, 1.0
-nelmts = 10
+nelmts = 5
 numghostlayers = 1
 polyorder = 2
 
 xc = [0.5,0.5]
 radius = 0.5
 speed = 1.0
-stoptime = 0.3
+stoptime = 0.4
 
 basis = TensorProductBasis(2,polyorder)
 mesh = CutCell.Mesh(x0,[L,W],[nelmts,nelmts],basis)
@@ -64,6 +64,7 @@ initiallevelset =
 levelsetspeed = speed*ones(length(initiallevelset))
 
 dt = time_step_size(levelsetspeed,mesh)
+@assert isinteger(stoptime/dt)
 nsteps = ceil(Int,stoptime/dt)
 
 levelsetcoeffs = run_time_steps(levelset,initiallevelset,mesh,levelsetspeed,dt,nsteps)
@@ -71,9 +72,6 @@ levelsetcoeffs = run_time_steps(levelset,initiallevelset,mesh,levelsetspeed,dt,n
 actualstoptime = dt*nsteps
 finalradius = radius - speed*actualstoptime
 
-# quad = tensor_product_quadrature(2,3)
-# initialerror = uniform_mesh_L2_error(levelsetcoeffs[1]',x->circle_distance_function(x,xc,radius)[1],basis,quad,mesh)
-# finalerror = uniform_mesh_L2_error(levelsetcoeffs[end]',x->circle_distance_function(x,xc,finalradius)[1],basis,quad,mesh)
 
 function grid_range(mesh)
     x0 = CutCell.reference_corner(mesh)
@@ -88,20 +86,20 @@ end
 
 rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 
-# using Plots
-# x,y = grid_range(mesh)
-# Z1 = reshape(levelsetcoeffs[1],length(y),:)
-# Z2 = reshape(levelsetcoeffs[end],length(y),:)
-# fig = plot(legend=false,aspect_ratio=:equal)
-# plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,strokecolor="black")
-# contour!(fig,x,y,Z1,color="black",linewidth=2)
-# contour!(fig,x,y,Z2,color="red",linewidth=2)
+using Plots
+x,y = grid_range(mesh)
+Z1 = reshape(levelsetcoeffs[1],length(y),:)
+Z2 = reshape(levelsetcoeffs[end],length(y),:)
+fig = plot(legend=false,aspect_ratio=:equal)
+plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,strokecolor="black")
+contour!(fig,x,y,Z1,color="black",linewidth=2,levels=[0.0])
+contour!(fig,x,y,Z2,color="red",linewidth=2,levels=[0.0])
 
-anim = @animate for i = 1:length(levelsetcoeffs)
-    Z = reshape(levelsetcoeffs[i],length(y),:)
-    fig = plot(legend=false,aspect_ratio=:equal)
-    plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,fillcolor="blue")
-    contour!(fig,x,y,Z,levels=[0.0],color="red",linewidth=2)
-end
-
-gif(anim,"examples/levelset-propagate/shrinking-circle.gif",fps=5)
+# anim = @animate for i = 1:length(levelsetcoeffs)
+#     Z = reshape(levelsetcoeffs[i],length(y),:)
+#     fig = plot(legend=false,aspect_ratio=:equal)
+#     plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,fillcolor="blue")
+#     contour!(fig,x,y,Z,levels=[0.0],color="red",linewidth=2)
+# end
+#
+# gif(anim,"examples/levelset-propagate/shrinking-circle.gif",fps=5)

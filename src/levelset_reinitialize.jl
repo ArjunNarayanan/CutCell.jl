@@ -154,7 +154,7 @@ function distance_to_zero_levelset(
     levelsetcoeffs,
     mesh,
     tol;
-    boundingradius = 2.5,
+    boundingradius = 4.5,
 )
 
     dim,numquerypoints = size(querypoints)

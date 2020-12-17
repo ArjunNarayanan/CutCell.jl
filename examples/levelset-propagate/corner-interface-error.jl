@@ -31,66 +31,9 @@ function interface_error(levelset, levelsetcoeffs, cutmesh, numqp, distance_to_i
     return sqrt(err)
 end
 
-function shrinking_circle_distance(x, xc, initialradius, speed, time)
-    r = initialradius - speed * time
-    return circle_distance_function(x, xc, r)
-end
-
-function interface_error_over_timesteps(
-    levelset,
-    mesh,
-    speed,
-    dt,
-    nsteps,
-    numqp,
-    xc,
-    initialradius,
-)
-    err = zeros(nsteps + 1)
-
-    levelsetcoeffs = CutCell.levelset_coefficients(
-        x -> shrinking_circle_distance(x, xc, initialradius, speed, 0.0),
-        mesh,
-    )
-    cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
-
-    err[1] = interface_error(
-        levelset,
-        levelsetcoeffs,
-        cutmesh,
-        numqp,
-        x -> shrinking_circle_distance(x, xc, initialradius, speed, 0.0),
-    )/(2pi*initialradius)
-
-    levelsetspeed = speed * ones(length(levelsetcoeffs))
-
-    for t = 1:nsteps
-        paddedmesh = CutCell.BoundaryPaddedMesh(cutmesh, 1)
-        refseedpoints, spatialseedpoints, seedcellids =
-            CutCell.seed_zero_levelset(2, levelset, levelsetcoeffs, cutmesh)
-        paddedlevelset = CutCell.BoundaryPaddedLevelset(
-            paddedmesh,
-            refseedpoints,
-            spatialseedpoints,
-            seedcellids,
-            levelset,
-            levelsetcoeffs,
-            cutmesh,
-            1e-10,
-        )
-        levelsetcoeffs =
-            CutCell.step_first_order_levelset(paddedlevelset, levelsetspeed, dt)
-
-        cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
-        err[t+1] = interface_error(
-            levelset,
-            levelsetcoeffs,
-            cutmesh,
-            numqp,
-            x -> shrinking_circle_distance(x,xc,initialradius,speed,t*dt),
-        )/(2pi*(initialradius - speed*t*dt))
-    end
-    return err
+function shrinking_corner_distance(x,xc,speed,time)
+    dx = speed*time
+    return corner_distance_function(x,xc-[dx,dx])
 end
 
 function final_interface_error(
@@ -101,17 +44,18 @@ function final_interface_error(
     nsteps,
     numqp,
     xc,
-    initialradius,
 )
 
     levelsetcoeffs = CutCell.levelset_coefficients(
-        x -> shrinking_circle_distance(x, xc, initialradius, speed, 0.0),
+        x -> shrinking_corner_distance(x, xc, speed, 0.0),
         mesh,
     )
     cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
     levelsetspeed = speed * ones(length(levelsetcoeffs))
 
     for t = 1:nsteps
+        println(t)
+
         paddedmesh = CutCell.BoundaryPaddedMesh(cutmesh, 1)
         refseedpoints, spatialseedpoints, seedcellids =
             CutCell.seed_zero_levelset(2, levelset, levelsetcoeffs, cutmesh)
@@ -125,21 +69,25 @@ function final_interface_error(
             cutmesh,
             1e-10,
         )
+
         levelsetcoeffs =
             CutCell.step_first_order_levelset(paddedlevelset, levelsetspeed, dt)
-
         cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
     end
+    dx = speed*nsteps*dt
+    cornerlocation = xc - [dx,dx]
+    exact_interface_length = sum(cornerlocation)
+
     err = interface_error(
         levelset,
         levelsetcoeffs,
         cutmesh,
         numqp,
-        x -> shrinking_circle_distance(x,xc,initialradius,speed,nsteps*dt),
-    )/(2pi*(initialradius - speed*nsteps*dt))
+        x -> shrinking_corner_distance(x,xc,speed,nsteps*dt),
+    )/exact_interface_length
+
     return err
 end
-
 
 function grid_size(mesh)
     w = CutCell.widths(mesh)
@@ -165,10 +113,9 @@ function error_for_numelmts(nelmts)
     polyorder = 2
     numqp = 3
 
-    xc = [0.5, 0.5]
-    initialradius = 0.50
+    xc = [0.87, 0.87]
     speed = 1.0
-    stoptime = 0.4
+    stoptime = 0.2
 
     basis = TensorProductBasis(2, polyorder)
     levelset = InterpolatingPolynomial(1, basis)
@@ -185,26 +132,9 @@ function error_for_numelmts(nelmts)
         nsteps,
         numqp,
         xc,
-        initialradius,
     )
 end
 
-nelmts = [5,10,20,40,80]
-
-# err80 = error_for_numelmts(80)
-err = [error_for_numelmts(ne) for ne in nelmts]
-
-dx = 1.0 ./ nelmts
-rate = diff(log.(err)) ./ diff(log.(dx))
-
-using CSV,DataFrames
-df = DataFrame([dx,err],["Element Size", "Error"])
-CSV.write("examples/levelset-propagate/circle-convergence.csv",df)
-
-#
-# using Plots
-# fig = plot(legend=:topleft)
-# plot!(range(0,stop=0.4,length=length(err[1])),err[1],label="5x5")
-# plot!(range(0,stop=0.4,length=length(err[2])),err[2],label="10x10")
-# plot!(range(0,stop=0.4,length=length(err[3])),err[3],label="20x20")
-# plot!(range(0,stop=0.4,length=length(err[4])),err[4],label="40x40")
+# nelmts = [5,10,20,40,80]
+err = error_for_numelmts(80)
+# err = [error_for_numelmts(ne) for ne in nelmts]

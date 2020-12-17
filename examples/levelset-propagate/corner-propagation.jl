@@ -29,7 +29,7 @@ function grid_size(mesh)
     return w ./ (nn .- 1)
 end
 
-function time_step_size(levelsetspeed,mesh;CFL=0.9)
+function time_step_size(levelsetspeed,mesh;CFL=0.5)
     dx = minimum(grid_size(mesh))
     s = maximum(abs.(levelsetspeed))
     return CFL*dx/s
@@ -59,11 +59,11 @@ rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 
 x0 = [0.0, 0.0]
 L, W = 1.0, 1.0
-nelmts = 10
+nelmts = 80
 numghostlayers = 1
 polyorder = 2
 
-xc = [0.8,0.8]
+xc = [0.87,0.87]
 speed = 1.0
 stoptime = 0.4
 
@@ -76,25 +76,29 @@ initiallevelset =
 
 levelsetspeed = speed*ones(length(initiallevelset))
 dt = time_step_size(levelsetspeed,mesh)
-nsteps = ceil(Int,stoptime/dt)
+@assert isinteger(stoptime/dt)
+# nsteps = round(Int,stoptime/dt)
+nsteps = 107
 
-levelsetcoeffs = run_time_steps(levelset,initiallevelset,mesh,levelsetspeed,dt,10)
+levelsetcoeffs = run_time_steps(levelset,initiallevelset,mesh,levelsetspeed,dt,nsteps)
+
 
 
 using Plots
-x,y = grid_range(mesh)
-Z1 = reshape(initiallevelset,length(y),:)
-Z2 = reshape(nextcoeffs,length(y),:)
-fig = plot(legend=false,aspect_ratio=:equal)
-plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,strokecolor="black")
-contour!(fig,x,y,Z1,levels=[0.0],color="black",linewidth=2)
-contour!(fig,x,y,Z2,levels=[0.0],color="red",linewidth=2)
-
+# x,y = grid_range(mesh)
+# Z1 = reshape(levelsetcoeffs[1],length(y),:)
+# Z2 = reshape(levelsetcoeffs[end],length(y),:)
+# fig = plot(legend=false,aspect_ratio=:equal)
+# plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,strokecolor="black")
+# contour!(fig,x,y,Z1,levels=[0.0],color="black",linewidth=2)
+# contour!(fig,x,y,Z2,levels=[0.0],color="red",linewidth=2)
+#
+l = range(-sqrt(2),stop=sqrt(2),length=10)
 anim = @animate for i = 1:length(levelsetcoeffs)
     Z = reshape(levelsetcoeffs[i],length(y),:)
     fig = plot(legend=false,aspect_ratio=:equal)
     plot!(fig,rectangle(L,W,x0[1],x0[2]),opacity=0.2,linewidth=2,fillcolor="blue")
-    contour!(fig,x,y,Z,levels=[0.0],color="red",linewidth=2)
+    contour!(fig,x,y,Z,levels=l,linewidth=2)
 end
 
-gif(anim,"examples/levelset-propagate/corner.gif",fps=5)
+gif(anim,"examples/levelset-propagate/corner.gif",fps=10)
