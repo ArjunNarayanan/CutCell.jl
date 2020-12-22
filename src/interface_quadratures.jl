@@ -30,12 +30,11 @@ function InterfaceQuadratures(
 
     xL, xR = [-1.0, -1.0], [1.0, 1.0]
     invjac = inverse_jacobian(cellmap)
-    quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numqp)
 
     hasinterface = cellsign .== 0
     numinterfaces = count(hasinterface)
-    quads = Matrix{Any}(undef, 2, numinterfaces)
-    normals = Vector{Any}(undef, numinterfaces)
+    quads = Matrix(undef, 2, numinterfaces)
+    normals = Vector(undef, numinterfaces)
     celltoquad = zeros(Int, numcells)
 
     counter = 1
@@ -44,7 +43,7 @@ function InterfaceQuadratures(
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
-            squad = surface_quadrature(levelset, xL, xR, quad1d)
+            squad = surface_quadrature(levelset, xL, xR, numqp)
             n = levelset_normal(levelset, squad.points, invjac)
 
             quads[1, counter] = squad

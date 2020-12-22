@@ -23,7 +23,6 @@ function CellQuadratures(
     @assert size(nodalconnectivity)[2] == numcells
 
     tpq = tensor_product_quadrature(2, numuniformqp)
-    quad1d = ImplicitDomainQuadrature.ReferenceQuadratureRule(numcutqp)
 
     quads = [tpq]
 
@@ -40,11 +39,11 @@ function CellQuadratures(
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
-            pquad = area_quadrature(levelset, +1, xL, xR, quad1d)
+            pquad = area_quadrature(levelset, +1, xL, xR, numcutqp)
             push!(quads, pquad)
             celltoquad[1, cellid] = length(quads)
 
-            nquad = area_quadrature(levelset, -1, xL, xR, quad1d)
+            nquad = area_quadrature(levelset, -1, xL, xR, numcutqp)
             push!(quads, nquad)
             celltoquad[2, cellid] = length(quads)
         else

@@ -18,10 +18,23 @@ cellmaps = CutCell.cell_maps(mesh)
 
 normal = [1.0, 0.0]
 x0 = [0.5, 0.0]
+tol = 1e-3
+perturbation = 0.0
 levelsetcoeffs = plane_distance_function(nodalcoordinates, normal, x0)
 
-cellsign = CutCell.cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
+cellsign = CutCell.cell_sign!(levelset, levelsetcoeffs, nodalconnectivity, tol, perturbation)
 @test allequal(cellsign, [0, 1, 1])
+
+normal = [1.0, 0.0]
+x0 = [1.0, 0.0]
+tol = 1e-3
+perturbation = 1e-3
+levelsetcoeffs = plane_distance_function(nodalcoordinates, normal, x0)
+cellsign = CutCell.cell_sign!(levelset,levelsetcoeffs,nodalconnectivity,tol,perturbation)
+
+@test allapprox(levelsetcoeffs[1:4],[-1.0+perturbation,-1.0+perturbation,perturbation, perturbation])
+@test allapprox(levelsetcoeffs[[3,4,5,6]],[perturbation,perturbation,1.0,1.0])
+@test allapprox(levelsetcoeffs[[5,6,7,8]],[1.,1.,2.,2.])
 
 posactivenodeids = CutCell.active_node_ids(+1, cellsign, nodalconnectivity)
 @test allequal(posactivenodeids, 1:8)

@@ -16,10 +16,9 @@ levelsetcoeffs = [-1.,-1.,1.,1.]
 update!(levelset,levelsetcoeffs)
 
 xL,xR = [-1.,-1.],[1.,1.]
-quad1d = ReferenceQuadratureRule(numqp)
-pquad = area_quadrature(levelset,+1,xL,xR,quad1d)
-nquad = area_quadrature(levelset,-1,xL,xR,quad1d)
-squad = surface_quadrature(levelset,xL,xR,quad1d)
+pquad = area_quadrature(levelset,+1,xL,xR,numqp)
+nquad = area_quadrature(levelset,-1,xL,xR,numqp)
+squad = surface_quadrature(levelset,xL,xR,numqp)
 
 lambda,mu = 1.,2.
 penalty = 1.0

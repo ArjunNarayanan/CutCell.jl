@@ -36,6 +36,10 @@ end
     include("test_cut_mesh.jl")
 end
 
+@safetestset "Test DG Mesh" begin
+    include("test_dg_mesh.jl")
+end
+
 @safetestset "Test Cut Cell Quadratures" begin
     include("test_cell_quadratures.jl")
 end
@@ -80,6 +84,14 @@ end
     include("test_cut_stress_convergence.jl")
 end
 
+@safetestset "Test Transformation Strain Simple Tension" begin
+    include("test_transformation_strain_simple_tension.jl")
+end
+
 @safetestset "Test Levelset Reinitialization" begin
     include("test_levelset_reinitialize.jl")
+end
+
+@safetestset "Test Levelset Propagate" begin
+    include("test_levelset_propagate.jl")
 end

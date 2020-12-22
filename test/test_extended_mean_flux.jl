@@ -18,11 +18,10 @@ update!(levelset,levelsetcoeffs)
 
 xL,xR = [-1.,-1.],[1.,1.]
 tpq = tensor_product_quadrature(2,numqp)
-quad1d = ReferenceQuadratureRule(numqp)
-pquad = area_quadrature(levelset,+1,xL,xR,quad1d)
-nquad = area_quadrature(levelset,-1,xL,xR,quad1d)
+pquad = area_quadrature(levelset,+1,xL,xR,numqp)
+nquad = area_quadrature(levelset,-1,xL,xR,numqp)
 nquad = QuadratureRule(nquad.points .+ [2.0,0.0],nquad.weights)
-psquad = surface_quadrature(levelset,xL,xR,quad1d)
+psquad = surface_quadrature(levelset,xL,xR,numqp)
 nsquad = QuadratureRule(psquad.points .+ [2.,0.],psquad.weights)
 
 lambda,mu = 1.,2.

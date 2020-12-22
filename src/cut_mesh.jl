@@ -29,9 +29,9 @@ function active_cells(cellsign)
     return activecells
 end
 
-function CutMesh(levelset::InterpolatingPolynomial, levelsetcoeffs, mesh)
+function CutMesh(levelset::InterpolatingPolynomial, levelsetcoeffs, mesh; tol = 1e-4, perturbation = 1e-3)
     nodalconnectivity = nodal_connectivity(mesh)
-    cellsign = cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
+    cellsign = cell_sign!(levelset, levelsetcoeffs, nodalconnectivity, tol, perturbation)
 
     posactivenodeids = active_node_ids(+1, cellsign, nodalconnectivity)
     negactivenodeids = active_node_ids(-1, cellsign, nodalconnectivity)
@@ -152,18 +152,28 @@ function nodal_coordinates(cutmesh::CutMesh)
     return nodal_coordinates(cutmesh.mesh)
 end
 
-function cell_sign(levelset, levelsetcoeffs, nodalconnectivity)
+function cell_sign!(levelset, levelsetcoeffs, nodalconnectivity, tol, perturbation)
     ncells = size(nodalconnectivity)[2]
     cellsign = zeros(Int, ncells)
     xL,xR = [-1.,-1.],[1.,1.]
     for cellid = 1:ncells
         nodeids = nodalconnectivity[:, cellid]
         update!(levelset, levelsetcoeffs[nodeids])
-        s = sign_allow_perturbations(levelset, xL,xR)
-        if (s == +1 || s == -1)
+
+        s = sign(levelset, xL, xR, tol=tol)
+        if (s == +1 || s == 0 || s == -1)
             cellsign[cellid] = s
         else
-            cellsign[cellid] = 0
+            @warn "Perturbing levelset function by perturbation = $perturbation"
+            levelsetcoeffs[nodeids] .+= perturbation
+            update!(levelset,levelsetcoeffs[nodeids])
+
+            s = sign(levelset, xL, xR, tol=tol)
+            if (s == +1 || s == 0 || s == -1)
+                cellsign[cellid] = s
+            else
+                error("Could not determine cell sign after perturbation = $perturbation")
+            end
         end
     end
     return cellsign
