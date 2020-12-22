@@ -76,6 +76,10 @@ end
     include("test_penalty_displacement_bc.jl")
 end
 
+@safetestset "Test Penalty Displacement Component BC" begin
+    include("test_displacement_component_bc.jl")
+end
+
 @safetestset "Test Cut Mesh Convergence" begin
     include("test_cut_convergence.jl")
 end
