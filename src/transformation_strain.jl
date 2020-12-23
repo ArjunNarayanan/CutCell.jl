@@ -1,5 +1,5 @@
 function plane_transformation_strain(theta)
-    return [theta/3.0,theta/3.0,0.0]
+    return [theta / 3.0, theta / 3.0, 0.0]
 end
 
 function plane_strain_transformation_stress(lambda, mu, theta)
@@ -45,6 +45,53 @@ function interface_transformation_rhs(basis, quad, normals, transfstress, cellma
         NK = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
 
         rhs .+= NI' * NK * transfstress * scalearea[qpidx] * w
+    end
+    return rhs
+end
+
+function face_traction_transformation_rhs(basis, quad, normal, transfstress, facescale)
+    dim = dimension(basis)
+    @assert length(normal) == dim
+    nf = number_of_basis_functions(basis)
+    ndofs = dim * nf
+    rhs = zeros(ndofs)
+
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+    NK = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
+
+    for (p, w) in quad
+        vals = basis(p)
+        NI = interpolation_matrix(vals, dim)
+
+        rhs .+= NI' * NK * transfstress * facescale * w
+    end
+    return rhs
+end
+
+function face_traction_component_transformation_rhs(
+    basis,
+    quad,
+    component,
+    normal,
+    transfstress,
+    facescale,
+)
+
+    dim = dimension(basis)
+    @assert length(normal) == dim
+    nf = number_of_basis_functions(basis)
+    ndofs = dim * nf
+    rhs = zeros(ndofs)
+
+    projector = component * component'
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+    NK = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
+
+    for (p, w) in quad
+        vals = basis(p)
+        NI = interpolation_matrix(vals, dim)
+
+        rhs .+= NI' * projector * NK * transfstress * facescale * w
     end
     return rhs
 end

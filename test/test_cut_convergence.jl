@@ -162,7 +162,7 @@ dx = 1.0 ./ nelmts
 u1rate = diff(log.(u1err)) ./ diff(log.(dx))
 u2rate = diff(log.(u2err)) ./ diff(log.(dx))
 
-println("Plane interface convergence of linear elements : ", u1rate[end], "    ", u2rate[end])
+# println("Plane interface convergence of linear elements : ", u1rate[end], "    ", u2rate[end])
 @test isapprox(mean(u1rate[3:end]), 2.0, atol = 0.05)
 @test isapprox(mean(u2rate[3:end]), 2.0, atol = 0.05)
 
@@ -178,7 +178,7 @@ dx = 1.0 ./ nelmts
 u1rate = diff(log.(u1err)) ./ diff(log.(dx))
 u2rate = diff(log.(u2err)) ./ diff(log.(dx))
 
-println("Plane interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
+# println("Plane interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
 @test isapprox(mean(u1rate), 3.0, atol = 0.05)
 @test isapprox(mean(u2rate), 3.0, atol = 0.05)
 
@@ -198,7 +198,7 @@ dx = 1.0 ./ nelmts
 u1rate = diff(log.(u1err)) ./ diff(log.(dx))
 u2rate = diff(log.(u2err)) ./ diff(log.(dx))
 
-println("Curved interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
+# println("Curved interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
 @test isapprox(mean(u1rate), 3.0, atol = 0.05)
 @test isapprox(mean(u2rate), 3.0, atol = 0.05)
 
@@ -219,6 +219,6 @@ dx = 1.0 ./ nelmts
 u1rate = diff(log.(u1err)) ./ diff(log.(dx))
 u2rate = diff(log.(u2err)) ./ diff(log.(dx))
 
-println("Curved interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
+# println("Curved interface convergence of quadratic elements : ", u1rate[end], "    ", u2rate[end])
 @test isapprox(mean(u1rate[2:end]), 3.0, atol = 0.05)
 @test isapprox(mean(u2rate[2:end]), 3.0, atol = 0.05)

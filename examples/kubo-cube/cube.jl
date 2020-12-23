@@ -62,84 +62,27 @@ function bulk_modulus(l, m)
     return l + 2m / 3
 end
 
-function analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
-    a = zeros(3, 3)
-    a[1, 1] = inradius
-    a[1, 2] = -inradius
-    a[1, 3] = -1.0 / inradius
-    a[2, 1] = 2 * (lc + mc)
-    a[2, 2] = -2 * (ls + ms)
-    a[2, 3] = 2ms / inradius^2
-    a[3, 2] = 2(ls + ms)
-    a[3, 3] = -2ms / outradius^2
-    return a
+function onleftboundary(x, L, W)
+    return x[1] ≈ 0.0
 end
 
-function analytical_coefficient_rhs(ls, ms, theta0)
-    r = zeros(3)
-    Ks = bulk_modulus(ls, ms)
-    r[2] = -Ks * theta0
-    r[3] = Ks * theta0
-    return r
+function onbottomboundary(x, L, W)
+    return x[2] ≈ 0.0
 end
 
-struct AnalyticalSolution
-    inradius::Any
-    outradius::Any
-    center::Any
-    A1c::Any
-    A1s::Any
-    A2s::Any
-    ls::Any
-    ms::Any
-    lc::Any
-    mc::Any
-    theta0::Any
-    function AnalyticalSolution(inradius, outradius, center, ls, ms, lc, mc, theta0)
-        a = analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
-        r = analytical_coefficient_rhs(ls, ms, theta0)
-        coeffs = a \ r
-        new(
-            inradius,
-            outradius,
-            center,
-            coeffs[1],
-            coeffs[2],
-            coeffs[3],
-            ls,
-            ms,
-            lc,
-            mc,
-            theta0,
-        )
-    end
+function onrightboundary(x, L, W)
+    return x[1] ≈ L
 end
 
-function radial_displacement(A::AnalyticalSolution, r)
-    if r <= A.inradius
-        return A.A1c * r
-    else
-        return A.A1s * r + A.A2s / r
-    end
-end
-
-function (A::AnalyticalSolution)(x)
-    relpos = x - A.center
-    r = sqrt(relpos' * relpos)
-    ur = radial_displacement(A, r)
-    if ur ≈ 0.0
-        [0.0, 0.0]
-    else
-        costheta = (x[1] - A.center[1]) / r
-        sintheta = (x[2] - A.center[2]) / r
-        u1 = ur * costheta
-        u2 = ur * sintheta
-        return [u1, u2]
-    end
+function ontopboundary(x, L, W)
+    return x[2] ≈ W
 end
 
 function onboundary(x, L, W)
-    return x[2] ≈ 0.0 || x[1] ≈ L || x[2] ≈ W || x[1] ≈ 0.0
+    return onleftboundary(x, L, W) ||
+           onbottomboundary(x, L, W) ||
+           onrightboundary(x, L, W) ||
+           ontopboundary(x, L, W)
 end
 
 function stress_error(
@@ -227,5 +170,5 @@ function stress_error(
 
     displacement = matrix \ rhs
 
-    
+
 end
