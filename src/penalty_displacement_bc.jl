@@ -21,7 +21,7 @@ function boundary_mass_operator(basis, facequads, cutmesh, onboundary, penalty)
     nfaces = length(facemidpoints)
     cellsign = cell_sign(cutmesh)
     ncells = length(cellsign)
-    facedetjac = face_determinant_jacobian(cell_map(cutmesh, 1))
+    facedetjac = face_determinant_jacobian(cutmesh)
     dim = dimension(basis)
 
     refquads = reference_face_quadrature(facequads)

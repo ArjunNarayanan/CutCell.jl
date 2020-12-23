@@ -184,6 +184,44 @@ function assemble_traction_force_linear_form!(
     end
 end
 
+function assemble_traction_force_component_linear_form!(
+    systemrhs,
+    tractionfunc,
+    basis,
+    facequads,
+    cellmaps,
+    nodalconnectivity,
+    cellconnectivity,
+    istractionboundary,
+    component,
+)
+
+    dim = dimension(basis)
+    refmidpoints = reference_face_midpoints()
+    isboundarycell = is_boundary_cell(cellconnectivity)
+    cellids = findall(isboundarycell)
+    facedetjac = face_determinant_jacobian(cellmaps[1])
+    for cellid in cellids
+        cellmap = cellmaps[cellid]
+        for (faceid, nbrcellid) in enumerate(cellconnectivity[:, cellid])
+            if nbrcellid == 0
+                if istractionboundary(cellmap(refmidpoints[faceid]))
+                    rhs = component_linear_form(
+                        tractionfunc,
+                        basis,
+                        facequads[faceid],
+                        component,
+                        cellmap,
+                        facedetjac[faceid],
+                    )
+                    edofs = element_dofs(nodalconnectivity[:, cellid], dim)
+                    assemble!(systemrhs, edofs, rhs)
+                end
+            end
+        end
+    end
+end
+
 function assemble_stress_linear_form!(
     systemrhs,
     basis,
@@ -196,16 +234,16 @@ function assemble_stress_linear_form!(
 
     dim = dimension(basis)
     sdim = number_of_symmetric_degrees_of_freedom(dim)
-    nf,ncells = size(nodalconnectivity)
+    nf, ncells = size(nodalconnectivity)
 
-    for cellid in 1:ncells
-        nodeids = nodalconnectivity[:,cellid]
-        elementdofs = element_dofs(nodeids,dim)
+    for cellid = 1:ncells
+        nodeids = nodalconnectivity[:, cellid]
+        elementdofs = element_dofs(nodeids, dim)
         celldisp = nodaldisplacement[elementdofs]
-        rhs = stress_cell_rhs(basis,quad,stiffness,celldisp,jacobian)
+        rhs = stress_cell_rhs(basis, quad, stiffness, celldisp, jacobian)
 
-        stressdofs = element_dofs(nodeids,sdim)
-        assemble!(systemrhs,stressdofs,rhs)
+        stressdofs = element_dofs(nodeids, sdim)
+        assemble!(systemrhs, stressdofs, rhs)
     end
 end
 
@@ -218,12 +256,12 @@ function make_sparse(sysmatrix::SystemMatrix, mesh)
     return make_sparse(sysmatrix, totaldofs)
 end
 
-function make_sparse_stress_operator(sysmatrix,mesh)
+function make_sparse_stress_operator(sysmatrix, mesh)
     dim = dimension(mesh)
     sdim = number_of_symmetric_degrees_of_freedom(dim)
     numnodes = number_of_nodes(mesh)
-    totaldofs = sdim*numnodes
-    return make_sparse(sysmatrix,totaldofs)
+    totaldofs = sdim * numnodes
+    return make_sparse(sysmatrix, totaldofs)
 end
 
 function rhs(sysrhs::SystemRHS, ndofs::Int)
@@ -235,10 +273,10 @@ function rhs(sysrhs::SystemRHS, mesh)
     return rhs(sysrhs, totaldofs)
 end
 
-function stress_rhs(sysrhs,mesh)
+function stress_rhs(sysrhs, mesh)
     dim = dimension(mesh)
     sdim = number_of_symmetric_degrees_of_freedom(dim)
     numnodes = number_of_nodes(mesh)
-    totaldofs = sdim*numnodes
-    return rhs(sysrhs,totaldofs)
+    totaldofs = sdim * numnodes
+    return rhs(sysrhs, totaldofs)
 end

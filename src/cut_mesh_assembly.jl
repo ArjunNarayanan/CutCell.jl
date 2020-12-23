@@ -159,6 +159,117 @@ function assemble_body_force_linear_form!(systemrhs, rhsfunc, basis, cellquads, 
     end
 end
 
+function assemble_traction_force_linear_form!(
+    systemrhs,
+    tractionfunc,
+    basis,
+    facequads,
+    cutmesh,
+    onboundary,
+)
+
+    dim = dimension(cutmesh)
+    facemidpoints = reference_face_midpoints()
+    cellconnectivity = cell_connectivity(cutmesh)
+    cellids = findall(is_boundary_cell(cutmesh))
+    nfaces = length(facemidpoints)
+    facedetjac = face_determinant_jacobian(cutmesh)
+
+    refnormals = reference_face_normals()
+
+    for cellid in cellids
+        cellmap = cell_map(cutmesh, cellid)
+        s = cell_sign(cutmesh, cellid)
+        for faceid = 1:nfaces
+            if cellconnectivity[faceid, cellid] == 0
+                if onboundary(cellmap(facemidpoints[faceid]))
+                    if s == 0 || s == +1
+                        rhs = linear_form(
+                            tractionfunc,
+                            basis,
+                            facequads[+1, faceid, cellid],
+                            cellmap,
+                            facedetjac[faceid],
+                        )
+                        nodeids = nodal_connectivity(cutmesh, +1, cellid)
+                        edofs = element_dofs(nodeids, dim)
+                        assemble!(systemrhs, edofs, rhs)
+                    end
+                    if s == 0 || s == -1
+                        rhs = linear_form(
+                            tractionfunc,
+                            basis,
+                            facequads[-1, faceid, cellid],
+                            cellmap,
+                            facedetjac[faceid],
+                        )
+                        nodeids = nodal_connectivity(cutmesh, -1, cellid)
+                        edofs = element_dofs(nodeids, dim)
+                        assemble!(systemrhs, edofs, rhs)
+                    end
+                end
+            end
+        end
+    end
+end
+
+function assemble_traction_force_component_linear_form!(
+    systemrhs,
+    tractionfunc,
+    basis,
+    facequads,
+    cutmesh,
+    onboundary,
+    component,
+)
+
+    dim = dimension(cutmesh)
+    facemidpoints = reference_face_midpoints()
+    cellconnectivity = cell_connectivity(cutmesh)
+    cellids = findall(is_boundary_cell(cutmesh))
+    nfaces = length(facemidpoints)
+    facedetjac = face_determinant_jacobian(cutmesh)
+
+    refnormals = reference_face_normals()
+
+    for cellid in cellids
+        cellmap = cell_map(cutmesh, cellid)
+        s = cell_sign(cutmesh, cellid)
+        for faceid = 1:nfaces
+            if cellconnectivity[faceid, cellid] == 0
+                if onboundary(cellmap(facemidpoints[faceid]))
+                    if s == 0 || s == +1
+                        rhs = component_linear_form(
+                            tractionfunc,
+                            basis,
+                            facequads[+1, faceid, cellid],
+                            component,
+                            cellmap,
+                            facedetjac[faceid],
+                        )
+                        nodeids = nodal_connectivity(cutmesh, +1, cellid)
+                        edofs = element_dofs(nodeids, dim)
+                        assemble!(systemrhs, edofs, rhs)
+                    end
+                    if s == 0 || s == -1
+                        rhs = component_linear_form(
+                            tractionfunc,
+                            basis,
+                            facequads[-1, faceid, cellid],
+                            component,
+                            cellmap,
+                            facedetjac[faceid],
+                        )
+                        nodeids = nodal_connectivity(cutmesh, -1, cellid)
+                        edofs = element_dofs(nodeids, dim)
+                        assemble!(systemrhs, edofs, rhs)
+                    end
+                end
+            end
+        end
+    end
+end
+
 function assemble_penalty_displacement_bc!(sysmatrix, sysrhs, dispcondition, cutmesh)
 
     ncells = number_of_cells(cutmesh)
