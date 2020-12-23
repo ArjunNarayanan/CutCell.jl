@@ -96,6 +96,14 @@ end
     include("test_transformation_strain_simple_tension.jl")
 end
 
+@safetestset "Test Transformation Strain Displacement Convergence" begin
+    include("test_transformation_strain_displacement_convergence.jl")
+end
+
+@safetestset "Test Transformation Strain Stress Convergence" begin
+    include("test_transformation_strain_stress_convergence.jl")
+end
+
 @safetestset "Test Levelset Reinitialization" begin
     include("test_levelset_reinitialize.jl")
 end
