@@ -55,7 +55,7 @@ function onboundary(x, L, W)
            onleftboundary(x, L, W)
 end
 
-function solve_plane_interface(x0,normal,nelmts,polyorder,numqp,penaltyfactor)
+function solve_plane_interface(x0, normal, nelmts, polyorder, numqp, penaltyfactor)
     L = 1.0
     W = 1.0
     lambda, mu = 1.0, 2.0
@@ -82,13 +82,14 @@ function solve_plane_interface(x0,normal,nelmts,polyorder,numqp,penaltyfactor)
         CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
 
 
-    bottomdisplacementbc = CutCell.DisplacementCondition(
-        x -> displacement(alpha, x),
+    bottomdisplacementbc = CutCell.DisplacementComponentCondition(
+        x -> displacement(alpha, x)[2],
         basis,
         facequads,
         stiffness,
         cutmesh,
         x -> onbottomboundary(x, L, W),
+        [0.0, 1.0],
         penalty,
     )
     rightdisplacementbc = CutCell.DisplacementComponentCondition(
@@ -101,22 +102,24 @@ function solve_plane_interface(x0,normal,nelmts,polyorder,numqp,penaltyfactor)
         [1.0, 0.0],
         penalty,
     )
-    topdisplacementbc = CutCell.DisplacementCondition(
-        x -> displacement(alpha, x),
+    topdisplacementbc = CutCell.DisplacementComponentCondition(
+        x -> displacement(alpha, x)[1],
         basis,
         facequads,
         stiffness,
         cutmesh,
         x -> ontopboundary(x, L, W),
+        [1.0, 0.0],
         penalty,
     )
-    leftdisplacementbc = CutCell.DisplacementCondition(
-        x -> displacement(alpha, x),
+    leftdisplacementbc = CutCell.DisplacementComponentCondition(
+        x -> displacement(alpha, x)[1],
         basis,
         facequads,
         stiffness,
         cutmesh,
         x -> onleftboundary(x, L, W),
+        [1.0, 0.0],
         penalty,
     )
 
@@ -132,10 +135,26 @@ function solve_plane_interface(x0,normal,nelmts,polyorder,numqp,penaltyfactor)
         cellquads,
         cutmesh,
     )
-    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, bottomdisplacementbc, cutmesh)
-    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, rightdisplacementbc, cutmesh)
+    CutCell.assemble_penalty_displacement_bc!(
+        sysmatrix,
+        sysrhs,
+        bottomdisplacementbc,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_bc!(
+        sysmatrix,
+        sysrhs,
+        rightdisplacementbc,
+        cutmesh,
+    )
     CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, topdisplacementbc, cutmesh)
-    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, leftdisplacementbc, cutmesh)
+    CutCell.assemble_penalty_displacement_bc!(
+        sysmatrix,
+        sysrhs,
+        leftdisplacementbc,
+        cutmesh,
+    )
+
     CutCell.assemble_traction_force_component_linear_form!(
         sysrhs,
         x -> stress_field(lambda, mu, alpha, x)[3],
@@ -143,6 +162,33 @@ function solve_plane_interface(x0,normal,nelmts,polyorder,numqp,penaltyfactor)
         facequads,
         cutmesh,
         x -> onrightboundary(x, L, W),
+        [0.0, 1.0],
+    )
+    CutCell.assemble_traction_force_component_linear_form!(
+        sysrhs,
+        x -> -stress_field(lambda, mu, alpha, x)[3],
+        basis,
+        facequads,
+        cutmesh,
+        x -> onbottomboundary(x, L, W),
+        [1.0, 0.0],
+    )
+    CutCell.assemble_traction_force_component_linear_form!(
+        sysrhs,
+        x -> stress_field(lambda, mu, alpha, x)[2],
+        basis,
+        facequads,
+        cutmesh,
+        x -> ontopboundary(x, L, W),
+        [0.0, 1.0],
+    )
+    CutCell.assemble_traction_force_component_linear_form!(
+        sysrhs,
+        x -> -stress_field(lambda, mu, alpha, x)[3],
+        basis,
+        facequads,
+        cutmesh,
+        x -> onleftboundary(x, L, W),
         [0.0, 1.0],
     )
 
@@ -158,12 +204,52 @@ function solve_plane_interface(x0,normal,nelmts,polyorder,numqp,penaltyfactor)
     return err
 end
 
+
+
+x0 = [0.5, 0.0]
+normal = [1.0, 0.0]
+penaltyfactor = 1e2
+polyorder = 1
+numqp = required_quadrature_order(polyorder) + 2
+powers = 1:7
+nelmts = [2^p + 1 for p in powers]
+
+err = [
+    solve_plane_interface(x0, normal, ne, polyorder, numqp, penaltyfactor) for ne in nelmts
+]
+
+dx = 1.0 ./ nelmts
+u1err = [er[1] for er in err]
+u2err = [er[2] for er in err]
+
+u1rate = convergence_rate(dx, u1err)
+u2rate = convergence_rate(dx, u2err)
+
+@test isapprox(mean(u1rate[3:end]), polyorder + 1, atol = 0.05)
+@test isapprox(mean(u2rate[3:end]), polyorder + 1, atol = 0.05)
+
+
+
+
+
 x0 = [0.5, 0.0]
 normal = [1.0, 0.0]
 penaltyfactor = 1e2
 polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 powers = 1:7
-nelmts = [2^p+1 for p in powers]
+nelmts = [2^p + 1 for p in powers]
 
-err = [solve_plane_interface(x0,normal,ne,polyorder,numqp,penaltyfactor) for ne in nelmts]
+err = [
+    solve_plane_interface(x0, normal, ne, polyorder, numqp, penaltyfactor) for ne in nelmts
+]
+
+dx = 1.0 ./ nelmts
+u1err = [er[1] for er in err]
+u2err = [er[2] for er in err]
+
+u1rate = convergence_rate(dx, u1err)
+u2rate = convergence_rate(dx, u2err)
+
+@test isapprox(mean(u1rate), polyorder + 1, atol = 0.05)
+@test isapprox(mean(u2rate), polyorder + 1, atol = 0.05)
