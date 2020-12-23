@@ -85,7 +85,7 @@ function onboundary(x, L, W)
            ontopboundary(x, L, W)
 end
 
-function stress_error(
+function solve_and_compute_stress(
     width,
     center,
     inradius,
