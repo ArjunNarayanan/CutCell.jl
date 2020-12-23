@@ -5,58 +5,8 @@ using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
 using CutCell
-include("../../test/useful_routines.jl")
-
-
-function compute_at_cell_quadrature_points!(vals, interpolater, quad)
-    for (p, w) in quad
-        append!(vals, interpolater(p))
-    end
-end
-
-function compute_field_at_quadrature_points(nodalvals, basis, cellquads, cutmesh)
-    ndofs, numnodes = size(nodalvals)
-    ncells = CutCell.number_of_cells(cutmesh)
-    interpolater = InterpolatingPolynomial(ndofs, basis)
-    quadvals = zeros(0)
-
-    for cellid = 1:ncells
-        s = CutCell.cell_sign(cutmesh, cellid)
-        @assert s == -1 || s == 0 || s == +1
-        if s == +1 || s == 0
-            nodeids = CutCell.nodal_connectivity(cutmesh, +1, cellid)
-            cellvals = nodalvals[:, nodeids]
-            update!(interpolater, cellvals)
-            quad = cellquads[+1, cellid]
-            compute_at_cell_quadrature_points!(quadvals, interpolater, quad)
-        end
-        if s == -1 || s == 0
-            nodeids = CutCell.nodal_connectivity(cutmesh, -1, cellid)
-            cellvals = nodalvals[:, nodeids]
-            update!(interpolater, cellvals)
-            quad = cellquads[-1, cellid]
-            compute_at_cell_quadrature_points!(quadvals, interpolater, quad)
-        end
-    end
-    return reshape(quadvals, ndofs, :)
-end
-
-function compute_quadrature_points(cellquads, cutmesh)
-    ncells = CutCell.number_of_cells(cutmesh)
-    coords = zeros(2, 0)
-    for cellid = 1:ncells
-        s = CutCell.cell_sign(cutmesh, cellid)
-        cellmap = CutCell.cell_map(cutmesh, cellid)
-        @assert s == -1 || s == 0 || s == +1
-        if s == +1 || s == 0
-            coords = hcat(coords, cellmap(cellquads[+1, cellid].points))
-        end
-        if s == -1 || s == 0
-            coords = hcat(coords, cellmap(cellquads[-1, cellid].points))
-        end
-    end
-    return coords
-end
+include("../../../test/useful_routines.jl")
+include("../compute-stress.jl")
 
 function bulk_modulus(l, m)
     return l + 2m / 3
@@ -87,9 +37,7 @@ end
 
 function solve_and_compute_stress(
     width,
-    center,
-    inradius,
-    outradius,
+    corner,
     stiffness,
     theta0,
     nelmts,
@@ -106,14 +54,11 @@ function solve_and_compute_stress(
     meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
     penalty = penaltyfactor / dx * meanmoduli
 
-    analyticalsolution =
-        AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
-
     basis = TensorProductBasis(2, polyorder)
     mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
     levelset = InterpolatingPolynomial(1, basis)
     levelsetcoeffs = CutCell.levelset_coefficients(
-        x -> -circle_distance_function(x, center, inradius),
+        x -> -corner_distance_function(x, corner),
         mesh,
     )
 
