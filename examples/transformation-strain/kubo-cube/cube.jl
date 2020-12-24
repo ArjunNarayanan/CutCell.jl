@@ -57,10 +57,8 @@ function solve_and_compute_stress(
     basis = TensorProductBasis(2, polyorder)
     mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
     levelset = InterpolatingPolynomial(1, basis)
-    levelsetcoeffs = CutCell.levelset_coefficients(
-        x -> -corner_distance_function(x, corner),
-        mesh,
-    )
+    levelsetcoeffs =
+        CutCell.levelset_coefficients(x -> -corner_distance_function(x, corner), mesh)
 
     cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
     cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
@@ -71,13 +69,24 @@ function solve_and_compute_stress(
     interfacecondition =
         CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
 
-    displacementbc = CutCell.DisplacementCondition(
-        analyticalsolution,
+    leftdisplacementbc = CutCell.DisplacementComponentCondition(
+        x -> 0.0,
         basis,
         facequads,
         stiffness,
         cutmesh,
-        x -> onboundary(x, width, width),
+        x -> onleftboundary(x, width, width),
+        [1.0, 0.0],
+        penalty,
+    )
+    bottomdisplacementbc = CutCell.DisplacementComponentCondition(
+        x -> 0.0,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        x -> onbottomboundary(x, width, width),
+        [0.0, 1.0],
         penalty,
     )
 
@@ -100,14 +109,35 @@ function solve_and_compute_stress(
         interfacequads,
         cutmesh,
     )
-    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
-    CutCell.assemble_penalty_displacement_transformation_rhs!(
+    CutCell.assemble_penalty_displacement_bc!(
+        sysmatrix,
+        sysrhs,
+        leftdisplacementbc,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_bc!(
+        sysmatrix,
+        sysrhs,
+        bottomdisplacementbc,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_component_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,
         facequads,
         cutmesh,
-        x -> onboundary(x, width, width),
+        x -> onleftboundary(x, width, width),
+        [1.0, 0.0],
+    )
+    CutCell.assemble_penalty_displacement_component_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onbottomboundary(x, width, width),
+        [0.0, 1.0],
     )
 
     matrix = CutCell.make_sparse(sysmatrix, cutmesh)
@@ -115,5 +145,66 @@ function solve_and_compute_stress(
 
     displacement = matrix \ rhs
 
+    qpstress = compute_stress_at_quadrature_points(
+        displacement,
+        basis,
+        stiffness,
+        transfstress,
+        theta0,
+        cellquads,
+        cutmesh,
+    )
+    qpcoords = compute_quadrature_points(cellquads, cutmesh)
 
+    return qpstress, qpcoords
 end
+
+
+K1, K2 = 247.0, 192.0
+mu1, mu2 = 126.0, 87.0
+lambda1 = lame_lambda(K1, mu1)
+lambda2 = lame_lambda(K2, mu2)
+
+theta0 = -0.067
+stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
+
+width = 1.0
+corner = [0.8, 0.8]
+penaltyfactor = 1e2
+
+nelmts = 37
+polyorder = 2
+numqp = required_quadrature_order(polyorder) + 2
+
+qpstress, qpcoords = solve_and_compute_stress(
+    width,
+    corner,
+    stiffness,
+    theta0,
+    nelmts,
+    polyorder,
+    numqp,
+    penaltyfactor,
+)
+
+pressure = -(qpstress[1, :] + qpstress[2, :] + qpstress[4, :]) / 3
+triin = Triangulate.TriangulateIO()
+triin.pointlist = qpcoords
+(triout, vorout) = triangulate("", triin)
+connectivity = triout.trianglelist
+cells = [
+    MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
+]
+filename = "stress-poly-"*string(polyorder)*"-nelmts-" * string(nelmts)
+vtkfile = vtk_grid(
+    "examples/transformation-strain/kubo-cube/" * filename,
+    qpcoords[1, :],
+    qpcoords[2, :],
+    cells,
+)
+vtkfile["pressure"] = pressure
+vtkfile["s11"] = qpstress[1,:]
+vtkfile["s22"] = qpstress[2,:]
+vtkfile["s12"] = qpstress[3,:]
+vtkfile["s33"] = qpstress[4,:]
+outfiles = vtk_save(vtkfile)
