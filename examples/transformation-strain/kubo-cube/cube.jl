@@ -8,6 +8,10 @@ using CutCell
 include("../../../test/useful_routines.jl")
 include("../compute-stress.jl")
 
+function lame_lambda(k, m)
+    return k - 2m / 3
+end
+
 function bulk_modulus(l, m)
     return l + 2m / 3
 end
@@ -172,8 +176,8 @@ width = 1.0
 corner = [0.8, 0.8]
 penaltyfactor = 1e2
 
-nelmts = 37
-polyorder = 2
+nelmts = 12
+polyorder = 3
 numqp = required_quadrature_order(polyorder) + 2
 
 qpstress, qpcoords = solve_and_compute_stress(
@@ -188,6 +192,18 @@ qpstress, qpcoords = solve_and_compute_stress(
 )
 
 pressure = -(qpstress[1, :] + qpstress[2, :] + qpstress[4, :]) / 3
+
+using PyPlot
+fig,ax = PyPlot.subplots()
+CS = ax.tricontour(qpcoords[1,:],qpcoords[2,:],pressure)
+ax.set_aspect("equal")
+ax.set_xlim(0.75,0.85)
+ax.set_ylim(0.75,0.85)
+ax.clabel(CS,CS.levels,inline=true)
+fig
+
+
+
 triin = Triangulate.TriangulateIO()
 triin.pointlist = qpcoords
 (triout, vorout) = triangulate("", triin)
