@@ -39,13 +39,23 @@ function CellQuadratures(
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
-            pquad = area_quadrature(levelset, +1, xL, xR, numcutqp)
-            push!(quads, pquad)
-            celltoquad[1, cellid] = length(quads)
+            try
+                pquad = area_quadrature(levelset, +1, xL, xR, numcutqp, numsplits = 2)
+                push!(quads, pquad)
+                celltoquad[1, cellid] = length(quads)
 
-            nquad = area_quadrature(levelset, -1, xL, xR, numcutqp)
-            push!(quads, nquad)
-            celltoquad[2, cellid] = length(quads)
+                nquad = area_quadrature(levelset, -1, xL, xR, numcutqp, numsplits = 2)
+                push!(quads, nquad)
+                celltoquad[2, cellid] = length(quads)
+            catch e
+                pquad = area_quadrature(levelset, +1, xL, xR, numcutqp, numsplits = 3)
+                push!(quads, pquad)
+                celltoquad[1, cellid] = length(quads)
+
+                nquad = area_quadrature(levelset, -1, xL, xR, numcutqp, numsplits = 3)
+                push!(quads, nquad)
+                celltoquad[2, cellid] = length(quads)
+            end
         else
             error("Expected cellsign ∈ {-1,0,+1}, got cellsign = $s")
         end

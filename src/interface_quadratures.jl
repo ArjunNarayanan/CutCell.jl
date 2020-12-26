@@ -43,16 +43,21 @@ function InterfaceQuadratures(
             nodeids = nodalconnectivity[:, cellid]
             update!(levelset, levelsetcoeffs[nodeids])
 
-            squad = surface_quadrature(levelset, xL, xR, numqp)
-            n = levelset_normal(levelset, squad.points, invjac)
-
-            quads[1, counter] = squad
-            quads[2, counter] = squad
-
-            normals[counter] = n
+            try
+                squad = surface_quadrature(levelset, xL, xR, numqp, numsplits = 2)
+                n = levelset_normal(levelset, squad.points, invjac)
+                quads[1, counter] = squad
+                quads[2, counter] = squad
+                normals[counter] = n
+            catch e
+                squad = surface_quadrature(levelset,xL,xR,numqp,numsplits = 3)
+                n = levelset_normal(levelset, squad.points, invjac)
+                quads[1, counter] = squad
+                quads[2, counter] = squad
+                normals[counter] = n
+            end
 
             celltoquad[cellid] = counter
-
             counter += 1
         end
     end

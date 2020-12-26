@@ -173,11 +173,11 @@ theta0 = -0.067
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
 width = 1.0
-corner = [0.8, 0.8]
+corner = [0.5, 0.5]
 penaltyfactor = 1e2
 
-nelmts = 12
-polyorder = 3
+nelmts = 33
+polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 
 qpstress, qpcoords = solve_and_compute_stress(
