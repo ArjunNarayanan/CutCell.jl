@@ -85,8 +85,8 @@ function component_mass_matrix(basis, quad, component, scale)
     projector = component * component'
     for (p, w) in quad
         vals = basis(p)
-        NP = make_row_matrix(projector, vals)
         NI = interpolation_matrix(vals, dim)
+        NP = make_row_matrix(projector, vals)
         matrix .+= NI' * NP * scale * w
     end
     return matrix
