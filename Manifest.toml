@@ -93,7 +93,7 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[ImplicitDomainQuadrature]]
 deps = ["FastGaussQuadrature", "IntervalArithmetic", "LinearAlgebra", "PolynomialBasis", "Roots"]
-git-tree-sha1 = "9e8dcbbef2f244a060ad8b8683c36f6d6c18349f"
+git-tree-sha1 = "cc10c89dcf9281ad845b91c9b5276ae423e5e151"
 repo-rev = "master"
 repo-url = "https://github.com/ArjunNarayanan/ImplicitDomainQuadrature.git"
 uuid = "215a9a07-c97b-423e-a99e-05c6f7357eae"

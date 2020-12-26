@@ -148,33 +148,33 @@ function Base.show(io::IO, interfacecondition::InterfaceCondition)
     print(io, str)
 end
 
-function coherent_traction_operator(basis, quad, normals, stiffness, cellmap)
-
-    @assert size(normals)[2] == length(quad)
-    dim = dimension(basis)
-    nf = number_of_basis_functions(basis)
-    ndofs = dim * nf
-    matrix = zeros(ndofs, ndofs)
-    vectosymmconverter = vector_to_symmetric_matrix_converter()
-
-    jac = jacobian(cellmap)
-    scalearea = scale_area(cellmap, normals)
-
-    for (idx, (p, w)) in enumerate(quad)
-        grad = transform_gradient(gradient(basis, p), jac)
-        vals = basis(p)
-        normal = normals[:, idx]
-        NK = zeros(3, 2nf)
-        N = zeros(2, 3)
-        for k = 1:dim
-            NK .+= make_row_matrix(vectosymmconverter[k], grad[:, k])
-            N .+= normal[k] * vectosymmconverter[k]'
-        end
-        NI = interpolation_matrix(vals, dim)
-        matrix .+= NI' * N * stiffness * NK * scalearea[idx] * w
-    end
-    return matrix
-end
+# function coherent_traction_operator(basis, quad, normals, stiffness, cellmap)
+#
+#     @assert size(normals)[2] == length(quad)
+#     dim = dimension(basis)
+#     nf = number_of_basis_functions(basis)
+#     ndofs = dim * nf
+#     matrix = zeros(ndofs, ndofs)
+#     vectosymmconverter = vector_to_symmetric_matrix_converter()
+#
+#     jac = jacobian(cellmap)
+#     scalearea = scale_area(cellmap, normals)
+#
+#     for (idx, (p, w)) in enumerate(quad)
+#         grad = transform_gradient(gradient(basis, p), jac)
+#         vals = basis(p)
+#         normal = normals[:, idx]
+#         NK = zeros(3, 2nf)
+#         N = zeros(2, 3)
+#         for k = 1:dim
+#             NK .+= make_row_matrix(vectosymmconverter[k], grad[:, k])
+#             N .+= normal[k] * vectosymmconverter[k]'
+#         end
+#         NI = interpolation_matrix(vals, dim)
+#         matrix .+= NI' * N * stiffness * NK * scalearea[idx] * w
+#     end
+#     return matrix
+# end
 
 function coherent_traction_operator(basis, quad1, quad2, normals, stiffness, cellmap)
     numqp = length(quad1)
@@ -203,6 +203,95 @@ function coherent_traction_operator(basis, quad1, quad2, normals, stiffness, cel
         matrix .+= NI' * N * stiffness * NK * scalearea[qpidx] * w1
     end
     return matrix
+end
+
+function component_traction_operator(basis, quad, components, normals, stiffness, cellmap)
+
+    @assert size(normals)[2] == size(component)[2] == length(quad)
+    dim = dimension(basis)
+    nf = number_of_basis_functions(basis)
+    ndofs = dim * nf
+    matrix = zeros(ndofs, ndofs)
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+
+    jac = jacobian(cellmap)
+    scalearea = scale_area(cellmap, normals)
+
+    for (idx, (p, w)) in enumerate(quad)
+        grad = transform_gradient(gradient(basis, p), jac)
+        vals = basis(p)
+        normal = normals[:, idx]
+        component = components[:, idx]
+
+        projector = component * component'
+
+        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
+        NI = interpolation_matrix(vals, dim)
+
+        matrix .+= NI' * projector * N * stiffness * NK * scalearea[idx] * w
+    end
+    return matrix
+end
+
+function component_traction_operator(
+    basis,
+    quad1,
+    quad2,
+    components,
+    normals,
+    stiffness,
+    cellmap,
+)
+    numqp = length(quad1)
+    @assert length(quad2) == size(normals)[2] == size(components)[2] == numqp
+    dim = dimension(basis)
+    nf = number_of_basis_functions(basis)
+    ndofs = dim * nf
+    matrix = zeros(ndofs, ndofs)
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+
+    jac = jacobian(cellmap)
+    scalearea = scale_area(cellmap, normals)
+
+    for qpidx = 1:numqp
+        p1, w1 = quad1[qpidx]
+        p2, w2 = quad2[qpidx]
+        @assert w1 ≈ w2
+
+        vals = basis(p1)
+        grad = transform_gradient(gradient(basis, p2), jac)
+
+        normal = normals[:, qpidx]
+        component = components[:, qpidx]
+        projector = component * component'
+
+        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
+        NI = interpolation_matrix(vals, dim)
+
+        matrix .+= NI' * component * N * stiffness * NK * scalearea[qpidx] * w1
+    end
+    return matrix
+end
+
+function incoherent_traction_operator(basis, quad, normals, stiffness, cellmap)
+    components = tangents(normals)
+    return component_traction_operator(basis, quad, components, normals, stiffness, cellmap)
+end
+
+function incoherent_traction_operator(basis, quad1, quad2, normals, stiffness, cellmap)
+
+    components = tangents(normals)
+    return component_traction_operator(
+        basis,
+        quad1,
+        quad2,
+        components,
+        normals,
+        stiffness,
+        cellmap,
+    )
 end
 
 function interface_mass_matrix(basis, quad1, quad2, scale)

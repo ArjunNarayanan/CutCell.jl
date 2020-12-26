@@ -34,7 +34,7 @@ pbf = CutCell.bilinear_form(basis,pquad,stiffness,cellmap)
 nbf = CutCell.bilinear_form(basis,nquad,stiffness,cellmap)
 
 normals = repeat([1.,0.],1,numqp)
-top = CutCell.coherent_traction_operator(basis,squad,normals,stiffness,cellmap)
+top = CutCell.coherent_traction_operator(basis,squad,squad,normals,stiffness,cellmap)
 
 facescale = CutCell.scale_area(cellmap,normals)
 mm = penalty*CutCell.mass_matrix(basis,squad,facescale,2)
