@@ -270,16 +270,23 @@ u1rate, u2rate = convergence(numelements, 2, lambda, mu, alpha)
 stressrate = stress_convergence(numelements,2,lambda,mu,alpha)
 @test all(stressrate .>= 1.9)
 
-u1rate, u2rate = convergence(numelements, 3, lambda, mu, alpha)
-# println("Convergence of cubic elements : ", u1rate, "    ", u2rate)
-@test isapprox(u1rate, 4.0, atol = 0.05)
-@test isapprox(u2rate, 4.0, atol = 0.05)
-stressrate = stress_convergence(numelements,3,lambda,mu,alpha)
-@test all(stressrate .>= 3.0)
 
-u1rate, u2rate = convergence(numelements, 4, lambda, mu, alpha)
-# println("Convergence of quartic elements : ", u1rate, "    ", u2rate)
-@test isapprox(u1rate, 5.0, atol = 0.05)
-@test isapprox(u2rate, 5.0, atol = 0.05)
-stressrate = stress_convergence(numelements,4,lambda,mu,alpha)
-@test all(stressrate .>= 3.9)
+
+
+
+
+
+
+# u1rate, u2rate = convergence(numelements, 3, lambda, mu, alpha)
+# # println("Convergence of cubic elements : ", u1rate, "    ", u2rate)
+# @test isapprox(u1rate, 4.0, atol = 0.05)
+# @test isapprox(u2rate, 4.0, atol = 0.05)
+# stressrate = stress_convergence(numelements,3,lambda,mu,alpha)
+# @test all(stressrate .>= 3.0)
+#
+# u1rate, u2rate = convergence(numelements, 4, lambda, mu, alpha)
+# # println("Convergence of quartic elements : ", u1rate, "    ", u2rate)
+# @test isapprox(u1rate, 5.0, atol = 0.05)
+# @test isapprox(u2rate, 5.0, atol = 0.05)
+# stressrate = stress_convergence(numelements,4,lambda,mu,alpha)
+# @test all(stressrate .>= 3.9)

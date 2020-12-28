@@ -113,7 +113,7 @@ facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
 bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
 interfacecondition =
-    CutCell.InterfaceIncoherentCondition(basis,interfacequads,stiffness,cutmesh,penalty)
+    CutCell.incoherent_interface_condition(basis,interfacequads,stiffness,cutmesh,penalty)
 
 
 onbottomboundary(x) = x[2] ≈ 0.0 ? true : false

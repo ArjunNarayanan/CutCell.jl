@@ -81,12 +81,12 @@ end
     include("test_displacement_component_bc.jl")
 end
 
-@safetestset "Test Penalty Displacement Component BC Convergence" begin
-    include("test_displacement_component_bc_convergence.jl")
-end
-
 @safetestset "Test Cut Mesh Convergence" begin
     include("test_cut_convergence.jl")
+end
+
+@safetestset "Test Penalty Displacement Component BC Convergence" begin
+    include("test_displacement_component_bc_convergence.jl")
 end
 
 @safetestset "Test Cut Mesh Stress Convergence" begin

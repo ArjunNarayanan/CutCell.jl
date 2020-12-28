@@ -79,7 +79,7 @@ function solve_plane_interface(x0, normal, nelmts, polyorder, numqp, penaltyfact
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
 
     bottomdisplacementbc = CutCell.DisplacementComponentCondition(
@@ -211,7 +211,7 @@ normal = [1.0, 0.0]
 penaltyfactor = 1e2
 polyorder = 1
 numqp = required_quadrature_order(polyorder) + 2
-powers = 1:7
+powers = [3,4,5]
 nelmts = [2^p + 1 for p in powers]
 
 err = [
@@ -225,11 +225,8 @@ u2err = [er[2] for er in err]
 u1rate = convergence_rate(dx, u1err)
 u2rate = convergence_rate(dx, u2err)
 
-@test isapprox(mean(u1rate[3:end]), polyorder + 1, atol = 0.05)
-@test isapprox(mean(u2rate[3:end]), polyorder + 1, atol = 0.05)
-
-
-
+@test allapprox(u1rate,repeat([2.0],length(u1rate)),0.1)
+@test allapprox(u2rate,repeat([2.0],length(u2rate)),0.1)
 
 
 x0 = [0.5, 0.0]
@@ -237,7 +234,7 @@ normal = [1.0, 0.0]
 penaltyfactor = 1e2
 polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
-powers = 1:7
+powers = [3,4,5]
 nelmts = [2^p + 1 for p in powers]
 
 err = [
@@ -251,5 +248,5 @@ u2err = [er[2] for er in err]
 u1rate = convergence_rate(dx, u1err)
 u2rate = convergence_rate(dx, u2err)
 
-@test isapprox(mean(u1rate), polyorder + 1, atol = 0.05)
-@test isapprox(mean(u2rate), polyorder + 1, atol = 0.05)
+@test allapprox(u1rate,repeat([3.0],length(u1rate)),1e-1)
+@test allapprox(u2rate,repeat([3.0],length(u1rate)),1e-1)

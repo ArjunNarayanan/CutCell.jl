@@ -128,7 +128,7 @@ function displacement_error(
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
     displacementbc = CutCell.DisplacementCondition(
         analyticalsolution,
@@ -204,7 +204,7 @@ center = [width/2, width/2]
 inradius = width / 4
 outradius = width
 
-powers = 1:7
+powers = [3,4,5]
 nelmts = [2^p + 1 for p in powers]
 
 err = [
@@ -229,15 +229,17 @@ u2err = [er[2] for er in err]
 u1rate = convergence_rate(dx,u1err)
 u2rate = convergence_rate(dx,u2err)
 
-@test isapprox(mean(u1rate[2:end]),3.0,atol=0.05)
-@test isapprox(mean(u2rate[2:end]),3.0,atol=0.05)
+@test allapprox(u1rate,repeat([3.0],length(u1rate)),0.1)
+@test allapprox(u2rate,repeat([3.0],length(u2rate)),0.1)
+
+
+
 
 
 center = [width, width]
 inradius = width / 2
 outradius = 2width
-
-powers = 1:7
+powers = [3,4,5]
 nelmts = [2^p + 1 for p in powers]
 
 err = [
@@ -262,5 +264,5 @@ u2err = [er[2] for er in err]
 u1rate = convergence_rate(dx,u1err)
 u2rate = convergence_rate(dx,u2err)
 
-@test isapprox(mean(u1rate[2:end]),3.0,atol=0.05)
-@test isapprox(mean(u2rate[2:end]),3.0,atol=0.05)
+@test allapprox(u1rate,repeat([3.0],length(u1rate)),0.1)
+@test allapprox(u2rate,repeat([3.0],length(u2rate)),0.1)

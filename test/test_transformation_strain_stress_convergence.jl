@@ -334,7 +334,7 @@ function solve_and_compute_stress_error(
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
     displacementbc = CutCell.DisplacementCondition(
         analyticalsolution,
@@ -423,7 +423,7 @@ polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 penaltyfactor = 1e2
 
-powers = 1:7
+powers = [3,4,5]
 nelmts = [2^p + 1 for p in powers]
 dx = 1.0 ./ nelmts
 
@@ -450,7 +450,7 @@ s22rate = convergence_rate(dx,s22err)
 s12rate = convergence_rate(dx,s12err)
 s33rate = convergence_rate(dx,s33err)
 
-@test isapprox(mean(s11rate),2.0,atol=0.05)
-@test isapprox(mean(s22rate),2.0,atol=0.05)
-@test isapprox(mean(s12rate[2:end]),2.0,atol=0.05)
-@test isapprox(mean(s33rate),2.0,atol=0.05)
+@test allapprox(s11rate,repeat([2.0],length(s11rate)),0.1)
+@test allapprox(s22rate,repeat([2.0],length(s11rate)),0.1)
+@test allapprox(s12rate,repeat([2.0],length(s11rate)),0.1)
+@test allapprox(s33rate,repeat([2.0],length(s11rate)),0.1)

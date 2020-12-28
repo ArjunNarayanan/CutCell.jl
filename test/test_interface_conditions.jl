@@ -35,8 +35,13 @@ function test_linear_cut_cell_assembly()
     stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+    interfacecondition = CutCell.coherent_interface_condition(
+        basis,
+        interfacequads,
+        stiffness,
+        cutmesh,
+        penalty,
+    )
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
@@ -94,8 +99,13 @@ function test_curved_interface_assembly()
     stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+    interfacecondition = CutCell.coherent_interface_condition(
+        basis,
+        interfacequads,
+        stiffness,
+        cutmesh,
+        penalty,
+    )
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()

@@ -53,8 +53,8 @@ L, W = 1.0, 1.0
 xc = [0.5, 0.5]
 rad = 0.25
 polyorder = 2
-
-nelmts = [2^i + 1 for i = 1:7]
+powers = [2,3,4,5]
+nelmts = [2^i + 1 for i in powers]
 
 dx = 1.0 ./nelmts
 err = [
@@ -62,5 +62,4 @@ err = [
     for ne in nelmts
 ]
 rate = convergence_rate(err,dx)
-
 @test allapprox(rate,2*ones(length(rate)),0.05)

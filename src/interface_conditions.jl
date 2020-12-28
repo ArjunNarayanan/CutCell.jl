@@ -112,10 +112,16 @@ function interface_incoherent_mass_operators(
     return InterfaceOperators(operators, celltooperator)
 end
 
-function interface_incoherent_mass_operators(basis,interfacequads,cutmesh,penalty)
-    cellmap = cell_map(cutmesh,1)
+function interface_incoherent_mass_operators(basis, interfacequads, cutmesh, penalty)
+    cellmap = cell_map(cutmesh, 1)
     cellsign = cell_sign(cutmesh)
-    return interface_incoherent_mass_operators(basis,interfacequads,cellmap,cellsign,penalty)
+    return interface_incoherent_mass_operators(
+        basis,
+        interfacequads,
+        cellmap,
+        cellsign,
+        penalty,
+    )
 end
 
 function interface_traction_operators(basis, interfacequads, stiffness, cellmap, cellsign)
@@ -159,7 +165,7 @@ end
 
 function interface_incoherent_traction_operators(basis, interfacequads, stiffness, cutmesh)
     cellsign = cell_sign(cutmesh)
-    cellmap = cell_map(cutmesh,1)
+    cellmap = cell_map(cutmesh, 1)
 
     ncells = length(cellsign)
     hasinterface = cellsign .== 0
@@ -209,14 +215,14 @@ struct InterfaceCondition
     end
 end
 
-function InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+function coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
     tractionoperator =
         interface_traction_operators(basis, interfacequads, stiffness, cutmesh)
     massoperator = interface_mass_operators(basis, interfacequads, cutmesh, penalty)
     return InterfaceCondition(tractionoperator, massoperator, penalty)
 end
 
-function InterfaceIncoherentCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+function incoherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
     tractionoperator =
         interface_incoherent_traction_operators(basis, interfacequads, stiffness, cutmesh)
     massoperator =

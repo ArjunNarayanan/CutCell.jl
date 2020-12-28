@@ -56,7 +56,7 @@ function solve_elasticity(distancefunc, nelmts, polyorder, numqp, penaltyfactor)
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
     displacementbc = CutCell.DisplacementCondition(
         x -> displacement(alpha, x),
@@ -122,8 +122,10 @@ normal = [1.0, 0.0]
 polyorder = 1
 numqp = required_quadrature_order(polyorder) + 2
 penaltyfactor = 1e2
-powers = 1:7
+powers = [3,4,5]
 nelmts = [2^p + 1 for p in powers]
+dx = 1.0 ./ nelmts
+
 
 err = [
     solve_elasticity(
@@ -135,13 +137,14 @@ err = [
     ) for ne in nelmts
 ]
 serr = [[er[i] for er in err] for i = 1:3]
-dx = 1.0 ./ nelmts
 
 rates = [convergence_rate(v, dx) for v in serr]
-meanrates = [mean(r) for r in rates]
-@test all(meanrates .> 1.5)
+@test all([allapprox(rates[i],repeat([1.5],length(rates[i])),0.05) for i = 1:3])
 
 
+powers = [3,4,5]
+nelmts = [2^p + 1 for p in powers]
+dx = 1.0 ./ nelmts
 polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 err = [
@@ -155,9 +158,12 @@ err = [
 ]
 serr = [[er[i] for er in err] for i = 1:3]
 rates = [convergence_rate(v, dx) for v in serr]
-meanrates = [mean(r) for r in rates]
-@test all([isapprox(m, 2.0, atol = 0.1) for m in meanrates])
+@test all([allapprox(rates[i],repeat([2.0],length(rates[i])),0.05) for i = 1:3])
 
+
+powers = [3,4,5]
+nelmts = [2^p + 1 for p in powers]
+dx = 1.0 ./ nelmts
 xc = [1.0, 0.5]
 radius = 0.45
 err = [
@@ -169,6 +175,6 @@ err = [
         penaltyfactor,
     ) for ne in nelmts
 ]
+serr = [[er[i] for er in err] for i = 1:3]
 rates = [convergence_rate(v, dx) for v in serr]
-meanrates = [mean(r) for r in rates]
-@test all([isapprox(m, 2.0, atol = 0.1) for m in meanrates])
+@test all([allapprox(rates[i],repeat([2.0],length(rates[i])),0.05) for i = 1:3])

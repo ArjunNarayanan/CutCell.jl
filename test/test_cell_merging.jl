@@ -84,7 +84,7 @@ function test_linear_merge_cell_assembly()
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, mergedmesh, penalty)
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
@@ -149,7 +149,7 @@ function test_curved_merge_assembly()
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, mergedmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, mergedmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, mergedmesh, penalty)
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
@@ -207,7 +207,7 @@ function test_four_cell_vertical_tension()
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
