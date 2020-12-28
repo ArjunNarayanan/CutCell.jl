@@ -99,18 +99,22 @@ end
 
 @safetestset "Test Transformation Strain - Displacement Convergence" begin
     include("test_transformation_strain_displacement_convergence.jl")
+    include("test_incoherent_transformation_strain_displacement_convergence.jl")
 end
 
 @safetestset "Test Transformation Strain - Stress Convergence" begin
     include("test_transformation_strain_stress_convergence.jl")
+    include("test_incoherent_transformation_strain_stress_convergence.jl")
 end
 
 @safetestset "Test Transformation Strain - Displacement + Traction BC convergence" begin
     include("test_transformation_strain_displacement_traction_bc_convergence.jl")
+    include("test_incoherent_transformation_strain_displacement_traction_bc_convergence.jl")
 end
 
 @safetestset "Test Transformation Strain - Mixed BC convergence" begin
     include("test_transformation_strain_mixed_bc_convergence.jl")
+    include("test_incoherent_transformation_strain_mixed_bc_convergence.jl")
 end
 
 @safetestset "Test Levelset Reinitialization" begin

@@ -49,6 +49,42 @@ function interface_transformation_rhs(basis, quad, normals, transfstress, cellma
     return rhs
 end
 
+function interface_transformation_component_rhs(
+    basis,
+    quad,
+    components,
+    normals,
+    transfstress,
+    cellmap,
+)
+
+    numqp = length(quad)
+    @assert size(normals)[2] == size(components)[2] == numqp
+    dim = dimension(basis)
+    nf = number_of_basis_functions(basis)
+    ndofs = dim * nf
+    rhs = zeros(ndofs)
+
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+    scalearea = scale_area(cellmap, normals)
+
+    for qpidx = 1:numqp
+        p, w = quad[qpidx]
+
+        vals = basis(p)
+        NI = interpolation_matrix(vals, dim)
+
+        normal = normals[:, qpidx]
+        NK = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
+
+        component = components[:,qpidx]
+        projector = component*component'
+
+        rhs .+= NI' * projector * NK * transfstress * scalearea[qpidx] * w
+    end
+    return rhs
+end
+
 function face_traction_transformation_rhs(basis, quad, normal, transfstress, facescale)
     dim = dimension(basis)
     @assert length(normal) == dim

@@ -349,6 +349,43 @@ function assemble_interface_transformation_rhs!(
     end
 end
 
+function assemble_incoherent_interface_transformation_rhs!(
+    systemrhs,
+    transfstress,
+    basis,
+    interfacequads,
+    cutmesh,
+)
+
+    cellsign = cell_sign(cutmesh)
+    dofspernode = dimension(cutmesh)
+
+    cellids = findall(cellsign .== 0)
+    for cellid in cellids
+        cellmap = cell_map(cutmesh, cellid)
+        normals = interface_normals(interfacequads, cellid)
+        components = normals
+
+        for s in [+1, -1]
+            quad = interfacequads[s, cellid]
+            rhs =
+                s *
+                0.5 *
+                interface_transformation_component_rhs(
+                    basis,
+                    quad,
+                    components,
+                    normals,
+                    transfstress,
+                    cellmap,
+                )
+            nodeids = nodal_connectivity(cutmesh, s, cellid)
+            assemble_cell_rhs!(systemrhs, nodeids, dofspernode, rhs)
+        end
+
+    end
+end
+
 function assemble_stress_mass_matrix!(sysmatrix, basis, cellquads, mesh)
     ncells = number_of_cells(mesh)
     detjac = determinant_jacobian(mesh)
@@ -537,8 +574,7 @@ function assemble_penalty_displacement_component_transformation_rhs!(
     refquads = reference_face_quadrature(facequads)
 
     uniformrhs = [
-        face_traction_component_transformation_rhs(basis, q, component, n, transfstress, s)
-        for (q, n, s) in zip(refquads, refnormals, facedetjac)
+        face_traction_component_transformation_rhs(basis, q, component, n, transfstress, s) for (q, n, s) in zip(refquads, refnormals, facedetjac)
     ]
 
     for cellid in cellids
