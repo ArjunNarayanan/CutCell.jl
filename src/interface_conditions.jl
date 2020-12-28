@@ -64,6 +64,12 @@ function interface_mass_operators(basis, interfacequads, cellmap, cellsign, pena
     return InterfaceOperators(operators, celltooperator)
 end
 
+function interface_mass_operators(basis, interfacequads, cutmesh, penalty)
+    cellmap = cell_map(cutmesh, 1)
+    cellsign = cell_sign(cutmesh)
+    return interface_mass_operators(basis, interfacequads, cellmap, cellsign, penalty)
+end
+
 function interface_incoherent_mass_operators(
     basis,
     interfacequads,
@@ -83,7 +89,7 @@ function interface_incoherent_mass_operators(
 
     for (idx, cellid) in enumerate(cellids)
         normal = interface_normals(interfacequads, cellid)
-        components = tangents(normal)
+        components = normal
         facescale = scale_area(cellmap, normal)
         for s1 in [+1, -1]
             quad1 = interfacequads[s1, cellid]
@@ -106,10 +112,10 @@ function interface_incoherent_mass_operators(
     return InterfaceOperators(operators, celltooperator)
 end
 
-function interface_mass_operators(basis, interfacequads, cutmesh, penalty)
-    cellmap = cell_map(cutmesh, 1)
+function interface_incoherent_mass_operators(basis,interfacequads,cutmesh,penalty)
+    cellmap = cell_map(cutmesh,1)
     cellsign = cell_sign(cutmesh)
-    return interface_mass_operators(basis, interfacequads, cellmap, cellsign, penalty)
+    return interface_incoherent_mass_operators(basis,interfacequads,cellmap,cellsign,penalty)
 end
 
 function interface_traction_operators(basis, interfacequads, stiffness, cellmap, cellsign)
@@ -152,6 +158,9 @@ function interface_traction_operators(basis, interfacequads, stiffness, cutmesh)
 end
 
 function interface_incoherent_traction_operators(basis, interfacequads, stiffness, cutmesh)
+    cellsign = cell_sign(cutmesh)
+    cellmap = cell_map(cutmesh,1)
+
     ncells = length(cellsign)
     hasinterface = cellsign .== 0
     numinterfaces = count(hasinterface)
@@ -295,14 +304,14 @@ function component_traction_operator(
         N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
         NI = interpolation_matrix(vals, dim)
 
-        matrix .+= NI' * component * N * stiffness * NK * scalearea[qpidx] * w1
+        matrix .+= NI' * projector * N * stiffness * NK * scalearea[qpidx] * w1
     end
     return matrix
 end
 
 function incoherent_traction_operator(basis, quad1, quad2, normals, stiffness, cellmap)
 
-    components = tangents(normals)
+    components = normals
     return component_traction_operator(
         basis,
         quad1,

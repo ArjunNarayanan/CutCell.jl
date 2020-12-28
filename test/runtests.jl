@@ -62,6 +62,7 @@ end
 
 @safetestset "Test Interface Conditions" begin
     include("test_interface_conditions.jl")
+    include("test_incoherent_condition.jl")
 end
 
 @safetestset "Test Conceptual Merging" begin

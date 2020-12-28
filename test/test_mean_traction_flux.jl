@@ -37,7 +37,7 @@ normals = repeat([1.,0.],1,numqp)
 top = CutCell.coherent_traction_operator(basis,squad,squad,normals,stiffness,cellmap)
 
 facescale = CutCell.scale_area(cellmap,normals)
-mm = penalty*CutCell.mass_matrix(basis,squad,facescale,2)
+mm = penalty*CutCell.interface_mass_matrix(basis,squad,squad,facescale)
 
 eta = -1.0
 BF = [pbf         zeros(8,8)
