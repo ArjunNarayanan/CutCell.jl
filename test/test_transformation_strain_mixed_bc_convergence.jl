@@ -263,7 +263,7 @@ function solve_and_compute_displacement_error(
         cellquads,
         cutmesh,
     )
-    CutCell.assemble_interface_transformation_rhs!(
+    CutCell.assemble_coherent_interface_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,

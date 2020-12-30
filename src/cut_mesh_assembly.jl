@@ -320,7 +320,7 @@ function assemble_bulk_transformation_linear_form!(
     end
 end
 
-function assemble_interface_transformation_rhs!(
+function assemble_coherent_interface_transformation_rhs!(
     systemrhs,
     transfstress,
     basis,

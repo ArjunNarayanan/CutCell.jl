@@ -39,11 +39,12 @@ function onboundary(x, L, W)
            ontopboundary(x, L, W)
 end
 
-function solve_and_compute_stress(
+function solve_coherent_cube_and_compute_stress(
     width,
     corner,
     stiffness,
     theta0,
+    initial_pressure,
     nelmts,
     polyorder,
     numqp,
@@ -70,8 +71,13 @@ function solve_and_compute_stress(
     facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition =
-        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
+    interfacecondition = CutCell.coherent_interface_condition(
+        basis,
+        interfacequads,
+        stiffness,
+        cutmesh,
+        penalty,
+    )
 
     leftdisplacementbc = CutCell.DisplacementComponentCondition(
         x -> 0.0,
@@ -144,6 +150,26 @@ function solve_and_compute_stress(
         [0.0, 1.0],
     )
 
+    CutCell.assemble_traction_force_component_linear_form!(
+        sysrhs,
+        x -> -initial_pressure,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onrightboundary(x, width, width),
+        [1.0, 0.0],
+    )
+    CutCell.assemble_traction_force_component_linear_form!(
+        sysrhs,
+        x -> -initial_pressure,
+        basis,
+        facequads,
+        cutmesh,
+        x -> ontopboundary(x, width, width),
+        [0.0, 1.0],
+    )
+
+
     matrix = CutCell.make_sparse(sysmatrix, cutmesh)
     rhs = CutCell.rhs(sysrhs, cutmesh)
 
@@ -159,8 +185,9 @@ function solve_and_compute_stress(
         cutmesh,
     )
     qpcoords = compute_quadrature_points(cellquads, cutmesh)
+    nodal_displacement = reshape(displacement, 2, :)
 
-    return qpstress, qpcoords
+    return nodal_displacement, qpstress, qpcoords
 end
 
 
@@ -170,6 +197,7 @@ lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
 
 theta0 = -0.067
+initial_pressure = 13.5
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
 width = 1.0
@@ -180,11 +208,12 @@ nelmts = 129
 polyorder = 1
 numqp = required_quadrature_order(polyorder) + 2
 
-qpstress, qpcoords = solve_and_compute_stress(
+nodal_displacement, qpstress, qpcoords = solve_coherent_cube_and_compute_stress(
     width,
     corner,
     stiffness,
     theta0,
+    initial_pressure,
     nelmts,
     polyorder,
     numqp,
@@ -196,23 +225,23 @@ pressure = -(qpstress[1, :] + qpstress[2, :] + qpstress[4, :]) / 3
 
 
 
-# triin = Triangulate.TriangulateIO()
-# triin.pointlist = qpcoords
-# (triout, vorout) = triangulate("", triin)
-# connectivity = triout.trianglelist
-# cells = [
-#     MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
-# ]
-# filename = "stress-poly-"*string(polyorder)*"-nelmts-" * string(nelmts)
-# vtkfile = vtk_grid(
-#     "examples/transformation-strain/kubo-cube/coherent/" * filename,
-#     qpcoords[1, :],
-#     qpcoords[2, :],
-#     cells,
-# )
-# vtkfile["pressure"] = pressure
-# vtkfile["s11"] = qpstress[1,:]
-# vtkfile["s22"] = qpstress[2,:]
-# vtkfile["s12"] = qpstress[3,:]
-# vtkfile["s33"] = qpstress[4,:]
-# outfiles = vtk_save(vtkfile)
+triin = Triangulate.TriangulateIO()
+triin.pointlist = qpcoords
+(triout, vorout) = triangulate("", triin)
+connectivity = triout.trianglelist
+cells = [
+    MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
+]
+filename = "stress-poly-"*string(polyorder)*"-nelmts-" * string(nelmts)
+vtkfile = vtk_grid(
+    "examples/transformation-strain/kubo-cube/coherent/" * filename,
+    qpcoords[1, :],
+    qpcoords[2, :],
+    cells,
+)
+vtkfile["pressure"] = pressure
+vtkfile["s11"] = qpstress[1,:]
+vtkfile["s22"] = qpstress[2,:]
+vtkfile["s12"] = qpstress[3,:]
+vtkfile["s33"] = qpstress[4,:]
+outfiles = vtk_save(vtkfile)
