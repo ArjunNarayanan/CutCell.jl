@@ -5,8 +5,8 @@ using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
 using CutCell
-include("../../../test/useful_routines.jl")
-include("../compute-stress.jl")
+include("../../../../test/useful_routines.jl")
+include("../../compute-stress.jl")
 
 function lame_lambda(k, m)
     return k - 2m / 3
@@ -71,7 +71,7 @@ function solve_and_compute_stress(
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
     leftdisplacementbc = CutCell.DisplacementComponentCondition(
         x -> 0.0,
@@ -173,11 +173,11 @@ theta0 = -0.067
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
 width = 1.0
-corner = [0.5, 0.5]
+corner = [0.8, 0.8]
 penaltyfactor = 1e2
 
-nelmts = 33
-polyorder = 2
+nelmts = 129
+polyorder = 1
 numqp = required_quadrature_order(polyorder) + 2
 
 qpstress, qpcoords = solve_and_compute_stress(
@@ -193,34 +193,26 @@ qpstress, qpcoords = solve_and_compute_stress(
 
 pressure = -(qpstress[1, :] + qpstress[2, :] + qpstress[4, :]) / 3
 
-using PyPlot
-fig,ax = PyPlot.subplots()
-CS = ax.tricontour(qpcoords[1,:],qpcoords[2,:],pressure)
-ax.set_aspect("equal")
-ax.set_xlim(0.75,0.85)
-ax.set_ylim(0.75,0.85)
-ax.clabel(CS,CS.levels,inline=true)
-fig
 
 
 
-triin = Triangulate.TriangulateIO()
-triin.pointlist = qpcoords
-(triout, vorout) = triangulate("", triin)
-connectivity = triout.trianglelist
-cells = [
-    MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
-]
-filename = "stress-poly-"*string(polyorder)*"-nelmts-" * string(nelmts)
-vtkfile = vtk_grid(
-    "examples/transformation-strain/kubo-cube/" * filename,
-    qpcoords[1, :],
-    qpcoords[2, :],
-    cells,
-)
-vtkfile["pressure"] = pressure
-vtkfile["s11"] = qpstress[1,:]
-vtkfile["s22"] = qpstress[2,:]
-vtkfile["s12"] = qpstress[3,:]
-vtkfile["s33"] = qpstress[4,:]
-outfiles = vtk_save(vtkfile)
+# triin = Triangulate.TriangulateIO()
+# triin.pointlist = qpcoords
+# (triout, vorout) = triangulate("", triin)
+# connectivity = triout.trianglelist
+# cells = [
+#     MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
+# ]
+# filename = "stress-poly-"*string(polyorder)*"-nelmts-" * string(nelmts)
+# vtkfile = vtk_grid(
+#     "examples/transformation-strain/kubo-cube/coherent/" * filename,
+#     qpcoords[1, :],
+#     qpcoords[2, :],
+#     cells,
+# )
+# vtkfile["pressure"] = pressure
+# vtkfile["s11"] = qpstress[1,:]
+# vtkfile["s22"] = qpstress[2,:]
+# vtkfile["s12"] = qpstress[3,:]
+# vtkfile["s33"] = qpstress[4,:]
+# outfiles = vtk_save(vtkfile)
