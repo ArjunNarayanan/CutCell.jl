@@ -112,7 +112,7 @@ function solve_coherent_cube_and_compute_stress(
         cellquads,
         cutmesh,
     )
-    CutCell.assemble_interface_transformation_rhs!(
+    CutCell.assemble_coherent_interface_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,
@@ -190,6 +190,10 @@ function solve_coherent_cube_and_compute_stress(
     return nodal_displacement, qpstress, qpcoords
 end
 
+ρ01 = 3.93e3		# Kg/m^3
+ρ02 = 3.68e3		# Kg/m^3
+V01 = 1.0/ρ01		# m^3/Kg
+V02 = 1.0/ρ02		# m^3/Kg
 
 K1, K2 = 247.0, 192.0
 mu1, mu2 = 126.0, 87.0
@@ -204,8 +208,8 @@ width = 1.0
 corner = [0.8, 0.8]
 penaltyfactor = 1e2
 
-nelmts = 129
-polyorder = 1
+nelmts = 37
+polyorder = 3
 numqp = required_quadrature_order(polyorder) + 2
 
 nodal_displacement, qpstress, qpcoords = solve_coherent_cube_and_compute_stress(

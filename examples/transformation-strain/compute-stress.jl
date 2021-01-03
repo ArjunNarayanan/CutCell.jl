@@ -111,6 +111,78 @@ function compute_stress_at_quadrature_points(
     return reshape(qpstress, 4, :)
 end
 
+function parent_stress_at_interface_quadrature_points(
+    nodaldisplacement,
+    basis,
+    stiffness,
+    interfacequads,
+    cutmesh,
+)
+
+    dim = CutCell.dimension(basis)
+    qpstress = zeros(0)
+    jac = CutCell.jacobian(cutmesh)
+    vectosymmconverter = CutCell.vector_to_symmetric_matrix_converter()
+    cellsign = CutCell.cell_sign(cutmesh)
+
+    cellids = findall(cellsign .== 0)
+
+    for cellid in cellids
+        nodeids = CutCell.nodal_connectivity(cutmesh, -1, cellid)
+        celldofs = CutCell.element_dofs(nodeids, dim)
+        celldisp = nodaldisplacement[celldofs]
+        points = interfacequads[-1, cellid].points
+        update_parent_stress!(
+            qpstress,
+            basis,
+            stiffness,
+            celldisp,
+            points,
+            jac,
+            vectosymmconverter,
+        )
+    end
+    return reshape(qpstress, 4, :)
+end
+
+function product_stress_at_interface_quadrature_points(
+    nodaldisplacement,
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    interfacequads,
+    cutmesh,
+)
+
+    dim = CutCell.dimension(basis)
+    qpstress = zeros(0)
+    jac = CutCell.jacobian(cutmesh)
+    vectosymmconverter = CutCell.vector_to_symmetric_matrix_converter()
+    cellsign = CutCell.cell_sign(cutmesh)
+
+    cellids = findall(cellsign .== 0)
+
+    for cellid in cellids
+        nodeids = CutCell.nodal_connectivity(cutmesh, +1, cellid)
+        celldofs = CutCell.element_dofs(nodeids, dim)
+        celldisp = nodaldisplacement[celldofs]
+        points = interfacequads[+1, cellid].points
+        update_product_stress!(
+            qpstress,
+            basis,
+            stiffness,
+            transfstress,
+            theta0,
+            celldisp,
+            points,
+            jac,
+            vectosymmconverter,
+        )
+    end
+    return reshape(qpstress, 4, :)
+end
+
 function compute_quadrature_points(cellquads, cutmesh)
     ncells = CutCell.number_of_cells(cutmesh)
     coords = zeros(2, 0)

@@ -204,8 +204,8 @@ width = 1.0
 corner = [0.8, 0.8]
 penaltyfactor = 1e2
 
-nelmts = 129
-polyorder = 1
+nelmts = 37
+polyorder = 3
 numqp = required_quadrature_order(polyorder) + 2
 
 nodal_displacement, qpstress, qpcoords = solve_incoherent_cube_and_compute_stress(
