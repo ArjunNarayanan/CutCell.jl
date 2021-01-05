@@ -46,37 +46,6 @@ function symmetric_displacement_gradient(displacement, basis, interfacequads, cu
     return reshape(totalstrain, 3, :)
 end
 
-function interface_quadrature_points(interfacequads, cutmesh)
-    cellsign = CutCell.cell_sign(cutmesh)
-    cellids = findall(cellsign .== 0)
-    numcellqps = length(interfacequads.quads[1])
-    numqps = numcellqps * length(cellids)
-    points = zeros(2, numqps)
-    counter = 1
-    for cellid in cellids
-        cellmap = CutCell.cell_map(cutmesh, cellid)
-        qp = cellmap(interfacequads[1, cellid].points)
-        points[:, counter:(counter+numcellqps-1)] .= qp
-        counter += numcellqps
-    end
-    return points
-end
-
-function interface_normals(interfacequads, cutmesh)
-    cellsign = CutCell.cell_sign(cutmesh)
-    cellids = findall(cellsign .== 0)
-    numcellqps = length(interfacequads.quads[1])
-    numqps = numcellqps * length(cellids)
-    normals = zeros(2, numqps)
-    counter = 1
-    for cellid in cellids
-        n = CutCell.interface_normals(interfacequads, cellid)
-        normals[:, counter:(counter+numcellqps-1)] .= n
-        counter += numcellqps
-    end
-    return normals
-end
-
 function stress_projected_on_normal(stress, normals)
     nump = size(stress)[2]
     @assert size(normals)[2] == nump

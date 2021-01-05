@@ -1,59 +1,217 @@
-function reference_coordinates(coords, cellids, cutmesh)
-    numpts = size(coords)[2]
-    @assert length(cellids) == numpts
-    refcoords = similar(coords)
-    for i = 1:numpts
-        cellmap = cell_map(cutmesh, cellids[i])
-        refcoords[:, i] .= inverse(cellmap, coords[:, i])
+function update_product_stress!(
+    qpstress,
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    celldisp,
+    points,
+    jac,
+    vectosymmconverter,
+)
+    dim = dimension(basis)
+    lambda, mu = lame_coefficients(stiffness, +1)
+    nump = size(points)[2]
+
+    for qpidx = 1:nump
+        p = points[:, qpidx]
+        grad = transform_gradient(gradient(basis, p), jac)
+        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        symmdispgrad = NK * celldisp
+
+        inplanestress = (stiffness[+1] * symmdispgrad) - transfstress
+        s33 = lambda * (symmdispgrad[1] + symmdispgrad[2]) - (lambda + 2mu / 3) * theta0
+
+        numericalstress = vcat(inplanestress, s33)
+
+        append!(qpstress, numericalstress)
     end
-    return refcoords
 end
 
-function levelset_sign(refcoords, cellids, levelset, levelsetcoeffs, mesh)
-    breakpoints = [i == 1 ? true : cellids[i] != cellids[i-1] for i = 1:length(cellids)]
-    start = 1
-    levelsetsign = zeros(Int, length(cellids))
-    while start <= length(cellids)
-        nodeids = nodal_connectivity(mesh, cellids[start])
-        update!(levelset, levelsetcoeffs[nodeids])
-        stop = findnext(breakpoints, start + 1)
-        stop = isnothing(stop) ? length(cellids) + 1 : stop
-        for idx = start:(stop-1)
-            levelsetsign[idx] = sign(levelset(refcoords[:, idx]))
-        end
-        start = stop
+function update_parent_stress!(
+    qpstress,
+    basis,
+    stiffness,
+    celldisp,
+    points,
+    jac,
+    vectosymmconverter,
+)
+
+    dim = dimension(basis)
+    lambda, mu = lame_coefficients(stiffness, -1)
+    nump = size(points)[2]
+    for qpidx = 1:nump
+        p = points[:, qpidx]
+        grad = transform_gradient(gradient(basis, p), jac)
+        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        symmdispgrad = NK * celldisp
+
+        inplanestress = stiffness[-1] * symmdispgrad
+        s33 = lambda * (symmdispgrad[1] + symmdispgrad[2])
+
+        numericalstress = vcat(inplanestress, s33)
+
+        append!(qpstress, numericalstress)
     end
-    return levelsetsign
 end
 
-function interpolate(coords, nodalvalues, basis, levelset, levelsetcoeffs, cutmesh)
-    dim, numpts = size(coords)
-    ndofs, numnodes = size(nodalvalues)
+function compute_stress_at_cell_quadrature_points(
+    nodaldisplacement,
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    cellquads,
+    cutmesh,
+)
 
-    cellids = [cell_id(cutmesh, coords[:, i]) for i = 1:numpts]
-    refcoords = reference_coordinates(coords, cellids, cutmesh)
-    bgmesh = background_mesh(cutmesh)
-    levelsetsign = levelset_sign(refcoords, cellids, levelset, levelsetcoeffs, bgmesh)
+    dim = dimension(basis)
+    ncells = number_of_cells(cutmesh)
+    qpstress = zeros(0)
+    jac = jacobian(cutmesh)
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
 
-    interpolater = InterpolatingPolynomial(ndofs, basis)
-    interpvals = zeros(ndofs, numpts)
-
-    breakpoints = [
-        i == 1 ? true :
-        (cellids[i] != cellids[i-1]) || (levelsetsign[i] != levelsetsign[i-1])
-        for i = 1:numpts
-    ]
-    start = 1
-    while start <= numpts
-        s = levelsetsign[start]
-        nodeids = nodal_connectivity(cutmesh,s,cellids[start])
-        update!(interpolater,nodalvalues[:,nodeids])
-        stop = findnext(breakpoints,start+1)
-        stop = isnothing(stop) ? numpts+1 : stop
-        for idx = start:(stop-1)
-            interpvals[:,idx] .= interpolater(refcoords[:,idx])
+    for cellid = 1:ncells
+        s = cell_sign(cutmesh, cellid)
+        @assert s == -1 || s == 0 || s == +1
+        if s == +1 || s == 0
+            nodeids = nodal_connectivity(cutmesh, +1, cellid)
+            celldofs = element_dofs(nodeids, dim)
+            celldisp = nodaldisplacement[celldofs]
+            points = cellquads[+1, cellid].points
+            update_product_stress!(
+                qpstress,
+                basis,
+                stiffness,
+                transfstress,
+                theta0,
+                celldisp,
+                points,
+                jac,
+                vectosymmconverter,
+            )
         end
-        start = stop
+        if s == -1 || s == 0
+            nodeids = nodal_connectivity(cutmesh, -1, cellid)
+            celldofs = element_dofs(nodeids, dim)
+            celldisp = nodaldisplacement[celldofs]
+            points = cellquads[-1, cellid].points
+            update_parent_stress!(
+                qpstress,
+                basis,
+                stiffness,
+                celldisp,
+                points,
+                jac,
+                vectosymmconverter,
+            )
+        end
     end
-    return interpvals
+    return reshape(qpstress, 4, :)
+end
+
+function parent_stress_at_interface_quadrature_points(
+    nodaldisplacement,
+    basis,
+    stiffness,
+    interfacequads,
+    cutmesh,
+)
+
+    dim = dimension(basis)
+    qpstress = zeros(0)
+    jac = jacobian(cutmesh)
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+    cellsign = cell_sign(cutmesh)
+
+    cellids = findall(cellsign .== 0)
+
+    for cellid in cellids
+        nodeids = nodal_connectivity(cutmesh, -1, cellid)
+        celldofs = element_dofs(nodeids, dim)
+        celldisp = nodaldisplacement[celldofs]
+        points = interfacequads[-1, cellid].points
+        update_parent_stress!(
+            qpstress,
+            basis,
+            stiffness,
+            celldisp,
+            points,
+            jac,
+            vectosymmconverter,
+        )
+    end
+    return reshape(qpstress, 4, :)
+end
+
+function product_stress_at_interface_quadrature_points(
+    nodaldisplacement,
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    interfacequads,
+    cutmesh,
+)
+
+    dim = dimension(basis)
+    qpstress = zeros(0)
+    jac = jacobian(cutmesh)
+    vectosymmconverter = vector_to_symmetric_matrix_converter()
+    cellsign = cell_sign(cutmesh)
+
+    cellids = findall(cellsign .== 0)
+
+    for cellid in cellids
+        nodeids = nodal_connectivity(cutmesh, +1, cellid)
+        celldofs = element_dofs(nodeids, dim)
+        celldisp = nodaldisplacement[celldofs]
+        points = interfacequads[+1, cellid].points
+        update_product_stress!(
+            qpstress,
+            basis,
+            stiffness,
+            transfstress,
+            theta0,
+            celldisp,
+            points,
+            jac,
+            vectosymmconverter,
+        )
+    end
+    return reshape(qpstress, 4, :)
+end
+
+function cell_quadrature_points(cellquads, cutmesh)
+    ncells = number_of_cells(cutmesh)
+    coords = zeros(2, 0)
+    for cellid = 1:ncells
+        s = cell_sign(cutmesh, cellid)
+        cellmap = cell_map(cutmesh, cellid)
+        @assert s == -1 || s == 0 || s == +1
+        if s == +1 || s == 0
+            coords = hcat(coords, cellmap(cellquads[+1, cellid].points))
+        end
+        if s == -1 || s == 0
+            coords = hcat(coords, cellmap(cellquads[-1, cellid].points))
+        end
+    end
+    return coords
+end
+
+function interface_quadrature_points(interfacequads, cutmesh)
+    cellsign = cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+    numcellqps = length(interfacequads.quads[1])
+    numqps = numcellqps * length(cellids)
+    points = zeros(2, numqps)
+    counter = 1
+    for cellid in cellids
+        cellmap = cell_map(cutmesh, cellid)
+        qp = cellmap(interfacequads[1, cellid].points)
+        points[:, counter:(counter+numcellqps-1)] .= qp
+        counter += numcellqps
+    end
+    return points
 end
