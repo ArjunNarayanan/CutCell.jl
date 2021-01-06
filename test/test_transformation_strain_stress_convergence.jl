@@ -175,14 +175,8 @@ function update_core_stress_error!(
     dim = CutCell.dimension(basis)
     lambda, mu = CutCell.lame_coefficients(stiffness, -1)
     for (p, w) in quad
-        grad = CutCell.transform_gradient(gradient(basis, p), jac)
-        NK = sum([CutCell.make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
-        symmdispgrad = NK * celldisp
-
-        inplanestress = stiffness[-1] * symmdispgrad
-        s33 = lambda * (symmdispgrad[1] + symmdispgrad[2])
-
-        numericalstress = vcat(inplanestress, s33)
+        numericalstress =
+            CutCell.parent_stress(p, basis, stiffness, celldisp, jac, vectosymmconverter)
         exactstress = core_stress(analyticalsolution)
 
         err .+= (numericalstress - exactstress) .^ 2 * detjac * w
@@ -207,14 +201,16 @@ function update_shell_stress_error!(
     lambda, mu = CutCell.lame_coefficients(stiffness, +1)
     theta0 = analyticalsolution.theta0
     for (p, w) in quad
-        grad = CutCell.transform_gradient(gradient(basis, p), jac)
-        NK = sum([CutCell.make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
-        symmdispgrad = NK * celldisp
-
-        inplanestress = (stiffness[+1] * symmdispgrad) - transfstress
-        s33 = lambda * (symmdispgrad[1] + symmdispgrad[2]) - (lambda + 2mu / 3) * theta0
-
-        numericalstress = vcat(inplanestress, s33)
+        numericalstress = CutCell.product_stress(
+            p,
+            basis,
+            stiffness,
+            transfstress,
+            theta0,
+            celldisp,
+            jac,
+            vectosymmconverter,
+        )
         exactstress = shell_stress(analyticalsolution, cellmap(p))
 
         err .+= (numericalstress - exactstress) .^ 2 * detjac * w
@@ -333,8 +329,13 @@ function solve_and_compute_stress_error(
     facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition =
-        CutCell.coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
+    interfacecondition = CutCell.coherent_interface_condition(
+        basis,
+        interfacequads,
+        stiffness,
+        cutmesh,
+        penalty,
+    )
 
     displacementbc = CutCell.DisplacementCondition(
         analyticalsolution,
@@ -409,7 +410,7 @@ mu1, mu2 = 126.0, 87.0
 lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
 
-stiffness = CutCell.HookeStiffness(lambda1,mu1,lambda2,mu2)
+stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
 theta0 = -0.067
 
@@ -423,34 +424,36 @@ polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 penaltyfactor = 1e2
 
-powers = [3,4,5]
+powers = [3, 4, 5,]
 nelmts = [2^p + 1 for p in powers]
 dx = 1.0 ./ nelmts
 
-stresserr = [solve_and_compute_stress_error(
-    width,
-    center,
-    inradius,
-    outradius,
-    stiffness,
-    theta0,
-    ne,
-    polyorder,
-    numqp,
-    penaltyfactor,
-) for ne in nelmts]
+stresserr = [
+    solve_and_compute_stress_error(
+        width,
+        center,
+        inradius,
+        outradius,
+        stiffness,
+        theta0,
+        ne,
+        polyorder,
+        numqp,
+        penaltyfactor,
+    ) for ne in nelmts
+]
 
 s11err = [st[1] for st in stresserr]
 s22err = [st[2] for st in stresserr]
 s12err = [st[3] for st in stresserr]
 s33err = [st[4] for st in stresserr]
 
-s11rate = convergence_rate(dx,s11err)
-s22rate = convergence_rate(dx,s22err)
-s12rate = convergence_rate(dx,s12err)
-s33rate = convergence_rate(dx,s33err)
+s11rate = convergence_rate(dx, s11err)
+s22rate = convergence_rate(dx, s22err)
+s12rate = convergence_rate(dx, s12err)
+s33rate = convergence_rate(dx, s33err)
 
-@test allapprox(s11rate,repeat([2.0],length(s11rate)),0.1)
-@test allapprox(s22rate,repeat([2.0],length(s11rate)),0.1)
-@test allapprox(s12rate,repeat([2.0],length(s11rate)),0.1)
-@test allapprox(s33rate,repeat([2.0],length(s11rate)),0.1)
+@test allapprox(s11rate, repeat([2.0], length(s11rate)), 0.1)
+@test allapprox(s22rate, repeat([2.0], length(s11rate)), 0.1)
+@test allapprox(s12rate, repeat([2.0], length(s11rate)), 0.1)
+@test allapprox(s33rate, repeat([2.0], length(s11rate)), 0.1)

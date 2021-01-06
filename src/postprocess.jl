@@ -1,3 +1,45 @@
+function product_stress(
+    point,
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    celldisp,
+    jac,
+    vectosymmconverter,
+)
+
+    dim = dimension(basis)
+    lambda, mu = lame_coefficients(stiffness, +1)
+
+    grad = transform_gradient(gradient(basis, point), jac)
+    NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+    symmdispgrad = NK * celldisp
+
+    inplanestress = (stiffness[+1] * symmdispgrad) - transfstress
+    s33 = lambda * (symmdispgrad[1] + symmdispgrad[2]) - (lambda + 2mu / 3) * theta0
+
+    stress = vcat(inplanestress, s33)
+
+    return stress
+end
+
+function parent_stress(point, basis, stiffness, celldisp, jac, vectosymmconverter)
+    dim = dimension(basis)
+    lambda, mu = lame_coefficients(stiffness, -1)
+
+    grad = transform_gradient(gradient(basis, point), jac)
+    NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+    symmdispgrad = NK * celldisp
+
+    inplanestress = stiffness[-1] * symmdispgrad
+    s33 = lambda * (symmdispgrad[1] + symmdispgrad[2])
+
+    stress = vcat(inplanestress, s33)
+
+    return stress
+end
+
 function update_product_stress!(
     qpstress,
     basis,
@@ -15,14 +57,17 @@ function update_product_stress!(
 
     for qpidx = 1:nump
         p = points[:, qpidx]
-        grad = transform_gradient(gradient(basis, p), jac)
-        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
-        symmdispgrad = NK * celldisp
 
-        inplanestress = (stiffness[+1] * symmdispgrad) - transfstress
-        s33 = lambda * (symmdispgrad[1] + symmdispgrad[2]) - (lambda + 2mu / 3) * theta0
-
-        numericalstress = vcat(inplanestress, s33)
+        numericalstress = product_stress(
+            p,
+            basis,
+            stiffness,
+            transfstress,
+            theta0,
+            celldisp,
+            jac,
+            vectosymmconverter,
+        )
 
         append!(qpstress, numericalstress)
     end
@@ -43,14 +88,9 @@ function update_parent_stress!(
     nump = size(points)[2]
     for qpidx = 1:nump
         p = points[:, qpidx]
-        grad = transform_gradient(gradient(basis, p), jac)
-        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
-        symmdispgrad = NK * celldisp
 
-        inplanestress = stiffness[-1] * symmdispgrad
-        s33 = lambda * (symmdispgrad[1] + symmdispgrad[2])
-
-        numericalstress = vcat(inplanestress, s33)
+        numericalstress =
+            parent_stress(p, basis, stiffness, celldisp, jac, vectosymmconverter)
 
         append!(qpstress, numericalstress)
     end

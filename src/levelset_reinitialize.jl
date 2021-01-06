@@ -145,6 +145,34 @@ function seed_zero_levelset(nump, levelset, levelsetcoeffs, cutmesh)
     return refseedpoints, spatialseedpoints, seedcellids
 end
 
+function seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
+    cellsign = cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+
+    totalnumqps = sum([length(interfacequads[1, cellid]) for cellid in cellids])
+
+    refseedpoints = zeros(2, totalnumqps)
+    spatialseedpoints = zeros(2, totalnumqps)
+    seedcellids = zeros(Int, totalnumqps)
+
+    start = 1
+    for cellid in cellids
+        cellmap = cell_map(cutmesh, cellid)
+        refpoints = interfacequads[1, cellid].points
+        spatialpoints = cellmap(refpoints)
+        numqps = size(refpoints)[2]
+
+        stop = start + numqps - 1
+
+        refseedpoints[:, start:stop] = refpoints
+        spatialseedpoints[:, start:stop] = spatialpoints
+        seedcellids[start:stop] = repeat([cellid], numqps)
+
+        start = stop + 1
+    end
+    return refseedpoints, spatialseedpoints, seedcellids
+end
+
 function distance_to_zero_levelset(
     querypoints,
     refseedpoints,
@@ -157,7 +185,7 @@ function distance_to_zero_levelset(
     boundingradius = 4.5,
 )
 
-    dim,numquerypoints = size(querypoints)
+    dim, numquerypoints = size(querypoints)
     signeddistance = zeros(numquerypoints)
     tree = KDTree(spatialseedpoints)
     seedidx, seeddists = nn(tree, querypoints)
@@ -182,10 +210,10 @@ function distance_to_zero_levelset(
 
         spatialclosestpt = cellmap(refclosestpt)
 
-        g = vec(transform_gradient(gradient(levelset,refclosestpt),jacobian(cellmap)))
-        s = sign(g'*(xquery - spatialclosestpt))
+        g = vec(transform_gradient(gradient(levelset, refclosestpt), jacobian(cellmap)))
+        s = sign(g' * (xquery - spatialclosestpt))
 
-        signeddistance[idx] = s*norm(spatialclosestpt - xquery)
+        signeddistance[idx] = s * norm(spatialclosestpt - xquery)
     end
     return signeddistance
 end
