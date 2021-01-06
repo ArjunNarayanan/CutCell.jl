@@ -259,35 +259,5 @@ function distance_to_zero_levelset(
         signeddistance[i] = s * norm(spatialcp - xquery)
     end
 
-
-    # signeddistance = zeros(numquerypoints)
-    # tree = KDTree(spatialseedpoints)
-    # seedidx, seeddists = nn(tree, querypoints)
-    # for (idx, sidx) in enumerate(seedidx)
-    #     xguess = refseedpoints[:, sidx]
-    #     xquery = querypoints[:, idx]
-    #     guesscellid = seedcellids[sidx]
-    #     cellmap = cell_map(mesh, guesscellid)
-    #     update!(levelset, levelsetcoeffs[nodal_connectivity(mesh, guesscellid)])
-    #
-    #     refclosestpt = saye_newton_iterate(
-    #         xguess,
-    #         xquery,
-    #         levelset,
-    #         x -> vec(gradient(levelset, x)),
-    #         x -> hessian_matrix(levelset, x),
-    #         cellmap,
-    #         tol,
-    #         boundingradius,
-    #     )
-    #
-    #     spatialclosestpt = cellmap(refclosestpt)
-    #
-    #     g = vec(transform_gradient(gradient(levelset, refclosestpt), jacobian(cellmap)))
-    #     s = sign(g' * (xquery - spatialclosestpt))
-    #
-    #     signeddistance[idx] = s * norm(spatialclosestpt - xquery)
-    # end
-
     return signeddistance
 end

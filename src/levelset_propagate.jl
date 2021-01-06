@@ -103,6 +103,7 @@ function BoundaryPaddedLevelset(
     levelsetcoeffs,
     cutmesh,
     tol,
+    boundingradius,
 )
 
     bottomghostdist = distance_to_zero_levelset(
@@ -114,6 +115,7 @@ function BoundaryPaddedLevelset(
         levelsetcoeffs,
         cutmesh,
         tol,
+        boundingradius,
     )
     rightghostdist = distance_to_zero_levelset(
         paddedmesh.rightghostcoords,
@@ -124,6 +126,7 @@ function BoundaryPaddedLevelset(
         levelsetcoeffs,
         cutmesh,
         tol,
+        boundingradius,
     )
     topghostdist = distance_to_zero_levelset(
         paddedmesh.topghostcoords,
@@ -134,6 +137,7 @@ function BoundaryPaddedLevelset(
         levelsetcoeffs,
         cutmesh,
         tol,
+        boundingradius,
     )
     leftghostdist = distance_to_zero_levelset(
         paddedmesh.leftghostcoords,
@@ -144,6 +148,7 @@ function BoundaryPaddedLevelset(
         levelsetcoeffs,
         cutmesh,
         tol,
+        boundingradius,
     )
 
     return BoundaryPaddedLevelset(

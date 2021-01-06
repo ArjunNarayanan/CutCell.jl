@@ -49,6 +49,7 @@ polyorder = 2
 xI = [0.0,0.5]
 normal = [0.0,1.0]
 tol = 1e-8
+boundingradius = 6.0
 
 basis = TensorProductBasis(2, polyorder)
 mesh = CutCell.Mesh(x0, [L, W], [nelmtsx, nelmtsy], basis)
@@ -72,6 +73,7 @@ paddedlevelset = CutCell.BoundaryPaddedLevelset(
     levelsetcoeffs,
     cutmesh,
     tol,
+    boundingradius,
 )
 
 Dmx = CutCell.first_order_horizontal_backward_difference(paddedlevelset)
@@ -95,6 +97,7 @@ polyorder = 2
 xI = [0.5,0.0]
 normal = [1.0,0.0]
 tol = 1e-8
+boundingradius = 6.0
 
 basis = TensorProductBasis(2, polyorder)
 mesh = CutCell.Mesh(x0, [L, W], [nelmtsx, nelmtsy], basis)
@@ -118,6 +121,7 @@ paddedlevelset = CutCell.BoundaryPaddedLevelset(
     levelsetcoeffs,
     cutmesh,
     tol,
+    boundingradius,
 )
 
 Dmx = CutCell.first_order_horizontal_backward_difference(paddedlevelset)
