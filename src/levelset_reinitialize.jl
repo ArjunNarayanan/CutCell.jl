@@ -55,7 +55,7 @@ function saye_newton_iterate(
         if norm(x1 - xguess) > r
             error("Did not converge in ball of radius $r")
         elseif norm(x1 - x0) < tol
-            return x1, counter
+            return x1
         else
             x0 = x1
             l0 = l1
@@ -173,7 +173,7 @@ function seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
     return refseedpoints, spatialseedpoints, seedcellids
 end
 
-function distance_to_zero_levelset(
+function closest_point_on_zero_levelset(
     querypoints,
     refseedpoints,
     spatialseedpoints,
@@ -181,12 +181,15 @@ function distance_to_zero_levelset(
     levelset,
     levelsetcoeffs,
     mesh,
-    tol;
-    boundingradius = 4.5,
+    tol,
+    boundingradius,
 )
 
-    dim, numquerypoints = size(querypoints)
-    signeddistance = zeros(numquerypoints)
+    dim,numquerypoints = size(querypoints)
+    refclosestpoints = zeros(dim, numquerypoints)
+    refclosestcellids = zeros(Int, numquerypoints)
+    refgradients = zeros(dim,numquerypoints)
+
     tree = KDTree(spatialseedpoints)
     seedidx, seeddists = nn(tree, querypoints)
 
@@ -197,7 +200,7 @@ function distance_to_zero_levelset(
         cellmap = cell_map(mesh, guesscellid)
         update!(levelset, levelsetcoeffs[nodal_connectivity(mesh, guesscellid)])
 
-        refclosestpt, iter = saye_newton_iterate(
+        refcp = saye_newton_iterate(
             xguess,
             xquery,
             levelset,
@@ -208,12 +211,83 @@ function distance_to_zero_levelset(
             boundingradius,
         )
 
-        spatialclosestpt = cellmap(refclosestpt)
-
-        g = vec(transform_gradient(gradient(levelset, refclosestpt), jacobian(cellmap)))
-        s = sign(g' * (xquery - spatialclosestpt))
-
-        signeddistance[idx] = s * norm(spatialclosestpt - xquery)
+        refclosestpoints[:, idx] = refcp
+        refclosestcellids[idx] = guesscellid
+        refgradients[:,idx] = gradient(levelset,refcp)
     end
+    return refclosestpoints, refclosestcellids, refgradients
+end
+
+function distance_to_zero_levelset(
+    querypoints,
+    refseedpoints,
+    spatialseedpoints,
+    seedcellids,
+    levelset,
+    levelsetcoeffs,
+    mesh,
+    tol,
+    boundingradius,
+)
+
+    dim, numquerypoints = size(querypoints)
+    signeddistance = zeros(numquerypoints)
+
+    refclosestpoints, refclosestcellids, refgradients = closest_point_on_zero_levelset(
+        querypoints,
+        refseedpoints,
+        spatialseedpoints,
+        seedcellids,
+        levelset,
+        levelsetcoeffs,
+        mesh,
+        tol,
+        boundingradius,
+    )
+
+    for i = 1:numquerypoints
+        refcp = refclosestpoints[:,i]
+        cellmap = cell_map(mesh,refclosestcellids[i])
+
+        spatialcp = cellmap(refcp)
+        xquery = querypoints[:,i]
+
+
+        g = vec(transform_gradient(refgradients[:,i]', jacobian(cellmap)))
+        s = sign(g' * (xquery - spatialcp))
+
+        signeddistance[i] = s * norm(spatialcp - xquery)
+    end
+
+
+    # signeddistance = zeros(numquerypoints)
+    # tree = KDTree(spatialseedpoints)
+    # seedidx, seeddists = nn(tree, querypoints)
+    # for (idx, sidx) in enumerate(seedidx)
+    #     xguess = refseedpoints[:, sidx]
+    #     xquery = querypoints[:, idx]
+    #     guesscellid = seedcellids[sidx]
+    #     cellmap = cell_map(mesh, guesscellid)
+    #     update!(levelset, levelsetcoeffs[nodal_connectivity(mesh, guesscellid)])
+    #
+    #     refclosestpt = saye_newton_iterate(
+    #         xguess,
+    #         xquery,
+    #         levelset,
+    #         x -> vec(gradient(levelset, x)),
+    #         x -> hessian_matrix(levelset, x),
+    #         cellmap,
+    #         tol,
+    #         boundingradius,
+    #     )
+    #
+    #     spatialclosestpt = cellmap(refclosestpt)
+    #
+    #     g = vec(transform_gradient(gradient(levelset, refclosestpt), jacobian(cellmap)))
+    #     s = sign(g' * (xquery - spatialclosestpt))
+    #
+    #     signeddistance[idx] = s * norm(spatialclosestpt - xquery)
+    # end
+
     return signeddistance
 end

@@ -1,3 +1,16 @@
+function pressure(stressvector)
+    return -(stressvector[1] + stressvector[2] + stressvector[4])/3.0
+end
+
+function deviatoric_stress(stressvector,p)
+    return stressvector + p*[1.0,1.0,0.0,1.0]
+end
+
+function deviatoric_stress(stressvector)
+    p = pressure(stressvector)
+    return deviatoric_stress(stressvector,p)
+end
+
 function product_stress(
     point,
     basis,

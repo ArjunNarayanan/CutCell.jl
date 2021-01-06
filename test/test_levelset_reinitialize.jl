@@ -1,14 +1,14 @@
 using Test
 using PolynomialBasis
 using ImplicitDomainQuadrature
-# using Revise
+using Revise
 using CutCell
 include("useful_routines.jl")
 
 function reinitialization_error(distancefunction, nelmts, polyorder)
     L, W = 1.0, 1.0
     basis = TensorProductBasis(2, polyorder)
-    numqp = required_quadrature_order(polyorder) + 2
+    numqp = required_quadrature_order(polyorder) + 4
     quad = tensor_product_quadrature(2, numqp)
     levelset = InterpolatingPolynomial(1, basis)
 
@@ -29,7 +29,7 @@ function reinitialization_error(distancefunction, nelmts, polyorder)
         levelsetcoeffs,
         cutmesh,
         1e-8,
-        boundingradius = 4.5,
+        4.5,
     )
 
     err = uniform_mesh_L2_error(
@@ -45,21 +45,29 @@ function reinitialization_error(distancefunction, nelmts, polyorder)
     return err[1] / den[1]
 end
 
-function convergence_rate(v,dx)
+function convergence_rate(v, dx)
     return diff(log.(v)) ./ diff(log.(dx))
 end
 
-L, W = 1.0, 1.0
+
 xc = [0.5, 0.5]
 rad = 0.25
 polyorder = 2
-powers = [2,3,4,5]
+powers = [2, 3, 4, 5]
 nelmts = [2^i + 1 for i in powers]
 
-dx = 1.0 ./nelmts
+dx = 1.0 ./ nelmts
 err = [
     reinitialization_error(x -> circle_distance_function(x, xc, rad), ne, polyorder)
     for ne in nelmts
 ]
+rate = convergence_rate(err, dx)
+@test allapprox(rate, 2 * ones(length(rate)), 0.05)
+
+corner = [0.5, 0.5]
+err = [
+    reinitialization_error(x -> corner_distance_function(x, corner), ne, polyorder)
+    for ne in nelmts
+]
 rate = convergence_rate(err,dx)
-@test allapprox(rate,2*ones(length(rate)),0.05)
+@test all(rate .> 1.0)
