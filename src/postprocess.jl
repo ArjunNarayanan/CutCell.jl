@@ -1,14 +1,14 @@
 function pressure(stressvector)
-    return -(stressvector[1] + stressvector[2] + stressvector[4])/3.0
+    return -(stressvector[1] + stressvector[2] + stressvector[4]) / 3.0
 end
 
-function deviatoric_stress(stressvector,p)
-    return stressvector + p*[1.0,1.0,0.0,1.0]
+function deviatoric_stress(stressvector, p)
+    return stressvector + p * [1.0, 1.0, 0.0, 1.0]
 end
 
 function deviatoric_stress(stressvector)
     p = pressure(stressvector)
-    return deviatoric_stress(stressvector,p)
+    return deviatoric_stress(stressvector, p)
 end
 
 function product_stress(
@@ -36,6 +36,44 @@ function product_stress(
 
     return stress
 end
+
+function product_stress_at_reference_points(
+    refpoints,
+    refcellids,
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    nodaldisplacement,
+    cutmesh,
+)
+
+    dim, numpts = size(refpoints)
+    productstress = zeros(4, numpts)
+    vectosymmconverter = CutCell.vector_to_symmetric_matrix_converter()
+    jac = CutCell.jacobian(cutmesh)
+
+    for i = 1:numpts
+        cellid = refcellids[i]
+        nodeids = CutCell.nodal_connectivity(cutmesh, +1, cellid)
+        celldofs = CutCell.element_dofs(nodeids, dim)
+        celldisp = nodaldisplacement[celldofs]
+        point = refpoints[:, i]
+
+        productstress[:, i] .= product_stress(
+            point,
+            basis,
+            stiffness,
+            transfstress,
+            theta0,
+            celldisp,
+            jac,
+            vectosymmconverter,
+        )
+    end
+    return productstress
+end
+
 
 function parent_stress(point, basis, stiffness, celldisp, jac, vectosymmconverter)
     dim = dimension(basis)

@@ -121,12 +121,39 @@ nodaldisplacement = solve_for_displacement(
 
 refseedpoints, spatialseedpoints, seedcellids =
     CutCell.seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
-
 nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
 
+tol = 1e-8
+boundingradius = 3.0
+refclosestpoints, refclosestcellids, refgradients =
+    CutCell.closest_reference_points_on_zero_levelset(
+        nodalcoordinates,
+        refseedpoints,
+        spatialseedpoints,
+        seedcellids,
+        levelset,
+        levelsetcoeffs,
+        mesh,
+        tol,
+        boundingradius,
+    )
 
-using PyPlot
-fig, ax = PyPlot.subplots()
-ax.tricontour(nodalcoordinates[1, :], nodalcoordinates[2, :], newlevelsetcoeffs, [0.0])
-ax.set_aspect("equal")
-fig
+
+product_stress_at_cp = CutCell.product_stress_at_reference_points(
+    refclosestpoints,
+    refclosestcellids,
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    nodaldisplacement,
+    cutmesh,
+)
+
+
+
+# using PyPlot
+# fig, ax = PyPlot.subplots()
+# ax.tricontour(nodalcoordinates[1, :], nodalcoordinates[2, :], newlevelsetcoeffs, [0.0])
+# ax.set_aspect("equal")
+# fig

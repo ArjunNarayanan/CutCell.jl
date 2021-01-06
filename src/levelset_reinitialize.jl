@@ -173,7 +173,7 @@ function seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
     return refseedpoints, spatialseedpoints, seedcellids
 end
 
-function closest_point_on_zero_levelset(
+function closest_reference_points_on_zero_levelset(
     querypoints,
     refseedpoints,
     spatialseedpoints,
@@ -185,10 +185,10 @@ function closest_point_on_zero_levelset(
     boundingradius,
 )
 
-    dim,numquerypoints = size(querypoints)
+    dim, numquerypoints = size(querypoints)
     refclosestpoints = zeros(dim, numquerypoints)
     refclosestcellids = zeros(Int, numquerypoints)
-    refgradients = zeros(dim,numquerypoints)
+    refgradients = zeros(dim, numquerypoints)
 
     tree = KDTree(spatialseedpoints)
     seedidx, seeddists = nn(tree, querypoints)
@@ -213,7 +213,7 @@ function closest_point_on_zero_levelset(
 
         refclosestpoints[:, idx] = refcp
         refclosestcellids[idx] = guesscellid
-        refgradients[:,idx] = gradient(levelset,refcp)
+        refgradients[:, idx] = gradient(levelset, refcp)
     end
     return refclosestpoints, refclosestcellids, refgradients
 end
@@ -233,27 +233,28 @@ function distance_to_zero_levelset(
     dim, numquerypoints = size(querypoints)
     signeddistance = zeros(numquerypoints)
 
-    refclosestpoints, refclosestcellids, refgradients = closest_point_on_zero_levelset(
-        querypoints,
-        refseedpoints,
-        spatialseedpoints,
-        seedcellids,
-        levelset,
-        levelsetcoeffs,
-        mesh,
-        tol,
-        boundingradius,
-    )
+    refclosestpoints, refclosestcellids, refgradients =
+        closest_reference_points_on_zero_levelset(
+            querypoints,
+            refseedpoints,
+            spatialseedpoints,
+            seedcellids,
+            levelset,
+            levelsetcoeffs,
+            mesh,
+            tol,
+            boundingradius,
+        )
 
     for i = 1:numquerypoints
-        refcp = refclosestpoints[:,i]
-        cellmap = cell_map(mesh,refclosestcellids[i])
+        refcp = refclosestpoints[:, i]
+        cellmap = cell_map(mesh, refclosestcellids[i])
 
         spatialcp = cellmap(refcp)
-        xquery = querypoints[:,i]
+        xquery = querypoints[:, i]
 
 
-        g = vec(transform_gradient(refgradients[:,i]', jacobian(cellmap)))
+        g = vec(transform_gradient(refgradients[:, i]', jacobian(cellmap)))
         s = sign(g' * (xquery - spatialcp))
 
         signeddistance[i] = s * norm(spatialcp - xquery)
