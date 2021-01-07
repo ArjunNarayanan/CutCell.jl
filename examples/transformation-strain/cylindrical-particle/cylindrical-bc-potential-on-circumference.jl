@@ -4,7 +4,6 @@ using ImplicitDomainQuadrature
 using Revise
 using CutCell
 include("../../../test/useful_routines.jl")
-include("../compute-stress.jl")
 
 
 function bulk_modulus(l, m)
@@ -91,18 +90,7 @@ function (A::AnalyticalSolution)(x)
     end
 end
 
-function interface_quadrature_points(interfacequads, cutmesh)
-    cellsign = CutCell.cell_sign(cutmesh)
-    cellids = findall(cellsign .== 0)
-    points = zeros(0)
 
-    for cellid in cellids
-        cellmap = CutCell.cell_map(cutmesh, cellid)
-        qp = cellmap(interfacequads[1, cellid].points)
-        append!(points, qp)
-    end
-    return reshape(points, 2, :)
-end
 
 function angular_position(points)
     cpoints = points[1, :] + im * points[2, :]
@@ -136,36 +124,106 @@ function onboundary(x, L, W)
            ontopboundary(x, L, W)
 end
 
-function strain_energy(stiffnessmatrix,stressvals)
-    compliancematrix = inv(stiffnessmatrix)
-    symmdispgrad = compliancematrix * stressvals[1:3,:]
-    
+function solve_for_displacement(
+    basis,
+    cellquads,
+    interfacequads,
+    facequads,
+    cutmesh,
+    levelset,
+    levelsetcoeffs,
+    stiffness,
+    theta0,
+    penalty,
+    analyticalsolution,
+)
+
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
+    interfacecondition = CutCell.incoherent_interface_condition(
+        basis,
+        interfacequads,
+        stiffness,
+        cutmesh,
+        penalty,
+    )
+
+    displacementbc = CutCell.DisplacementCondition(
+        analyticalsolution,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        x -> onboundary(x, width, width),
+        penalty,
+    )
+
+    sysmatrix = CutCell.SystemMatrix()
+    sysrhs = CutCell.SystemRHS()
+
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
+    CutCell.assemble_bulk_transformation_linear_form!(
+        sysrhs,
+        transfstress,
+        basis,
+        cellquads,
+        cutmesh,
+    )
+    CutCell.assemble_incoherent_interface_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        interfacequads,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
+    CutCell.assemble_penalty_displacement_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onboundary(x, width, width),
+    )
+
+
+    matrix = CutCell.make_sparse(sysmatrix, cutmesh)
+    rhs = CutCell.rhs(sysrhs, cutmesh)
+
+    nodaldisplacement = matrix \ rhs
+
+    return nodaldisplacement
 end
 
-K1, K2 = 247.0, 192.0
-mu1, mu2 = 126.0, 87.0
+
+K1, K2 = 247.0e9, 192.0e9    # Pa
+mu1, mu2 = 126.0e9, 87.0e9   # Pa
 lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
-
-V1 = 1.0 / 3.68e-6
-V2 = 1.0 / 3.93e-6
-theta0 = -0.067
-initial_pressure = 13.5
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
-width = 1.0
+rho1 = 3.93e3   # Kg/m^3
+rho2 = 3.68e3   # Kg/m^3
+
+V1 = inv(rho1)
+V2 = inv(rho2)
+theta0 = -0.067
+ΔG = -1022.0    # J/mol
+molarmass = 0.147   # Kg/mol
+diffG0 = ΔG / molarmass # J/Kg
+
+width = 1.0e-3
 penaltyfactor = 1e2
 
-polyorder = 2
-numqp = required_quadrature_order(polyorder) + 4
-nelmts = 11
+polyorder = 3
+numqp = required_quadrature_order(polyorder) + 2
+nelmts = 33
 center = [width / 2, width / 2]
 inradius = width / 4
 outradius = width
 
 analyticalsolution =
     AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
-
 
 transfstrain = CutCell.plane_transformation_strain(theta0)
 transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
@@ -186,100 +244,16 @@ cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
-bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-interfacecondition = CutCell.incoherent_interface_condition(
-    basis,
-    interfacequads,
-    stiffness,
-    cutmesh,
-    penalty,
-)
-
-displacementbc = CutCell.DisplacementCondition(
-    analyticalsolution,
-    basis,
-    facequads,
-    stiffness,
-    cutmesh,
-    x -> onboundary(x, width, width),
-    penalty,
-)
-
-
-sysmatrix = CutCell.SystemMatrix()
-sysrhs = CutCell.SystemRHS()
-
-CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
-CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
-CutCell.assemble_bulk_transformation_linear_form!(
-    sysrhs,
-    transfstress,
+nodaldisplacement = solve_for_displacement(
     basis,
     cellquads,
-    cutmesh,
-)
-CutCell.assemble_incoherent_interface_transformation_rhs!(
-    sysrhs,
-    transfstress,
-    basis,
     interfacequads,
-    cutmesh,
-)
-CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
-CutCell.assemble_penalty_displacement_transformation_rhs!(
-    sysrhs,
-    transfstress,
-    basis,
     facequads,
     cutmesh,
-    x -> onboundary(x, width, width),
-)
-
-
-matrix = CutCell.make_sparse(sysmatrix, cutmesh)
-rhs = CutCell.rhs(sysrhs, cutmesh)
-
-nodaldisplacement = matrix \ rhs
-
-
-quadpoints = interface_quadrature_points(interfacequads, cutmesh)
-relquadpoints = quadpoints .- center
-angularposition = angular_position(relquadpoints)
-sortidx = sortperm(angularposition)
-angularposition = angularposition[sortidx]
-
-
-
-parentstress = parent_stress_at_interface_quadrature_points(
-    nodaldisplacement,
-    basis,
+    levelset,
+    levelsetcoeffs,
     stiffness,
-    interfacequads,
-    cutmesh,
-)
-parentstress = parentstress[:,sortidx]
-
-productstress = product_stress_at_interface_quadrature_points(
-    nodaldisplacement,
-    basis,
-    stiffness,
-    transfstress,
     theta0,
-    interfacequads,
-    cutmesh,
+    penalty,
+    analyticalsolution,
 )
-productstress = productstress[:,sortidx]
-
-parentpressure = pressure(parentstress)
-productpressure = pressure(productstress)
-
-
-# parentstrainenergy = parent_strain_energy(parentsymmdispgrad,parentstress)
-# productstrainenergy = product_strain_energy(productsymmdispgrad,productstress,theta0)
-
-using PyPlot
-fig,ax = PyPlot.subplots()
-ax.plot(angularposition,parentpressure)
-# ax.set_ylim(0.15,0.2)
-ax.grid()
-fig

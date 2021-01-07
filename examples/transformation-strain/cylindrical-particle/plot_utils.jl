@@ -70,3 +70,14 @@ function plot_all_stress_strain(angularposition, stress, symmdispgrad, filename)
     fig22.savefig(filename * "22.png")
     fig12.savefig(filename * "12.png")
 end
+
+# using PyPlot
+# fig,ax = PyPlot.subplots()
+# ax.plot(angularposition,productpressure,label="product")
+# ax.plot(angularposition,parentpressure,label="parent")
+# ax.set_title("Pressure around circumference")
+# ax.set_xlabel("Angular position (deg)")
+# ax.set_ylabel("Pressure (Pa)")
+# ax.grid()
+# ax.legend()
+# fig.savefig("Pressure-around-circumference.png")
