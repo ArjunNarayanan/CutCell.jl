@@ -1,3 +1,4 @@
+using LinearAlgebra
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
@@ -66,14 +67,24 @@ function solve_for_displacement(
     return nodaldisplacement
 end
 
+function spatial_closest_points(refclosestpoints, refclosestcellids, mesh)
+    dim, npts = size(refclosestpoints)
+    spclosestpoints = zeros(dim, npts)
+    for i = 1:npts
+        cellmap = CutCell.cell_map(mesh, refclosestcellids[i])
+        spclosestpoints[:, i] .= cellmap(refclosestpoints[:, i])
+    end
+    return spclosestpoints
+end
+
 K1, K2 = 247.0, 192.0
 mu1, mu2 = 126.0, 87.0
 lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
-V1 = 1.0 / 3.68e-6
-V2 = 1.0 / 3.93e-6
+V1 = 1.0 / 3.93e-6
+V2 = 1.0 / 3.68e-6
 theta0 = -0.067
 ΔG = -6.95
 
@@ -137,7 +148,11 @@ refclosestpoints, refclosestcellids, refgradients =
         tol,
         boundingradius,
     )
+spclosestpoints = spatial_closest_points(refclosestpoints,refclosestcellids,cutmesh)
 
+invjac = CutCell.inverse_jacobian(cutmesh)
+normals = diagm(invjac) * refgradients
+CutCell.normalize_normals!(normals)
 
 product_stress_at_cp = CutCell.product_stress_at_reference_points(
     refclosestpoints,
@@ -149,11 +164,58 @@ product_stress_at_cp = CutCell.product_stress_at_reference_points(
     nodaldisplacement,
     cutmesh,
 )
+parent_stress_at_cp = CutCell.parent_stress_at_reference_points(
+    refclosestpoints,
+    refclosestcellids,
+    basis,
+    stiffness,
+    nodaldisplacement,
+    cutmesh,
+)
 
+function normal_stress_component(stressvector, normal)
+    snn =
+        normal[1] * stressvector[1] * normal[1] +
+        2.0 * normal[1] * stressvector[3] * normal[2] +
+        normal[2] * stressvector[2] * normal[2]
+end
 
+function normal_stress_component_over_points(stresses,normals)
+    numstresscomponents,npts = size(stresses)
+    @assert size(normals) == (2,npts)
 
-# using PyPlot
-# fig, ax = PyPlot.subplots()
-# ax.tricontour(nodalcoordinates[1, :], nodalcoordinates[2, :], newlevelsetcoeffs, [0.0])
-# ax.set_aspect("equal")
-# fig
+    normalstresscomp = zeros(npts)
+    for i = 1:npts
+        normalstresscomp[i] = normal_stress_component(stresses[:,i],normals[:,i])
+    end
+    return normalstresscomp
+end
+
+function stress_inner_product_over_points(stresses)
+    return stresses[1,:].^2 + stresses[2,:].^2 + 2.0*stresses[3,:].^2 + stresses[4,:].^2
+end
+
+function interface_potential(V0,K,mu,pressure,devstress,normals)
+    dsnn = normal_stress_component_over_points(devstress,normals)
+    devnorm = stress_inner_product_over_points(devstress)
+    V = V0*(1.0 .- pressure/K)
+
+    return V0*pressure - V0/(2.0K)*pressure.^2 + V.*dsnn + V0/(4.0mu)*devnorm
+end
+
+productpressure = CutCell.pressure_at_points(product_stress_at_cp)
+parentpressure = CutCell.pressure_at_points(parent_stress_at_cp)
+
+productdevstress = CutCell.deviatoric_stress_at_points(product_stress_at_cp,productpressure)
+parentdevstress = CutCell.deviatoric_stress_at_points(parent_stress_at_cp,parentpressure)
+
+productdevnorm = stress_inner_product_over_points(productdevstress)
+
+productnormaldevstress = normal_stress_component_over_points(productdevstress,normals)
+parentnormaldevstress = normal_stress_component_over_points(parentdevstress,normals)
+
+productspecificvolume = V1*(1.0 .- productpressure/K1)
+parentspecificvolume = V2*(1.0 .- parentpressure/K2)
+
+productpotential = interface_potential(V1,K1,mu1,productpressure,productdevstress,normals)
+parentpotential = interface_potential(V2,K2,mu2,parentpressure,parentdevstress,normals)

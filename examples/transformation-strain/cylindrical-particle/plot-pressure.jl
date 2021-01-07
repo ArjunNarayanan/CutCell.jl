@@ -4,7 +4,7 @@ using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
 using CutCell
-include("../../test/useful_routines.jl")
+include("../../../test/useful_routines.jl")
 
 function update_product_stress!(
     qpstress,
@@ -265,7 +265,7 @@ function solve_cylindrical_bc_elasticity(
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.incoherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
     displacementbc = CutCell.DisplacementCondition(
         analyticalsolution,
@@ -289,7 +289,7 @@ function solve_cylindrical_bc_elasticity(
         cellquads,
         cutmesh,
     )
-    CutCell.assemble_interface_transformation_rhs!(
+    CutCell.assemble_incoherent_interface_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,
@@ -351,7 +351,7 @@ function solve_zero_traction_bc_elasticity(
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition =
-        CutCell.InterfaceCondition(basis, interfacequads, stiffness, cutmesh, penalty)
+        CutCell.incoherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
 
     sysmatrix = CutCell.SystemMatrix()
     sysrhs = CutCell.SystemRHS()
@@ -365,7 +365,7 @@ function solve_zero_traction_bc_elasticity(
         cellquads,
         cutmesh,
     )
-    CutCell.assemble_interface_transformation_rhs!(
+    CutCell.assemble_incoherent_interface_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,
@@ -400,7 +400,7 @@ stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 width = 1.0
 penaltyfactor = 1e2
 
-nelmts = 21
+nelmts = 11
 polyorder = 2
 numqp = required_quadrature_order(polyorder) + 4
 center = [width / 2, width / 2]
@@ -460,10 +460,14 @@ cells = [
     MeshCell(VTKCellTypes.VTK_TRIANGLE, connectivity[:, i]) for i = 1:size(connectivity)[2]
 ]
 vtkfile = vtk_grid(
-    "examples/transformation-strain/zero-traction-pressure",
+    "examples/transformation-strain/cylindrical-particle/zero-traction-pressure",
     quadcoords[1, :],
     quadcoords[2, :],
     cells,
 )
 vtkfile["pressure"] = pressure
+vtkfile["s11"] = qpstress[1,:]
+vtkfile["s22"] = qpstress[2,:]
+vtkfile["s12"] = qpstress[3,:]
+vtkfile["s33"] = qpstress[4,:]
 outfiles = vtk_save(vtkfile)

@@ -1,7 +1,7 @@
-# using Triangulate
-# using WriteVTK
-# using PyPlot
-# using CSV, DataFrames
+using Triangulate
+using WriteVTK
+using PyPlot
+using CSV, DataFrames
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise

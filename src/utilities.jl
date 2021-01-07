@@ -4,6 +4,14 @@ function levelset_normal(levelset, p::V, invjac) where {V<:AbstractVector}
     return n / norm(n)
 end
 
+function normalize_normals!(normals)
+    dim,npts = size(normals)
+    for i = 1:npts
+        n = normals[:,i]
+        normals[:,i] .= n/norm(n)
+    end
+end
+
 function levelset_normal(levelset, points::M, invjac) where {M<:AbstractMatrix}
     npts = size(points)[2]
     if npts == 0
@@ -11,10 +19,7 @@ function levelset_normal(levelset, points::M, invjac) where {M<:AbstractMatrix}
     else
         g = hcat([gradient(levelset, points[:, i])' for i = 1:npts]...)
         normals = diagm(invjac) * g
-        for i = 1:npts
-            n = normals[:, i]
-            normals[:, i] = n / norm(n)
-        end
+        normalize_normals!(normals)
         return normals
     end
 end

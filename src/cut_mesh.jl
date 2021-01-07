@@ -136,6 +136,10 @@ function jacobian(cutmesh::CutMesh)
     return jacobian(cell_map(cutmesh))
 end
 
+function inverse_jacobian(cutmesh::CutMesh)
+    return 1.0 ./ jacobian(cutmesh)
+end
+
 function face_determinant_jacobian(cutmesh::CutMesh)
     return face_determinant_jacobian(cutmesh.mesh)
 end
