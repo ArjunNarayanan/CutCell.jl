@@ -219,9 +219,6 @@ parent_stress_at_cp = CutCell.parent_stress_at_reference_points(
 )
 
 
-# productpotential = interface_potential(V1,K1,mu1,productpressure,productdevstress,normals)
-# parentpotential = interface_potential(V2,K2,mu2,parentpressure,parentdevstress,normals)
-
 
 productpressure = CutCell.pressure_at_points(product_stress_at_cp)
 parentpressure = CutCell.pressure_at_points(parent_stress_at_cp)
