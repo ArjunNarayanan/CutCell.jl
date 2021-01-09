@@ -1,9 +1,10 @@
+using PyPlot
 using LinearAlgebra
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
 using CutCell
-include("../../../../test/useful_routines.jl")
+include("../../../test/useful_routines.jl")
 
 
 function bulk_modulus(l, m)
@@ -12,93 +13,6 @@ end
 
 function lame_lambda(k, m)
     return k - 2m / 3
-end
-
-function analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
-    a = zeros(3, 3)
-    a[1, 1] = inradius
-    a[1, 2] = -inradius
-    a[1, 3] = -1.0 / inradius
-    a[2, 1] = 2 * (lc + mc)
-    a[2, 2] = -2 * (ls + ms)
-    a[2, 3] = 2ms / inradius^2
-    a[3, 2] = 2(ls + ms)
-    a[3, 3] = -2ms / outradius^2
-    return a
-end
-
-function analytical_coefficient_rhs(ls, ms, theta0)
-    r = zeros(3)
-    Ks = bulk_modulus(ls, ms)
-    r[2] = -Ks * theta0
-    r[3] = Ks * theta0
-    return r
-end
-
-struct AnalyticalSolution
-    inradius::Any
-    outradius::Any
-    center::Any
-    A1c::Any
-    A1s::Any
-    A2s::Any
-    ls::Any
-    ms::Any
-    lc::Any
-    mc::Any
-    theta0::Any
-    function AnalyticalSolution(inradius, outradius, center, ls, ms, lc, mc, theta0)
-        a = analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
-        r = analytical_coefficient_rhs(ls, ms, theta0)
-        coeffs = a \ r
-        new(
-            inradius,
-            outradius,
-            center,
-            coeffs[1],
-            coeffs[2],
-            coeffs[3],
-            ls,
-            ms,
-            lc,
-            mc,
-            theta0,
-        )
-    end
-end
-
-function radial_displacement(A::AnalyticalSolution, r)
-    if r <= A.inradius
-        return A.A1c * r
-    else
-        return A.A1s * r + A.A2s / r
-    end
-end
-
-function (A::AnalyticalSolution)(x)
-    relpos = x - A.center
-    r = sqrt(relpos' * relpos)
-    ur = radial_displacement(A, r)
-    if ur ≈ 0.0
-        [0.0, 0.0]
-    else
-        costheta = (x[1] - A.center[1]) / r
-        sintheta = (x[2] - A.center[2]) / r
-        u1 = ur * costheta
-        u2 = ur * sintheta
-        return [u1, u2]
-    end
-end
-
-
-
-function angular_position(points)
-    cpoints = points[1, :] + im * points[2, :]
-    return rad2deg.(angle.(cpoints))
-end
-
-function pressure(stress)
-    return -(stress[1, :] + stress[2, :] + stress[4, :]) / 3
 end
 
 function onleftboundary(x, L, W)
@@ -117,13 +31,6 @@ function ontopboundary(x, L, W)
     return x[2] ≈ W
 end
 
-function onboundary(x, L, W)
-    return onleftboundary(x, L, W) ||
-           onbottomboundary(x, L, W) ||
-           onrightboundary(x, L, W) ||
-           ontopboundary(x, L, W)
-end
-
 function solve_for_displacement(
     basis,
     cellquads,
@@ -133,10 +40,12 @@ function solve_for_displacement(
     levelset,
     levelsetcoeffs,
     stiffness,
-    theta0,
+    transfstress,
     penalty,
-    analyticalsolution,
+    applydisplacement
 )
+
+    L,W = CutCell.widths(cutmesh)
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition = CutCell.coherent_interface_condition(
@@ -147,13 +56,34 @@ function solve_for_displacement(
         penalty,
     )
 
-    displacementbc = CutCell.DisplacementCondition(
-        analyticalsolution,
+    leftbc = CutCell.DisplacementComponentCondition(
+        x -> 0.0,
         basis,
         facequads,
         stiffness,
         cutmesh,
-        x -> onboundary(x, width, width),
+        x->onleftboundary(x,L,W),
+        [1.0, 0.0],
+        penalty,
+    )
+    bottombc = CutCell.DisplacementComponentCondition(
+        x -> 0.0,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        x->onbottomboundary(x,L,W),
+        [0.0, 1.0],
+        penalty,
+    )
+    rightbc = CutCell.DisplacementComponentCondition(
+        x -> applydisplacement,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        x->onrightboundary(x,L,W),
+        [1.0, 0.0],
         penalty,
     )
 
@@ -169,6 +99,7 @@ function solve_for_displacement(
         cellquads,
         cutmesh,
     )
+
     CutCell.assemble_coherent_interface_transformation_rhs!(
         sysrhs,
         transfstress,
@@ -176,16 +107,39 @@ function solve_for_displacement(
         interfacequads,
         cutmesh,
     )
-    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
-    CutCell.assemble_penalty_displacement_transformation_rhs!(
+
+    CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,leftbc,cutmesh)
+    CutCell.assemble_penalty_displacement_component_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,
         facequads,
         cutmesh,
-        x -> onboundary(x, width, width),
+        x -> onleftboundary(x, L, W),
+        [1.0,0.0]
     )
 
+    CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,bottombc,cutmesh)
+    CutCell.assemble_penalty_displacement_component_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onbottomboundary(x, L, W),
+        [0.0,1.0]
+    )
+
+    CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,rightbc,cutmesh)
+    CutCell.assemble_penalty_displacement_component_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onrightboundary(x, L, W),
+        [1.0,0.0]
+    )
 
     matrix = CutCell.make_sparse(sysmatrix, cutmesh)
     rhs = CutCell.rhs(sysrhs, cutmesh)
@@ -227,43 +181,38 @@ function stress_inner_product_over_points(stresses)
     return stresses[1,:].^2 + stresses[2,:].^2 + 2.0*stresses[3,:].^2 + stresses[4,:].^2
 end
 
-function angular_position(points)
-    cpoints = points[1, :] + im * points[2, :]
-    return rad2deg.(angle.(cpoints))
-end
 
 
-K1, K2 = 247.0e9, 192.0e9    # Pa
-mu1, mu2 = 126.0e9, 87.0e9   # Pa
+
+K1, K2 = 247.0e9, 247.0e9    # Pa
+mu1, mu2 = 126.0e9, 126.0e9   # Pa
 lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
 rho1 = 3.93e3   # Kg/m^3
-rho2 = 3.68e3   # Kg/m^3
+rho2 = 3.93e3   # Kg/m^3
 
 V1 = inv(rho1)
 V2 = inv(rho2)
-theta0 = -0.067
+theta0 = 0.0
+transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 ΔG = -1022.0    # J/mol
 molarmass = 0.147   # Kg/mol
 diffG0 = ΔG / molarmass # J/Kg
 
+
+
 width = 1.0e-3
 penaltyfactor = 1e2
+applydisplacement = 0.01*width
 
-polyorder = 3
+polyorder = 1
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 33
-center = [width / 2, width / 2]
-inradius = width / 4
-outradius = width
-
-analyticalsolution =
-    AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
-
-transfstrain = CutCell.plane_transformation_strain(theta0)
-transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
+nelmts = 9
+interfacex0 = [0.8width,0.0]
+interfaceangle = 30.0
+interfacenormal = [cosd(interfaceangle),sind(interfaceangle)]
 
 dx = width / nelmts
 meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
@@ -273,8 +222,7 @@ basis = TensorProductBasis(2, polyorder)
 mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
 levelset = InterpolatingPolynomial(1, basis)
 levelsetcoeffs =
-    CutCell.levelset_coefficients(x -> -circle_distance_function(x, center, inradius), mesh)
-
+    CutCell.levelset_coefficients(x -> plane_distance_function(x,interfacenormal,interfacex0), mesh)
 
 cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
 cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
@@ -290,15 +238,16 @@ nodaldisplacement = solve_for_displacement(
     levelset,
     levelsetcoeffs,
     stiffness,
-    theta0,
+    transfstress,
     penalty,
-    analyticalsolution,
+    applydisplacement
 )
 
 
 refseedpoints, spatialseedpoints, seedcellids =
     CutCell.seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
 nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
+
 
 tol = 1e-8
 boundingradius = 3.0
@@ -316,11 +265,10 @@ refclosestpoints, refclosestcellids, refgradients =
     )
 spclosestpoints = spatial_closest_points(refclosestpoints,refclosestcellids,cutmesh)
 
-relspatialpoints = spclosestpoints .- center
-angularposition = angular_position(relspatialpoints)
-sortidx = sortperm(angularposition)
-angularposition = angularposition[sortidx]
 
+sortidx = sortperm(spclosestpoints[2,:])
+
+spclosestpoints = spclosestpoints[:,sortidx]
 refclosestpoints = refclosestpoints[:,sortidx]
 refclosestcellids = refclosestcellids[sortidx]
 refgradients = refgradients[:,sortidx]
@@ -328,10 +276,6 @@ refgradients = refgradients[:,sortidx]
 invjac = CutCell.inverse_jacobian(cutmesh)
 normals = diagm(invjac) * refgradients
 CutCell.normalize_normals!(normals)
-
-
-
-
 
 product_stress_at_cp = CutCell.product_stress_at_reference_points(
     refclosestpoints,
@@ -351,7 +295,6 @@ parent_stress_at_cp = CutCell.parent_stress_at_reference_points(
     nodaldisplacement,
     cutmesh,
 )
-
 
 
 productpressure = CutCell.pressure_at_points(product_stress_at_cp)
@@ -383,66 +326,50 @@ parentp3 = -(parentspecificvolume .* parentnormaldevstress)
 parentp4 = V2/(4mu2)*parentdevnorm
 parentpotential = parentp1+parentp2+parentp3+parentp4
 
-potentialdifference = diffG0 .+ productpotential - parentpotential
+potentialdifference = productpotential - parentpotential
 
 
+folderpath = "examples/transformation-strain/plane-interface/"
+cpycoords = spclosestpoints[2,:]
 
-folderpath = "examples/transformation-strain/cylindrical-particle/cylindrical-bc/"
-
-# using PyPlot
 # fig,ax = PyPlot.subplots()
-# ax.plot(angularposition,productpressure,label="product")
-# ax.plot(angularposition,parentpressure,label="parent")
-# ax.grid()
-# ax.set_title("Pressure along interface")
-# ax.set_ylabel("Pressure (Pa)")
-# ax.set_xlabel("Angular position (deg)")
-# ax.legend()
-# fig.tight_layout()
-# fig
-# fig.savefig(folderpath*"pressure.png")
-
-
-# using PyPlot
-# fig,ax = PyPlot.subplots()
-# ax.plot(angularposition,parentp1,label="term1")
-# ax.plot(angularposition,parentp2,label="term2")
-# ax.plot(angularposition,parentp3,label="term3")
-# ax.plot(angularposition,parentp4,label="term4")
-# ax.plot(angularposition,parentpotential,label="potential")
-# ax.set_xlabel("Angular position (deg)")
+# ax.plot(cpycoords,parentp1,label="term1")
+# ax.plot(cpycoords,parentp2,label="term2")
+# ax.plot(cpycoords,parentp3,label="term3")
+# ax.plot(cpycoords,parentp4,label="term4")
+# ax.plot(cpycoords,parentpotential,label="potential")
+# ax.set_xlabel("Height (mm)")
 # ax.set_ylabel("Energy density (J/Kg)")
 # ax.set_title("Potential on parent side of interface")
-# ax.set_ylim(-1e6,2e6)
 # ax.grid()
 # ax.legend()
+# fig
 # fig.tight_layout()
 # fig.savefig(folderpath*"parent-potential.png")
-#
-#
-#
+
+
 # fig,ax = PyPlot.subplots()
-# ax.plot(angularposition,productp1,label="term1")
-# ax.plot(angularposition,productp2,label="term2")
-# ax.plot(angularposition,productp3,label="term3")
-# ax.plot(angularposition,productp4,label="term4")
-# ax.plot(angularposition,productpotential,label="potential")
-# ax.set_xlabel("Angular position (deg)")
+# ax.plot(cpycoords,productp1,label="term1")
+# ax.plot(cpycoords,productp2,label="term2")
+# ax.plot(cpycoords,productp3,label="term3")
+# ax.plot(cpycoords,productp4,label="term4")
+# ax.plot(cpycoords,productpotential,label="potential")
+# ax.set_xlabel("Height (mm)")
 # ax.set_ylabel("Energy density (J/Kg)")
-# ax.set_ylim(-1e6,2e6)
-# ax.set_title("Potential on product side of interface")
+# ax.set_title("Potential on parent side of interface")
 # ax.grid()
 # ax.legend()
+# fig
 # fig.tight_layout()
-# fig.savefig(folderpath*"product-potential.png")
-#
-#
-#
-# fig,ax = PyPlot.subplots()
-# ax.plot(angularposition,potentialdifference)
-# ax.grid()
-# ax.set_xlabel("Angular position (deg)")
-# ax.set_ylabel("Potential difference (J/Kg)")
-# ax.set_title("Potential difference along interface circumference")
-# fig.tight_layout()
+# fig.savefig(folderpath*"parent-potential.png")
+
+fig,ax = PyPlot.subplots()
+ax.plot(cpycoords,potentialdifference)
+ax.grid()
+ax.set_xlabel("Height (mm)")
+ax.set_ylabel("Potential difference (J/Kg)")
+ax.set_title("Potential difference along interface")
+ax.set_ylim(-1,1)
+fig.tight_layout()
+fig
 # fig.savefig(folderpath*"potential-difference.png")
