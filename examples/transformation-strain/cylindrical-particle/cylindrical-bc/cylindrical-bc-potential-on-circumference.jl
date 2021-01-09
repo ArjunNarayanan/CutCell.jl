@@ -139,7 +139,7 @@ function solve_for_displacement(
 )
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition = CutCell.coherent_interface_condition(
+    interfacecondition = CutCell.incoherent_interface_condition(
         basis,
         interfacequads,
         stiffness,
@@ -169,7 +169,7 @@ function solve_for_displacement(
         cellquads,
         cutmesh,
     )
-    CutCell.assemble_coherent_interface_transformation_rhs!(
+    CutCell.assemble_incoherent_interface_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,
@@ -254,7 +254,7 @@ penaltyfactor = 1e2
 
 polyorder = 3
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 33
+nelmts = 21
 center = [width / 2, width / 2]
 inradius = width / 4
 outradius = width
@@ -389,10 +389,10 @@ potentialdifference = diffG0 .+ productpotential - parentpotential
 
 folderpath = "examples/transformation-strain/cylindrical-particle/cylindrical-bc/"
 
-# using PyPlot
+using PyPlot
 # fig,ax = PyPlot.subplots()
 # ax.plot(angularposition,productpressure,label="product")
-# ax.plot(angularposition,parentpressure,label="parent")
+# # ax.plot(angularposition,parentpressure,label="parent")
 # ax.grid()
 # ax.set_title("Pressure along interface")
 # ax.set_ylabel("Pressure (Pa)")
@@ -445,4 +445,5 @@ folderpath = "examples/transformation-strain/cylindrical-particle/cylindrical-bc
 # ax.set_ylabel("Potential difference (J/Kg)")
 # ax.set_title("Potential difference along interface circumference")
 # fig.tight_layout()
+# fig
 # fig.savefig(folderpath*"potential-difference.png")
