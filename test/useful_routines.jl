@@ -40,12 +40,12 @@ function circle_distance_function(coords, center, radius)
     return distance
 end
 
-function corner_distance_function(x::V,xc) where {V<:AbstractVector}
+function corner_distance_function(x::V, xc) where {V<:AbstractVector}
     v = xc - x
     if all(x .<= xc)
         minimum(v)
-    elseif all(x.> xc)
-        return -sqrt(v'*v)
+    elseif all(x .> xc)
+        return -sqrt(v' * v)
     elseif x[2] > xc[2]
         return v[2]
     else
@@ -53,15 +53,23 @@ function corner_distance_function(x::V,xc) where {V<:AbstractVector}
     end
 end
 
-function corner_distance_function(points::M,xc) where {M<:AbstractMatrix}
-    return vec(mapslices(x->corner_distance_function(x,xc),points,dims=1))
+function corner_distance_function(points::M, xc) where {M<:AbstractMatrix}
+    return vec(
+        mapslices(x -> corner_distance_function(x, xc), points, dims = 1),
+    )
 end
 
 function normal_from_angle(theta)
     return [cosd(theta), sind(theta)]
 end
 
-function add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
+function add_cell_error_squared!(
+    err,
+    interpolater,
+    exactsolution,
+    cellmap,
+    quad,
+)
     detjac = CutCell.determinant_jacobian(cellmap)
     for (p, w) in quad
         numsol = interpolater(p)
@@ -70,11 +78,35 @@ function add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad
     end
 end
 
+function add_interface_error_squared!(
+    err,
+    interpolater,
+    exactsolution,
+    cellmap,
+    quad,
+    facescale,
+)
+    @assert length(quad) == length(facescale)
+    for (i, (p, w)) in enumerate(quad)
+        numsol = interpolater(p)
+        exsol = exactsolution(cellmap(p))
+        err .+= (numsol - exsol) .^ 2 * facescale[i] * w
+    end
+end
+
 function add_cell_norm_squared!(vals, func, cellmap, quad)
     detjac = CutCell.determinant_jacobian(cellmap)
     for (p, w) in quad
         v = func(cellmap(p))
         vals .+= v .^ 2 * detjac * w
+    end
+end
+
+function add_interface_norm_squared!(vals, func, cellmap, quad, facescale)
+    @assert length(quad) == length(facescale)
+    for (i, (p, w)) in enumerate(quad)
+        v = func(cellmap(p))
+        vals .+= v .^ 2 * facescale[i] * w
     end
 end
 
@@ -97,12 +129,71 @@ function integral_norm_on_cut_mesh(func, cellquads, cutmesh, ndofs)
     return sqrt.(vals)
 end
 
-function integral_norm_on_uniform_mesh(func,quad,cellmaps,ndofs)
+function integral_norm_on_uniform_mesh(func, quad, cellmaps, ndofs)
     vals = zeros(ndofs)
     for cellmap in cellmaps
-        add_cell_norm_squared!(vals,func,cellmap,quad)
+        add_cell_norm_squared!(vals, func, cellmap, quad)
     end
     return sqrt.(vals)
+end
+
+function integral_norm_on_interface(
+    func,
+    interfacequads,
+    levelsetsign,
+    cutmesh,
+    ndofs,
+)
+    vals = zeros(ndofs)
+    cellsign = CutCell.cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+    for cellid in cellids
+        cellmap = CutCell.cell_map(cutmesh, cellid)
+        quad = interfacequads[levelsetsign, cellid]
+        normals = CutCell.interface_normals(interfacequads, cellid)
+        facescale = CutCell.scale_area(cellmap, normals)
+
+        add_interface_norm_squared!(vals, func, cellmap, quad, facescale)
+
+    end
+    return sqrt.(vals)
+end
+
+function interface_L2_error(
+    nodalsolutions,
+    exactsolution,
+    levelsetsign,
+    basis,
+    interfacequads,
+    cutmesh,
+)
+    ndofs = size(nodalsolutions)[1]
+    err = zeros(ndofs)
+    interpolater = InterpolatingPolynomial(ndofs, basis)
+
+    cellsign = CutCell.cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+
+    for cellid in cellids
+        quad = interfacequads[levelsetsign, cellid]
+        normals = CutCell.interface_normals(interfacequads, cellid)
+        cellmap = CutCell.cell_map(cutmesh, cellid)
+        facescale = CutCell.scale_area(cellmap, normals)
+
+        nodeids = CutCell.nodal_connectivity(cutmesh, levelsetsign, cellid)
+        elementsolution = nodalsolutions[:, nodeids]
+        update!(interpolater, elementsolution)
+
+        add_interface_error_squared!(
+            err,
+            interpolater,
+            exactsolution,
+            cellmap,
+            quad,
+            facescale,
+        )
+    end
+    return sqrt.(err)
 end
 
 function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
@@ -119,7 +210,13 @@ function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
             elementsolution = nodalsolutions[:, nodeids]
             update!(interpolater, elementsolution)
             quad = cellquads[1, cellid]
-            add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
+            add_cell_error_squared!(
+                err,
+                interpolater,
+                exactsolution,
+                cellmap,
+                quad,
+            )
         end
         if s == -1 || s == 0
             cellmap = CutCell.cell_map(cutmesh, -1, cellid)
@@ -127,25 +224,31 @@ function mesh_L2_error(nodalsolutions, exactsolution, basis, cellquads, cutmesh)
             elementsolution = nodalsolutions[:, nodeids]
             update!(interpolater, elementsolution)
             quad = cellquads[-1, cellid]
-            add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
+            add_cell_error_squared!(
+                err,
+                interpolater,
+                exactsolution,
+                cellmap,
+                quad,
+            )
         end
     end
     return sqrt.(err)
 end
 
 function uniform_mesh_L2_error(nodalsolutions, exactsolution, basis, quad, mesh)
-    ndofs,nnodes = size(nodalsolutions)
+    ndofs, nnodes = size(nodalsolutions)
     err = zeros(ndofs)
-    interpolater = InterpolatingPolynomial(ndofs,basis)
+    interpolater = InterpolatingPolynomial(ndofs, basis)
     ncells = CutCell.number_of_cells(mesh)
     nodalconnectivity = CutCell.nodal_connectivity(mesh)
 
     for cellid = 1:ncells
-        cellmap = CutCell.cell_map(mesh,cellid)
-        nodeids = nodalconnectivity[:,cellid]
-        elementsolution = nodalsolutions[:,nodeids]
-        update!(interpolater,elementsolution)
-        add_cell_error_squared!(err,interpolater,exactsolution,cellmap,quad)
+        cellmap = CutCell.cell_map(mesh, cellid)
+        nodeids = nodalconnectivity[:, cellid]
+        elementsolution = nodalsolutions[:, nodeids]
+        update!(interpolater, elementsolution)
+        add_cell_error_squared!(err, interpolater, exactsolution, cellmap, quad)
     end
     return sqrt.(err)
 end
@@ -155,9 +258,9 @@ function required_quadrature_order(polyorder)
 end
 
 function mean(v)
-    return sum(v)/length(v)
+    return sum(v) / length(v)
 end
 
-function convergence_rate(dx,err)
+function convergence_rate(dx, err)
     return diff(log.(err)) ./ diff(log.(dx))
 end
