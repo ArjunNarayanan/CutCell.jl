@@ -173,6 +173,27 @@ function seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
     return refseedpoints, spatialseedpoints, seedcellids
 end
 
+function collect_interface_normals(interfacequads,cutmesh)
+    cellsign = cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+
+    totalnumqps = sum([length(interfacequads[1,cellid]) for cellid in cellids])
+
+    interfacenormals = zeros(2,totalnumqps)
+    start = 1
+
+    for cellid in cellids
+        normals = interface_normals(interfacequads,cellid)
+        numqps = size(normals)[2]
+
+        stop = start + numqps - 1
+
+        interfacenormals[:,start:stop] = normals
+        start = stop + 1
+    end
+    return interfacenormals
+end
+
 function closest_reference_points_on_zero_levelset(
     querypoints,
     refseedpoints,

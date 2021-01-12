@@ -1,25 +1,16 @@
-# function pressure(stressvector)
-#     return -(stressvector[1] + stressvector[2] + stressvector[4]) / 3.0
-# end
-# function deviatoric_stress(stressvector)
-#     p = pressure(stressvector)
-#     return deviatoric_stress(stressvector, p)
-# end
-
-
 function pressure_at_points(stresses)
-    return -1.0/3.0*(stresses[1,:] + stresses[2,:] + stresses[4,:])
+    return -1.0 / 3.0 * (stresses[1, :] + stresses[2, :] + stresses[4, :])
 end
 
 function deviatoric_stress(stressvector, p)
     return stressvector + p * [1.0, 1.0, 0.0, 1.0]
 end
 
-function deviatoric_stress_at_points(stresses,p)
+function deviatoric_stress_at_points(stresses, p)
     devstress = copy(stresses)
-    devstress[1,:] .+= p
-    devstress[2,:] .+= p
-    devstress[4,:] .+= p
+    devstress[1, :] .+= p
+    devstress[2, :] .+= p
+    devstress[4, :] .+= p
 
     return devstress
 end
@@ -43,7 +34,9 @@ function product_stress(
     symmdispgrad = NK * celldisp
 
     inplanestress = (stiffness[+1] * symmdispgrad) - transfstress
-    s33 = lambda * (symmdispgrad[1] + symmdispgrad[2]) - (lambda + 2mu / 3) * theta0
+    s33 =
+        lambda * (symmdispgrad[1] + symmdispgrad[2]) -
+        (lambda + 2mu / 3) * theta0
 
     stress = vcat(inplanestress, s33)
 
@@ -87,8 +80,41 @@ function product_stress_at_reference_points(
     return productstress
 end
 
+function displacement_at_reference_points(
+    refpoints,
+    refcellids,
+    levelsetsign,
+    basis,
+    nodaldisplacement,
+    cutmesh,
+)
 
-function parent_stress(point, basis, stiffness, celldisp, jac, vectosymmconverter)
+    dim,numpts = size(refpoints)
+    displacement = zeros(2,numpts)
+
+    for i = 1:numpts
+        cellid = refcellids[i]
+        nodeids = CutCell.nodal_connectivity(cutmesh,levelsetsign,cellid)
+        celldofs = CutCell.element_dofs(nodeids,dim)
+        celldisp = nodaldisplacement[celldofs]
+
+        vals = basis(refpoints[:,i])
+        NI = interpolation_matrix(vals,dim)
+
+        displacement[:,i] = NI*celldisp
+    end
+    
+    return displacement
+end
+
+function parent_stress(
+    point,
+    basis,
+    stiffness,
+    celldisp,
+    jac,
+    vectosymmconverter,
+)
     dim = dimension(basis)
     lambda, mu = lame_coefficients(stiffness, -1)
 
@@ -186,8 +212,14 @@ function update_parent_stress!(
     for qpidx = 1:nump
         p = points[:, qpidx]
 
-        numericalstress =
-            parent_stress(p, basis, stiffness, celldisp, jac, vectosymmconverter)
+        numericalstress = parent_stress(
+            p,
+            basis,
+            stiffness,
+            celldisp,
+            jac,
+            vectosymmconverter,
+        )
 
         append!(qpstress, numericalstress)
     end

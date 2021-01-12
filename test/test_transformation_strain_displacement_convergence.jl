@@ -365,43 +365,43 @@ u2rate = convergence_rate(dx,u2err)
 
 
 
-center = [width/2, width/2]
-inradius = width / 4
-outradius = width
-
-powers = [2,3,4,5]
-nelmts = [2^p + 1 for p in powers]
-
-err = [
-    interface_displacement_error(
-        width,
-        center,
-        inradius,
-        outradius,
-        stiffness,
-        theta0,
-        ne,
-        polyorder,
-        numqp,
-        penaltyfactor,
-    ) for ne in nelmts
-]
-
-perr = [er[1] for er in err]
-nerr = [er[2] for er in err]
-
-dx = 1.0 ./ nelmts
-pu1err = [er[1] for er in perr]
-pu2err = [er[2] for er in perr]
-
-pu1rate = convergence_rate(dx,pu1err)
-pu2rate = convergence_rate(dx,pu2err)
-
-nu1err = [er[1] for er in nerr]
-nu2err = [er[2] for er in nerr]
-
-nu1rate = convergence_rate(dx,nu1err)
-nu2rate = convergence_rate(dx,nu2err)
+# center = [width/2, width/2]
+# inradius = width / 4
+# outradius = width
+#
+# powers = [2,3,4,5]
+# nelmts = [2^p + 1 for p in powers]
+#
+# err = [
+#     interface_displacement_error(
+#         width,
+#         center,
+#         inradius,
+#         outradius,
+#         stiffness,
+#         theta0,
+#         ne,
+#         polyorder,
+#         numqp,
+#         penaltyfactor,
+#     ) for ne in nelmts
+# ]
+#
+# perr = [er[1] for er in err]
+# nerr = [er[2] for er in err]
+#
+# dx = 1.0 ./ nelmts
+# pu1err = [er[1] for er in perr]
+# pu2err = [er[2] for er in perr]
+#
+# pu1rate = convergence_rate(dx,pu1err)
+# pu2rate = convergence_rate(dx,pu2err)
+#
+# nu1err = [er[1] for er in nerr]
+# nu2err = [er[2] for er in nerr]
+#
+# nu1rate = convergence_rate(dx,nu1err)
+# nu2rate = convergence_rate(dx,nu2err)
 
 #
 # @test allapprox(u1rate,repeat([3.0],length(u1rate)),0.1)
