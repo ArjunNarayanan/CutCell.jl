@@ -313,12 +313,12 @@ using PyPlot
 
 
 
-fig,ax = PyPlot.subplots()
-ax.plot(angularposition,potentialdifference)
-ax.grid()
-ax.set_xlabel("Angular position (deg)")
-ax.set_ylabel("Potential difference (J/Kg)")
-ax.set_title("Potential difference along interface circumference")
-fig.tight_layout()
-fig
+# fig,ax = PyPlot.subplots()
+# ax.plot(angularposition,potentialdifference)
+# ax.grid()
+# ax.set_xlabel("Angular position (deg)")
+# ax.set_ylabel("Potential difference (J/Kg)")
+# ax.set_title("Potential difference along interface circumference")
+# fig.tight_layout()
+# fig
 # fig.savefig("potential-difference.png")

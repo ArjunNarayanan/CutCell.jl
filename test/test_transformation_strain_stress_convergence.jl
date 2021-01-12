@@ -46,7 +46,16 @@ struct AnalyticalSolution
     lc::Any
     mc::Any
     theta0::Any
-    function AnalyticalSolution(inradius, outradius, center, ls, ms, lc, mc, theta0)
+    function AnalyticalSolution(
+        inradius,
+        outradius,
+        center,
+        ls,
+        ms,
+        lc,
+        mc,
+        theta0,
+    )
         a = analytical_coefficient_matrix(inradius, outradius, ls, ms, lc, mc)
         r = analytical_coefficient_rhs(ls, ms, theta0)
         coeffs = a \ r
@@ -90,11 +99,13 @@ function (A::AnalyticalSolution)(x)
 end
 
 function shell_radial_stress(ls, ms, theta0, A1, A2, r)
-    return (ls + 2ms) * (A1 - A2 / r^2) + ls * (A1 + A2 / r^2) - (ls + 2ms / 3) * theta0
+    return (ls + 2ms) * (A1 - A2 / r^2) + ls * (A1 + A2 / r^2) -
+           (ls + 2ms / 3) * theta0
 end
 
 function shell_circumferential_stress(ls, ms, theta0, A1, A2, r)
-    return ls * (A1 - A2 / r^2) + (ls + 2ms) * (A1 + A2 / r^2) - (ls + 2ms / 3) * theta0
+    return ls * (A1 - A2 / r^2) + (ls + 2ms) * (A1 + A2 / r^2) -
+           (ls + 2ms / 3) * theta0
 end
 
 function shell_out_of_plane_stress(ls, ms, A1, theta0)
@@ -175,11 +186,47 @@ function update_core_stress_error!(
     dim = CutCell.dimension(basis)
     lambda, mu = CutCell.lame_coefficients(stiffness, -1)
     for (p, w) in quad
-        numericalstress =
-            CutCell.parent_stress(p, basis, stiffness, celldisp, jac, vectosymmconverter)
+        numericalstress = CutCell.parent_stress(
+            p,
+            basis,
+            stiffness,
+            celldisp,
+            jac,
+            vectosymmconverter,
+        )
         exactstress = core_stress(analyticalsolution)
 
         err .+= (numericalstress - exactstress) .^ 2 * detjac * w
+    end
+end
+
+function update_interface_core_stress_error!(
+    err,
+    basis,
+    stiffness,
+    celldisp,
+    quad,
+    jac,
+    facescale,
+    vectosymmconverter,
+    analyticalsolution,
+)
+
+    @assert length(facescale) == length(quad)
+    dim = CutCell.dimension(basis)
+    lambda, mu = CutCell.lame_coefficients(stiffness, -1)
+    for (idx, (p, w)) in enumerate(quad)
+        numericalstress = CutCell.parent_stress(
+            p,
+            basis,
+            stiffness,
+            celldisp,
+            jac,
+            vectosymmconverter,
+        )
+        exactstress = core_stress(analyticalsolution)
+
+        err .+= (numericalstress - exactstress) .^ 2 * facescale[idx] * w
     end
 end
 
@@ -216,6 +263,41 @@ function update_shell_stress_error!(
         err .+= (numericalstress - exactstress) .^ 2 * detjac * w
     end
 end
+
+function update_interface_shell_stress_error!(
+    err,
+    basis,
+    stiffness,
+    transfstress,
+    celldisp,
+    quad,
+    jac,
+    facescale,
+    cellmap,
+    vectosymmconverter,
+    analyticalsolution,
+)
+    @assert length(facescale) == length(quad)
+    dim = CutCell.dimension(basis)
+    lambda, mu = CutCell.lame_coefficients(stiffness, +1)
+    theta0 = analyticalsolution.theta0
+    for (idx, (p, w)) in enumerate(quad)
+        numericalstress = CutCell.product_stress(
+            p,
+            basis,
+            stiffness,
+            transfstress,
+            theta0,
+            celldisp,
+            jac,
+            vectosymmconverter,
+        )
+        exactstress = shell_stress(analyticalsolution, cellmap(p))
+
+        err .+= (numericalstress - exactstress) .^ 2 * facescale[idx] * w
+    end
+end
+
 
 function compute_stress_error(
     displacement,
@@ -290,6 +372,88 @@ function compute_stress_error(
     return sqrt.(err) ./ den
 end
 
+function compute_interface_stress_error(
+    displacement,
+    basis,
+    interfacequads,
+    stiffness,
+    transfstress,
+    cutmesh,
+    analyticalsolution,
+)
+
+    perr = zeros(4)
+    nerr = zeros(4)
+
+    cellsign = CutCell.cell_sign(cutmesh)
+    cellids = findall(cellsign .== 0)
+    dim = CutCell.dimension(cutmesh)
+    jac = CutCell.jacobian(cutmesh)
+    vectosymmconverter = CutCell.vector_to_symmetric_matrix_converter()
+
+    for cellid in cellids
+        cellmap = CutCell.cell_map(cutmesh, cellid)
+        normals = CutCell.interface_normals(interfacequads, cellid)
+        facescale = CutCell.scale_area(cellmap, normals)
+
+        nnodeids = CutCell.nodal_connectivity(cutmesh, -1, cellid)
+        celldofs = CutCell.element_dofs(nnodeids, dim)
+        celldisp = displacement[celldofs]
+        nquad = interfacequads[-1, cellid]
+
+        update_interface_core_stress_error!(
+            nerr,
+            basis,
+            stiffness,
+            celldisp,
+            nquad,
+            jac,
+            facescale,
+            vectosymmconverter,
+            analyticalsolution,
+        )
+
+        pnodeids = CutCell.nodal_connectivity(cutmesh, +1, cellid)
+        celldofs = CutCell.element_dofs(pnodeids, dim)
+        celldisp = displacement[celldofs]
+        pquad = interfacequads[+1, cellid]
+
+        update_interface_shell_stress_error!(
+            perr,
+            basis,
+            stiffness,
+            transfstress,
+            celldisp,
+            pquad,
+            jac,
+            facescale,
+            cellmap,
+            vectosymmconverter,
+            analyticalsolution,
+        )
+    end
+
+    nden = integral_norm_on_interface(
+        x -> core_stress(analyticalsolution),
+        interfacequads,
+        -1,
+        cutmesh,
+        4,
+    )
+    pden = integral_norm_on_interface(
+        x -> shell_stress(analyticalsolution, x),
+        interfacequads,
+        +1,
+        cutmesh,
+        4,
+    )
+
+    return perr ./ pden, nerr ./ nden
+
+end
+
+
+
 function solve_and_compute_stress_error(
     width,
     center,
@@ -305,10 +469,19 @@ function solve_and_compute_stress_error(
 
     lambda1, mu1 = CutCell.lame_coefficients(stiffness, +1)
     lambda2, mu2 = CutCell.lame_coefficients(stiffness, -1)
-    transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
+    transfstress =
+        CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 
-    analyticalsolution =
-        AnalyticalSolution(inradius, outradius, center, lambda1, mu1, lambda2, mu2, theta0)
+    analyticalsolution = AnalyticalSolution(
+        inradius,
+        outradius,
+        center,
+        lambda1,
+        mu1,
+        lambda2,
+        mu2,
+        theta0,
+    )
 
     dx = width / nelmts
     meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
@@ -324,9 +497,12 @@ function solve_and_compute_stress_error(
     )
 
     cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
-    cellquads = CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-    interfacequads = CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
-    facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    cellquads =
+        CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    interfacequads =
+        CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    facequads =
+        CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
     interfacecondition = CutCell.coherent_interface_condition(
@@ -352,7 +528,11 @@ function solve_and_compute_stress_error(
     sysrhs = CutCell.SystemRHS()
 
     CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
-    CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, cutmesh)
+    CutCell.assemble_interface_condition!(
+        sysmatrix,
+        interfacecondition,
+        cutmesh,
+    )
     CutCell.assemble_bulk_transformation_linear_form!(
         sysrhs,
         transfstress,
@@ -367,7 +547,12 @@ function solve_and_compute_stress_error(
         interfacequads,
         cutmesh,
     )
-    CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, displacementbc, cutmesh)
+    CutCell.assemble_penalty_displacement_bc!(
+        sysmatrix,
+        sysrhs,
+        displacementbc,
+        cutmesh,
+    )
     CutCell.assemble_penalty_displacement_transformation_rhs!(
         sysrhs,
         transfstress,
@@ -394,6 +579,133 @@ function solve_and_compute_stress_error(
     )
 
     return stresserr
+end
+
+function solve_and_compute_interface_stress_error(
+    width,
+    center,
+    inradius,
+    outradius,
+    stiffness,
+    theta0,
+    nelmts,
+    polyorder,
+    numqp,
+    penaltyfactor,
+)
+
+    lambda1, mu1 = CutCell.lame_coefficients(stiffness, +1)
+    lambda2, mu2 = CutCell.lame_coefficients(stiffness, -1)
+    transfstress =
+        CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
+
+    analyticalsolution = AnalyticalSolution(
+        inradius,
+        outradius,
+        center,
+        lambda1,
+        mu1,
+        lambda2,
+        mu2,
+        theta0,
+    )
+
+    dx = width / nelmts
+    meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
+    penalty = penaltyfactor / dx * meanmoduli
+
+
+    basis = TensorProductBasis(2, polyorder)
+    mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
+    levelset = InterpolatingPolynomial(1, basis)
+    levelsetcoeffs = CutCell.levelset_coefficients(
+        x -> -circle_distance_function(x, center, inradius),
+        mesh,
+    )
+
+    cutmesh = CutCell.CutMesh(levelset, levelsetcoeffs, mesh)
+    cellquads =
+        CutCell.CellQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    interfacequads =
+        CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+    facequads =
+        CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
+
+    bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
+    interfacecondition = CutCell.coherent_interface_condition(
+        basis,
+        interfacequads,
+        stiffness,
+        cutmesh,
+        penalty,
+    )
+
+    displacementbc = CutCell.DisplacementCondition(
+        analyticalsolution,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        x -> onboundary(x, width, width),
+        penalty,
+    )
+
+
+    sysmatrix = CutCell.SystemMatrix()
+    sysrhs = CutCell.SystemRHS()
+
+    CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+    CutCell.assemble_interface_condition!(
+        sysmatrix,
+        interfacecondition,
+        cutmesh,
+    )
+    CutCell.assemble_bulk_transformation_linear_form!(
+        sysrhs,
+        transfstress,
+        basis,
+        cellquads,
+        cutmesh,
+    )
+    CutCell.assemble_coherent_interface_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        interfacequads,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_bc!(
+        sysmatrix,
+        sysrhs,
+        displacementbc,
+        cutmesh,
+    )
+    CutCell.assemble_penalty_displacement_transformation_rhs!(
+        sysrhs,
+        transfstress,
+        basis,
+        facequads,
+        cutmesh,
+        x -> onboundary(x, width, width),
+    )
+
+
+    matrix = CutCell.make_sparse(sysmatrix, cutmesh)
+    rhs = CutCell.rhs(sysrhs, cutmesh)
+
+    sol = matrix \ rhs
+
+    perr, nerr = compute_interface_stress_error(
+        sol,
+        basis,
+        interfacequads,
+        stiffness,
+        transfstress,
+        cutmesh,
+        analyticalsolution,
+    )
+
+    return perr, nerr
 end
 
 function mean(v)
@@ -424,7 +736,7 @@ polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 penaltyfactor = 1e2
 
-powers = [3, 4, 5,]
+powers = [3, 4, 5]
 nelmts = [2^p + 1 for p in powers]
 dx = 1.0 ./ nelmts
 
@@ -457,3 +769,72 @@ s33rate = convergence_rate(dx, s33err)
 @test allapprox(s22rate, repeat([2.0], length(s11rate)), 0.1)
 @test allapprox(s12rate, repeat([2.0], length(s11rate)), 0.1)
 @test allapprox(s33rate, repeat([2.0], length(s11rate)), 0.1)
+
+
+
+# K1, K2 = 247.0, 192.0
+# mu1, mu2 = 126.0, 87.0
+# lambda1 = lame_lambda(K1, mu1)
+# lambda2 = lame_lambda(K2, mu2)
+#
+# stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
+#
+# theta0 = -0.067
+#
+# width = 1.0
+#
+# center = [width / 2, width / 2]
+# inradius = width / 4
+# outradius = width
+#
+# polyorder = 2
+# numqp = required_quadrature_order(polyorder) + 2
+# penaltyfactor = 1e2
+#
+# powers = [2, 3, 4, 5]
+# nelmts = [2^p + 1 for p in powers]
+# dx = 1.0 ./ nelmts
+#
+#
+# stresserr = [
+#     solve_and_compute_interface_stress_error(
+#         width,
+#         center,
+#         inradius,
+#         outradius,
+#         stiffness,
+#         theta0,
+#         ne,
+#         polyorder,
+#         numqp,
+#         penaltyfactor,
+#     ) for ne in nelmts
+# ]
+#
+# perr = [st[1] for st in stresserr]
+# nerr = [st[2] for st in stresserr]
+#
+# ps11err = [st[1] for st in perr]
+# ps22err = [st[2] for st in perr]
+# ps12err = [st[3] for st in perr]
+# ps33err = [st[4] for st in perr]
+#
+# ns11err = [st[1] for st in nerr]
+# ns22err = [st[2] for st in nerr]
+# ns12err = [st[3] for st in nerr]
+# ns33err = [st[4] for st in nerr]
+#
+# ps11rate = convergence_rate(dx, ps11err)
+# ps22rate = convergence_rate(dx, ps22err)
+# ps12rate = convergence_rate(dx, ps12err)
+# ps33rate = convergence_rate(dx, ps33err)
+#
+# ns11rate = convergence_rate(dx, ns11err)
+# ns22rate = convergence_rate(dx, ns22err)
+# ns12rate = convergence_rate(dx, ns12err)
+# ns33rate = convergence_rate(dx, ns33err)
+
+# @test allapprox(s11rate, repeat([2.0], length(s11rate)), 0.1)
+# @test allapprox(s22rate, repeat([2.0], length(s11rate)), 0.1)
+# @test allapprox(s12rate, repeat([2.0], length(s11rate)), 0.1)
+# @test allapprox(s33rate, repeat([2.0], length(s11rate)), 0.1)
