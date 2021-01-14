@@ -19,11 +19,25 @@ function deviatoric_stress_at_points(stresses, p)
     return devstress
 end
 
+function traction_force(stressvector, normal)
+    return [
+        stressvector[1] * normal[1] + stressvector[3] * normal[2],
+        stressvector[3] * normal[1] + stressvector[2] * normal[2],
+    ]
+end
+
+function traction_force_at_points(stresses, normals)
+    npts = size(stresses)[2]
+    @assert size(normals)[2] == npts
+
+    return hcat(
+        [traction_force(stresses[:, i], normals[:, i]) for i = 1:npts]...,
+    )
+end
+
 function normal_stress_component(stressvector, normal)
-    snn =
-        normal[1] * stressvector[1] * normal[1] +
-        2.0 * normal[1] * stressvector[3] * normal[2] +
-        normal[2] * stressvector[2] * normal[2]
+    tn = traction_force(stressvector,normal)
+    return dot(stressvector,normal)
 end
 
 function normal_stress_component_over_points(stresses,normals)
