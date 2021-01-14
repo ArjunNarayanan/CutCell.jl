@@ -14,29 +14,16 @@ function lame_lambda(k, m)
     return k - 2m / 3
 end
 
-function displacement(alpha, x)
-    u1 = alpha * x[2] * sin(pi * x[1])
-    u2 = alpha * (x[1]^3 + cos(pi * x[2]))
+function displacement(x)
+    u1 = x[1]^2 + 2 * x[1] * x[2]
+    u2 = x[2]^2 + 3x[1]
     return [u1, u2]
 end
 
-function body_force(lambda, mu, alpha, x)
-    b1 = alpha * (lambda + 2mu) * pi^2 * x[2] * sin(pi * x[1])
-    b2 =
-        -alpha * (6mu * x[1] + (lambda + mu) * pi * cos(pi * x[1])) +
-        alpha * (lambda + 2mu) * pi^2 * cos(pi * x[2])
+function body_force(lambda, mu)
+    b1 = -2 * (lambda + 2mu)
+    b2 = -(4lambda + 6mu)
     return [b1, b2]
-end
-
-function stress_field(lambda, mu, alpha, x)
-    s11 =
-        (lambda + 2mu) * alpha * pi * x[2] * cos(pi * x[1]) -
-        lambda * alpha * pi * sin(pi * x[2])
-    s22 =
-        -(lambda + 2mu) * alpha * pi * sin(pi * x[2]) +
-        lambda * alpha * pi * x[2] * cos(pi * x[1])
-    s12 = alpha * mu * (3x[1]^2 + sin(pi * x[1]))
-    return [s11, s22, s12]
 end
 
 function onboundary(x, L, W)
@@ -68,7 +55,7 @@ function solve_for_displacement(
         penalty,
     )
     displacementbc = CutCell.DisplacementCondition(
-        x -> displacement(alpha, x),
+        x -> displacement(x),
         basis,
         facequads,
         stiffness,
@@ -88,7 +75,7 @@ function solve_for_displacement(
     )
     CutCell.assemble_body_force_linear_form!(
         sysrhs,
-        x -> body_force(lambda, mu, alpha, x),
+        x -> body_force(lambda, mu),
         basis,
         cellquads,
         cutmesh,
@@ -120,8 +107,9 @@ function spatial_closest_points(refclosestpoints, refclosestcellids, mesh)
     return spclosestpoints
 end
 
-K1, K2 = 247.0, 192.0    # Pa
-mu1, mu2 = 126.0, 86.0   # Pa
+
+K1, K2 = 247.0, 247.0    # Pa
+mu1, mu2 = 126.0, 126.0   # Pa
 lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
@@ -137,8 +125,9 @@ polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
 nelmts = 3
 delta = 0.01
-interfacepoint = [1/3+delta, 0.0]
-interfacenormal = [1.0, 0.0]
+interfacepoint = [1/3+delta, 1/3]
+interfaceangle = 45
+interfacenormal = [cosd(interfaceangle),sind(interfaceangle)]
 
 dx = width / nelmts
 meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
@@ -177,25 +166,6 @@ refseedpoints, spatialseedpoints, seedcellids =
     CutCell.seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
 interfacenormals = CutCell.collect_interface_normals(interfacequads,cutmesh)
 
-# nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
-# tol = 1e-8
-# boundingradius = 3.0
-# refclosestpoints, refclosestcellids, refgradients =
-#     CutCell.closest_reference_points_on_zero_levelset(
-#         nodalcoordinates,
-#         refseedpoints,
-#         spatialseedpoints,
-#         seedcellids,
-#         levelset,
-#         levelsetcoeffs,
-#         mesh,
-#         tol,
-#         boundingradius,
-#     )
-
-# spclosestpoints =
-#     spatial_closest_points(refclosestpoints, refclosestcellids, cutmesh)
-
 spatialpoints = spatialseedpoints
 referencepoints = refseedpoints
 referencecellids = seedcellids
@@ -204,9 +174,8 @@ sortidx = sortperm(spatialpoints[2, :])
 spatialpoints = spatialpoints[:, sortidx]
 referencepoints = referencepoints[:, sortidx]
 referencecellids = referencecellids[sortidx]
-interfacenormals = interfacenormals[:, sortidx]
-
 spycoords = spatialpoints[2, :]
+interfacenormals = interfacenormals[:,sortidx]
 
 productdisplacement = CutCell.displacement_at_reference_points(
     referencepoints,
@@ -228,7 +197,7 @@ parentdisplacement = CutCell.displacement_at_reference_points(
 
 exactdisplacement = hcat(
     [
-        displacement(displacementscale, spatialpoints[:, i]) for
+        displacement(spatialpoints[:, i]) for
         i = 1:size(spatialpoints)[2]
     ]...,
 )
@@ -265,8 +234,9 @@ parentstress = CutCell.parent_stress_at_reference_points(
     nodaldisplacement,
     cutmesh,
 )
+#
+# exactstress = hcat([stress_field(lambda1,mu1,displacementscale,spatialpoints[:,i]) for i = 1:size(spatialpoints)[2]]...)
 
-exactstress = hcat([stress_field(lambda1,mu1,displacementscale,spatialpoints[:,i]) for i = 1:size(spatialpoints)[2]]...)
 
 producttraction = CutCell.traction_force_at_points(productstress,interfacenormals)
 parenttraction = CutCell.traction_force_at_points(parentstress,interfacenormals)
@@ -284,6 +254,25 @@ ax[2].legend()
 ax[2].grid()
 fig.tight_layout()
 fig
+#
+#
+# using Statistics
+# difftraction = parenttraction - producttraction
+#
+# idx = findall(difftraction[1,:] .> 3.0)
+# oscillating_cells = referencecellids[idx]
+#
+# fig, ax = PyPlot.subplots(2, 1)
+# ax[1].plot(spycoords, difftraction[1, :])
+# ax[1].set_title("diff t1")
+# ax[1].legend()
+# ax[1].grid()
+# ax[2].plot(spycoords, difftraction[2, :])
+# ax[2].set_title("diff t2")
+# ax[2].legend()
+# ax[2].grid()
+# fig.tight_layout()
+# fig
 
 
 
@@ -307,7 +296,7 @@ fig
 # ax[3].set_title("S12")
 # ax[3].legend()
 # ax[3].grid()
-# ax[3].set_ylim(2,2.5)
+# # ax[3].set_ylim(2,2.5)
 # fig.tight_layout()
 # fig
 

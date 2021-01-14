@@ -134,11 +134,12 @@ width = 1.0
 displacementscale = 0.01 * width
 penaltyfactor = 1e1
 
-polyorder = 3
+polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 17
-interfacepoint = [0.8, 0.0]
-interfaceangle = 40.0
+nelmts = 3
+delta = -0.05
+interfacepoint = [1/3+delta, 1/3]
+interfaceangle = 45
 interfacenormal = [cosd(interfaceangle),sind(interfaceangle)]
 
 dx = width / nelmts
@@ -265,7 +266,30 @@ ax[2].set_title("t2")
 ax[2].legend()
 ax[2].grid()
 fig.tight_layout()
+folderpath = "examples/potential/plane/"
 fig
+# fig.savefig(folderpath*"inclined-slab-interface-traction-product.png")
+
+
+using Statistics
+difftraction = abs.(parenttraction - producttraction)
+
+idx = findall(difftraction[1,:] .> 2.0)
+oscillating_cells = referencecellids[idx]
+#
+# fig, ax = PyPlot.subplots(2, 1)
+# ax[1].plot(spycoords, difftraction[1, :])
+# ax[1].set_title("diff t1")
+# ax[1].legend()
+# ax[1].grid()
+# ax[2].plot(spycoords, difftraction[2, :])
+# ax[2].set_title("diff t2")
+# ax[2].legend()
+# ax[2].grid()
+# fig.tight_layout()
+# fig
+#
+
 
 
 # fig, ax = PyPlot.subplots(3, 1)
