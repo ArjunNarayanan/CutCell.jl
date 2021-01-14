@@ -205,28 +205,6 @@ function spatial_closest_points(refclosestpoints, refclosestcellids, mesh)
     return spclosestpoints
 end
 
-function normal_stress_component(stressvector, normal)
-    snn =
-        normal[1] * stressvector[1] * normal[1] +
-        2.0 * normal[1] * stressvector[3] * normal[2] +
-        normal[2] * stressvector[2] * normal[2]
-end
-
-function normal_stress_component_over_points(stresses,normals)
-    numstresscomponents,npts = size(stresses)
-    @assert size(normals) == (2,npts)
-
-    normalstresscomp = zeros(npts)
-    for i = 1:npts
-        normalstresscomp[i] = normal_stress_component(stresses[:,i],normals[:,i])
-    end
-    return normalstresscomp
-end
-
-function stress_inner_product_over_points(stresses)
-    return stresses[1,:].^2 + stresses[2,:].^2 + 2.0*stresses[3,:].^2 + stresses[4,:].^2
-end
-
 function angular_position(points)
     cpoints = points[1, :] + im * points[2, :]
     return rad2deg.(angle.(cpoints))

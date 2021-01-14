@@ -2,6 +2,10 @@ function pressure_at_points(stresses)
     return -1.0 / 3.0 * (stresses[1, :] + stresses[2, :] + stresses[4, :])
 end
 
+function stress_inner_product_over_points(stresses)
+    return stresses[1,:].^2 + stresses[2,:].^2 + 2.0*stresses[3,:].^2 + stresses[4,:].^2
+end
+
 function deviatoric_stress(stressvector, p)
     return stressvector + p * [1.0, 1.0, 0.0, 1.0]
 end
@@ -13,6 +17,24 @@ function deviatoric_stress_at_points(stresses, p)
     devstress[4, :] .+= p
 
     return devstress
+end
+
+function normal_stress_component(stressvector, normal)
+    snn =
+        normal[1] * stressvector[1] * normal[1] +
+        2.0 * normal[1] * stressvector[3] * normal[2] +
+        normal[2] * stressvector[2] * normal[2]
+end
+
+function normal_stress_component_over_points(stresses,normals)
+    numstresscomponents,npts = size(stresses)
+    @assert size(normals) == (2,npts)
+
+    normalstresscomp = zeros(npts)
+    for i = 1:npts
+        normalstresscomp[i] = normal_stress_component(stresses[:,i],normals[:,i])
+    end
+    return normalstresscomp
 end
 
 function product_stress(
@@ -80,6 +102,33 @@ function product_stress_at_reference_points(
     return productstress
 end
 
+function interpolate_at_reference_points(
+    refpoints,
+    refcellids,
+    levelsetsign,
+    basis,
+    nodalvalues,
+    dofspernode,
+    cutmesh,
+)
+    dim, numpts = size(refpoints)
+    interpolatedvals = zeros(dofspernode, numpts)
+
+    for i = 1:numpts
+        cellid = refcellids[i]
+        nodeids = CutCell.nodal_connectivity(cutmesh, levelsetsign, cellid)
+        celldofs = CutCell.element_dofs(nodeids, dofspernode)
+        cellvals = nodalvalues[celldofs]
+
+        vals = basis(refpoints[:, i])
+        NI = interpolation_matrix(vals, dofspernode)
+
+        interpolatedvals[:, i] = NI * cellvals
+    end
+
+    return interpolatedvals
+end
+
 function displacement_at_reference_points(
     refpoints,
     refcellids,
@@ -89,22 +138,16 @@ function displacement_at_reference_points(
     cutmesh,
 )
 
-    dim,numpts = size(refpoints)
-    displacement = zeros(2,numpts)
-
-    for i = 1:numpts
-        cellid = refcellids[i]
-        nodeids = CutCell.nodal_connectivity(cutmesh,levelsetsign,cellid)
-        celldofs = CutCell.element_dofs(nodeids,dim)
-        celldisp = nodaldisplacement[celldofs]
-
-        vals = basis(refpoints[:,i])
-        NI = interpolation_matrix(vals,dim)
-
-        displacement[:,i] = NI*celldisp
-    end
-    
-    return displacement
+    dim = dimension(basis)
+    return interpolate_at_reference_points(
+        refpoints,
+        refcellids,
+        levelsetsign,
+        basis,
+        nodaldisplacement,
+        dim,
+        cutmesh,
+    )
 end
 
 function parent_stress(
