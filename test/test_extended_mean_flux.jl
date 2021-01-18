@@ -30,7 +30,6 @@ dx = 0.1
 e11 = dx / 2.0
 e22 = -lambda / (lambda + 2mu) * e11
 dy = e22
-penalty = 1.
 stiffness = CutCell.plane_strain_voigt_hooke_matrix(lambda,mu)
 cellmap = CutCell.CellMap([0.,0.],[1.,1.])
 

@@ -36,7 +36,13 @@ function number_of_operators(interfaceoperator::InterfaceOperators)
     return interfaceoperator.numoperators
 end
 
-function interface_mass_operators(basis, interfacequads, cellmap, cellsign, penalty)
+function interface_mass_operators(
+    basis,
+    interfacequads,
+    cellmap,
+    cellsign,
+    penalty,
+)
 
     ncells = length(cellsign)
     hasinterface = cellsign .== 0
@@ -55,7 +61,9 @@ function interface_mass_operators(basis, interfacequads, cellmap, cellsign, pena
             for s2 in [+1, -1]
                 row = cell_couple_sign_to_row(s1, s2)
                 quad2 = interfacequads[s2, cellid]
-                mass = penalty * interface_mass_matrix(basis, quad1, quad2, facescale)
+                mass =
+                    penalty *
+                    interface_mass_matrix(basis, quad1, quad2, facescale)
                 operators[row, idx] = mass
             end
         end
@@ -67,7 +75,13 @@ end
 function interface_mass_operators(basis, interfacequads, cutmesh, penalty)
     cellmap = cell_map(cutmesh, 1)
     cellsign = cell_sign(cutmesh)
-    return interface_mass_operators(basis, interfacequads, cellmap, cellsign, penalty)
+    return interface_mass_operators(
+        basis,
+        interfacequads,
+        cellmap,
+        cellsign,
+        penalty,
+    )
 end
 
 function interface_incoherent_mass_operators(
@@ -112,7 +126,12 @@ function interface_incoherent_mass_operators(
     return InterfaceOperators(operators, celltooperator)
 end
 
-function interface_incoherent_mass_operators(basis, interfacequads, cutmesh, penalty)
+function interface_incoherent_mass_operators(
+    basis,
+    interfacequads,
+    cutmesh,
+    penalty,
+)
     cellmap = cell_map(cutmesh, 1)
     cellsign = cell_sign(cutmesh)
     return interface_incoherent_mass_operators(
@@ -124,7 +143,13 @@ function interface_incoherent_mass_operators(basis, interfacequads, cutmesh, pen
     )
 end
 
-function interface_traction_operators(basis, interfacequads, stiffness, cellmap, cellsign)
+function interface_traction_operators(
+    basis,
+    interfacequads,
+    stiffness,
+    cellmap,
+    cellsign,
+)
 
     ncells = length(cellsign)
     hasinterface = cellsign .== 0
@@ -160,10 +185,21 @@ end
 function interface_traction_operators(basis, interfacequads, stiffness, cutmesh)
     cellmap = cell_map(cutmesh, 1)
     cellsign = cell_sign(cutmesh)
-    return interface_traction_operators(basis, interfacequads, stiffness, cellmap, cellsign)
+    return interface_traction_operators(
+        basis,
+        interfacequads,
+        stiffness,
+        cellmap,
+        cellsign,
+    )
 end
 
-function interface_incoherent_traction_operators(basis, interfacequads, stiffness, cutmesh)
+function interface_incoherent_traction_operators(
+    basis,
+    interfacequads,
+    stiffness,
+    cutmesh,
+)
     cellsign = cell_sign(cutmesh)
     cellmap = cell_map(cutmesh, 1)
 
@@ -215,22 +251,48 @@ struct InterfaceCondition
     end
 end
 
-function coherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
+function coherent_interface_condition(
+    basis,
+    interfacequads,
+    stiffness,
+    cutmesh,
+    penalty,
+)
     tractionoperator =
         interface_traction_operators(basis, interfacequads, stiffness, cutmesh)
-    massoperator = interface_mass_operators(basis, interfacequads, cutmesh, penalty)
-    return InterfaceCondition(tractionoperator, massoperator, penalty)
-end
-
-function incoherent_interface_condition(basis, interfacequads, stiffness, cutmesh, penalty)
-    tractionoperator =
-        interface_incoherent_traction_operators(basis, interfacequads, stiffness, cutmesh)
     massoperator =
-        interface_incoherent_mass_operators(basis, interfacequads, cutmesh, penalty)
+        interface_mass_operators(basis, interfacequads, cutmesh, penalty)
     return InterfaceCondition(tractionoperator, massoperator, penalty)
 end
 
-function traction_operator(interfacecondition::InterfaceCondition, s1, s2, cellid)
+function incoherent_interface_condition(
+    basis,
+    interfacequads,
+    stiffness,
+    cutmesh,
+    penalty,
+)
+    tractionoperator = interface_incoherent_traction_operators(
+        basis,
+        interfacequads,
+        stiffness,
+        cutmesh,
+    )
+    massoperator = interface_incoherent_mass_operators(
+        basis,
+        interfacequads,
+        cutmesh,
+        penalty,
+    )
+    return InterfaceCondition(tractionoperator, massoperator, penalty)
+end
+
+function traction_operator(
+    interfacecondition::InterfaceCondition,
+    s1,
+    s2,
+    cellid,
+)
     return interfacecondition.tractionoperator[s1, s2, cellid]
 end
 
@@ -245,7 +307,14 @@ function Base.show(io::IO, interfacecondition::InterfaceCondition)
     print(io, str)
 end
 
-function coherent_traction_operator(basis, quad1, quad2, normals, stiffness, cellmap)
+function coherent_traction_operator(
+    basis,
+    quad1,
+    quad2,
+    normals,
+    stiffness,
+    cellmap,
+)
     numqp = length(quad1)
     @assert length(quad2) == size(normals)[2] == numqp
     dim = dimension(basis)
@@ -265,7 +334,9 @@ function coherent_traction_operator(basis, quad1, quad2, normals, stiffness, cel
         vals = basis(p1)
         grad = transform_gradient(gradient(basis, p2), jac)
         normal = normals[:, qpidx]
-        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        NK = sum([
+            make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim
+        ])
         N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
         NI = interpolation_matrix(vals, dim)
 
@@ -306,7 +377,9 @@ function component_traction_operator(
         component = components[:, qpidx]
         projector = component * component'
 
-        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        NK = sum([
+            make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim
+        ])
         N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
         NI = interpolation_matrix(vals, dim)
 
@@ -315,7 +388,14 @@ function component_traction_operator(
     return matrix
 end
 
-function incoherent_traction_operator(basis, quad1, quad2, normals, stiffness, cellmap)
+function incoherent_traction_operator(
+    basis,
+    quad1,
+    quad2,
+    normals,
+    stiffness,
+    cellmap,
+)
 
     components = normals
     return component_traction_operator(

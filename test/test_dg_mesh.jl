@@ -23,4 +23,18 @@ testnodalconnectivity = [1  5  9   13
                          4  8  12  16]
 @test allequal(nodalconnectivity,testnodalconnectivity)
 
+
+
+basis = TensorProductBasis(2,2)
 dgmesh = CutCell.DGMesh([0.,0.],[2.,1.],[2,2],basis)
+nodalcoordinates = CutCell.nodal_coordinates(dgmesh)
+tn1 = [0.  0.   0.  0.5  0.5  0.5  1.  1.   1.  0.  0.   0.  0.5  0.5  0.5  1.  1.  1.
+       0.  0.25 0.5 0.   0.25 0.5  0.  0.25 0.5 0.5 0.75 1.  0.5  0.75 1.   0.5 0.75 1.]
+tn2 = copy(tn1)
+tn2[1,:] .+= 1.0
+testnodalcoordinates = hcat(tn1,tn2)
+@test allapprox(nodalcoordinates,testnodalcoordinates)
+
+nodalconnectivity = CutCell.nodal_connectivity(dgmesh)
+testnodalconnectivity = reshape(1:36,9,:)
+@test allequal(nodalconnectivity,testnodalconnectivity)
