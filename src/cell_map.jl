@@ -36,7 +36,7 @@ function determinant_jacobian(C)
     return prod(jacobian(C))
 end
 
-function face_determinant_jacobian(C)
+function face_determinant_jacobian(C::CellMap)
     jac = jacobian(C)
     return [jac[1], jac[2], jac[1], jac[2]]
 end

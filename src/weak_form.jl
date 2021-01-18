@@ -92,7 +92,18 @@ function component_mass_matrix(basis, quad, component, scale)
     return matrix
 end
 
-function face_traction_operator(basis, quad, normal, stiffness, facescale, cellmap)
+function face_traction_operator(
+    basis,
+    quad1,
+    quad2,
+    normal,
+    stiffness,
+    facescale,
+    cellmap,
+)
+
+    numqp = length(quad1)
+    @assert length(quad2) == numqp
 
     dim = dimension(basis)
     @assert length(normal) == dim
@@ -104,18 +115,65 @@ function face_traction_operator(basis, quad, normal, stiffness, facescale, cellm
     N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
     jac = jacobian(cellmap)
 
-    for (p, w) in quad
-        grad = transform_gradient(gradient(basis, p), jac)
-        vals = basis(p)
+    for qpidx = 1:numqp
+        p1, w1 = quad1[qpidx]
+        p2, w2 = quad2[qpidx]
 
-        NK = zeros(3, 2nf)
-        for k = 1:dim
-            NK .+= make_row_matrix(vectosymmconverter[k], grad[:, k])
-        end
+        @assert w1 ≈ w2
+
+        vals = basis(p1)
+        grad = transform_gradient(gradient(basis, p2), jac)
+
+        NK = sum([
+            make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim
+        ])
         NI = interpolation_matrix(vals, dim)
-        matrix .+= NI' * N * stiffness * NK * facescale * w
+
+        matrix .+= NI' * N * stiffness * NK * facescale * w1
     end
     return matrix
+end
+
+function face_traction_operator(
+    basis,
+    quad,
+    normal,
+    stiffness,
+    facescale,
+    cellmap,
+)
+
+    return face_traction_operator(
+        basis,
+        quad,
+        quad,
+        normal,
+        stiffness,
+        facescale,
+        cellmap,
+    )
+    # dim = dimension(basis)
+    # @assert length(normal) == dim
+    # nf = number_of_basis_functions(basis)
+    # ndofs = dim * nf
+    # matrix = zeros(ndofs, ndofs)
+    #
+    # vectosymmconverter = vector_to_symmetric_matrix_converter()
+    # N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
+    # jac = jacobian(cellmap)
+    #
+    # for (p, w) in quad
+    #     grad = transform_gradient(gradient(basis, p), jac)
+    #     vals = basis(p)
+    #
+    #     NK = zeros(3, 2nf)
+    #     for k = 1:dim
+    #         NK .+= make_row_matrix(vectosymmconverter[k], grad[:, k])
+    #     end
+    #     NI = interpolation_matrix(vals, dim)
+    #     matrix .+= NI' * N * stiffness * NK * facescale * w
+    # end
+    # return matrix
 end
 
 function face_traction_component_operator(
@@ -144,7 +202,9 @@ function face_traction_component_operator(
         grad = transform_gradient(gradient(basis, p), jac)
         vals = basis(p)
 
-        NK = sum([make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim])
+        NK = sum([
+            make_row_matrix(vectosymmconverter[k], grad[:, k]) for k = 1:dim
+        ])
         NI = interpolation_matrix(vals, dim)
 
         matrix .+= NI' * projector * N * stiffness * NK * facescale * w

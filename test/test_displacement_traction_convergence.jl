@@ -232,7 +232,8 @@ const lambda = 1.0
 const mu = 2.0
 const alpha = 0.01
 
-numelements = [2,4,8,16,32,64]
+powers = [2,3,4]
+numelements = [2^p for p in powers]
 u1rate, u2rate = convergence(numelements,1)
 # println("Convergence of linear elements : ", u1rate, "    ", u2rate)
 @test isapprox(u1rate,2.0,atol=0.05)

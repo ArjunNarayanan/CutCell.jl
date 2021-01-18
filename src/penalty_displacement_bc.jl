@@ -73,7 +73,8 @@ function boundary_traction_operator(basis, facequads, stiffness, cutmesh, onboun
     ncells = length(cellsign)
 
     cellmap = cell_map(cutmesh, 1)
-    facedetjac = face_determinant_jacobian(cellmap)
+    jac = jacobian(cutmesh)
+    facedetjac = face_determinant_jacobian(cutmesh)
     dim = dimension(basis)
 
     refnormals = reference_face_normals()

@@ -255,7 +255,10 @@ lambda = 1.0
 mu = 2.0
 alpha = 0.01
 
-numelements = [2, 4, 8, 16, 32, 64]
+polyorder = 1
+powers = [2,3,4]
+numelements = [2^p for p in powers]
+# numelements = [2, 4, 8, 16, 32, 64]
 u1rate, u2rate = convergence(numelements, 1, lambda, mu, alpha)
 # println("Convergence of linear elements : ", u1rate, "    ", u2rate)
 @test isapprox(u1rate, 2.0, atol = 0.05)
@@ -263,6 +266,7 @@ u1rate, u2rate = convergence(numelements, 1, lambda, mu, alpha)
 stressrate = stress_convergence(numelements,1,lambda,mu,alpha)
 @test all(stressrate .>= 1.0)
 
+polyorder = 2
 u1rate, u2rate = convergence(numelements, 2, lambda, mu, alpha)
 # println("Convergence of quadratic elements : ", u1rate, "    ", u2rate)
 @test isapprox(u1rate, 3.0, atol = 0.05)
