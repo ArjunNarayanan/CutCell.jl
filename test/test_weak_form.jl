@@ -55,7 +55,8 @@ rhs = CutCell.linear_form(rhsfunc, basis, quad, cellmap)
 basis = TensorProductBasis(2, 2)
 quad = tensor_product_quadrature(2, 4)
 cellmap = CutCell.CellMap([-1, -1.0], [1.0, 1.0])
-M = CutCell.mass_matrix(basis, quad, cellmap, 2)
+detjac = CutCell.determinant_jacobian(cellmap)
+M = CutCell.mass_matrix(basis, quad, detjac, 2)
 rhsfunc(x) = [x[1]^2 + x[2]^2, 2x[1] * x[2]]
 R = CutCell.linear_form(rhsfunc, basis, quad, cellmap)
 

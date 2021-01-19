@@ -53,7 +53,7 @@ function Base.getindex(facequads::FaceQuadratures, s, faceid, cellid)
     return facequads.quads[facequads.facetoquad[phaseid, faceid, cellid]]
 end
 
-function reference_face_quadrature(facequads::FaceQuadratures)
+function uniform_face_quadratures(facequads::FaceQuadratures)
     return facequads.quads[1:facequads.nfaces]
 end
 

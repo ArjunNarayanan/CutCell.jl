@@ -46,34 +46,30 @@ function bilinear_form(basis, quad, stiffness, cellmap::CellMap)
     return bilinear_form(basis, quad, stiffness, jacobian(cellmap))
 end
 
-function mass_matrix(basis, quad, detjac::R, ndofs) where {R<:Real}
+function mass_matrix(basis, quad1, quad2, detjac, ndofs)
+    numqp = length(quad1)
+    @assert length(quad2) == numqp
     nf = number_of_basis_functions(basis)
     totaldofs = ndofs * nf
     matrix = zeros(totaldofs, totaldofs)
-    for (p, w) in quad
-        vals = basis(p)
-        N = interpolation_matrix(vals, ndofs)
-        matrix .+= N' * N * detjac * w
+    for qpidx = 1:numqp
+        p1, w1 = quad1[qpidx]
+        p2, w2 = quad2[qpidx]
+        @assert w1 ≈ w2
+
+        vals1 = basis(p1)
+        vals2 = basis(p2)
+
+        NI1 = interpolation_matrix(vals1, ndofs)
+        NI2 = interpolation_matrix(vals2, ndofs)
+
+        matrix .+= NI1' * NI2 * detjac * w1
     end
     return matrix
 end
 
-function mass_matrix(basis, quad, cellmap::CellMap, ndofs)
-    detjac = determinant_jacobian(cellmap)
-    return mass_matrix(basis, quad, detjac, ndofs)
-end
-
-function mass_matrix(basis, quad, scale::V, ndofs) where {V<:AbstractVector}
-    nf = number_of_basis_functions(basis)
-    totaldofs = ndofs * nf
-    matrix = zeros(totaldofs, totaldofs)
-    @assert length(scale) == length(quad)
-    for (idx, (p, w)) in enumerate(quad)
-        vals = basis(p)
-        N = interpolation_matrix(vals, ndofs)
-        matrix .+= N' * N * scale[idx] * w
-    end
-    return matrix
+function mass_matrix(basis, quad, detjac, ndofs)
+    return mass_matrix(basis,quad,quad,detjac,ndofs)
 end
 
 function component_mass_matrix(basis, quad, component, scale)
@@ -99,7 +95,7 @@ function face_traction_operator(
     normal,
     stiffness,
     facescale,
-    cellmap,
+    jac,
 )
 
     numqp = length(quad1)
@@ -113,7 +109,6 @@ function face_traction_operator(
 
     vectosymmconverter = vector_to_symmetric_matrix_converter()
     N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
-    jac = jacobian(cellmap)
 
     for qpidx = 1:numqp
         p1, w1 = quad1[qpidx]
@@ -152,28 +147,6 @@ function face_traction_operator(
         facescale,
         cellmap,
     )
-    # dim = dimension(basis)
-    # @assert length(normal) == dim
-    # nf = number_of_basis_functions(basis)
-    # ndofs = dim * nf
-    # matrix = zeros(ndofs, ndofs)
-    #
-    # vectosymmconverter = vector_to_symmetric_matrix_converter()
-    # N = sum([normal[k] * vectosymmconverter[k]' for k = 1:dim])
-    # jac = jacobian(cellmap)
-    #
-    # for (p, w) in quad
-    #     grad = transform_gradient(gradient(basis, p), jac)
-    #     vals = basis(p)
-    #
-    #     NK = zeros(3, 2nf)
-    #     for k = 1:dim
-    #         NK .+= make_row_matrix(vectosymmconverter[k], grad[:, k])
-    #     end
-    #     NI = interpolation_matrix(vals, dim)
-    #     matrix .+= NI' * N * stiffness * NK * facescale * w
-    # end
-    # return matrix
 end
 
 function face_traction_component_operator(

@@ -24,7 +24,7 @@ function boundary_mass_operator(basis, facequads, cutmesh, onboundary, penalty)
     facedetjac = face_determinant_jacobian(cutmesh)
     dim = dimension(basis)
 
-    refquads = reference_face_quadrature(facequads)
+    refquads = uniform_face_quadratures(facequads)
     operators = [
         penalty * mass_matrix(basis, q, detjac, dim)
         for (q, detjac) in zip(refquads, facedetjac)
@@ -72,19 +72,18 @@ function boundary_traction_operator(basis, facequads, stiffness, cutmesh, onboun
     cellsign = cell_sign(cutmesh)
     ncells = length(cellsign)
 
-    cellmap = cell_map(cutmesh, 1)
     jac = jacobian(cutmesh)
     facedetjac = face_determinant_jacobian(cutmesh)
     dim = dimension(basis)
 
     refnormals = reference_face_normals()
-    refquads = reference_face_quadrature(facequads)
+    refquads = uniform_face_quadratures(facequads)
     operators1 = [
-        face_traction_operator(basis, q, n, stiffness[+1], detjac, cellmap)
+        face_traction_operator(basis, q, n, stiffness[+1], detjac, jac)
         for (q, n, detjac) in zip(refquads, refnormals, facedetjac)
     ]
     operators2 = [
-        face_traction_operator(basis, q, n, stiffness[-1], detjac, cellmap)
+        face_traction_operator(basis, q, n, stiffness[-1], detjac, jac)
         for (q, n, detjac) in zip(refquads, refnormals, facedetjac)
     ]
 
@@ -109,7 +108,7 @@ function boundary_traction_operator(basis, facequads, stiffness, cutmesh, onboun
                             refnormals[faceid],
                             stiffness[1],
                             facedetjac[faceid],
-                            cellmap,
+                            jac,
                         )
                         push!(operators, positiveop)
                         facetooperator[1, faceid, cellid] = length(operators)
@@ -121,7 +120,7 @@ function boundary_traction_operator(basis, facequads, stiffness, cutmesh, onboun
                             refnormals[faceid],
                             stiffness[-1],
                             facedetjac[faceid],
-                            cellmap,
+                            jac,
                         )
                         push!(operators, negativeop)
                         facetooperator[2, faceid, cellid] = length(operators)
@@ -211,7 +210,7 @@ function boundary_mass_component_operator(
     facedetjac = face_determinant_jacobian(cell_map(cutmesh, 1))
     dim = dimension(basis)
 
-    refquads = reference_face_quadrature(facequads)
+    refquads = uniform_face_quadratures(facequads)
     operators = [
         penalty * component_mass_matrix(basis, q, component, detjac)
         for (q, detjac) in zip(refquads, facedetjac)
@@ -281,7 +280,7 @@ function boundary_traction_component_operator(
     dim = dimension(basis)
 
     refnormals = reference_face_normals()
-    refquads = reference_face_quadrature(facequads)
+    refquads = uniform_face_quadratures(facequads)
     operators1 = [
         face_traction_component_operator(
             basis,

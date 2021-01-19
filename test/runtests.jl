@@ -81,41 +81,41 @@ end
     include("test_displacement_component_bc.jl")
 end
 
-@safetestset "Test Cut Mesh Convergence" begin
-    include("test_cut_convergence.jl")
-end
+# @safetestset "Test Cut Mesh Convergence" begin
+#     include("test_cut_convergence.jl")
+# end
 
-@safetestset "Test Penalty Displacement Component BC Convergence" begin
-    include("test_displacement_component_bc_convergence.jl")
-end
+# @safetestset "Test Penalty Displacement Component BC Convergence" begin
+#     include("test_displacement_component_bc_convergence.jl")
+# end
 
-@safetestset "Test Cut Mesh Stress Convergence" begin
-    include("test_cut_stress_convergence.jl")
-end
+# @safetestset "Test Cut Mesh Stress Convergence" begin
+#     include("test_cut_stress_convergence.jl")
+# end
 
 @safetestset "Test Transformation Strain Simple Tension" begin
     include("test_transformation_strain_simple_tension.jl")
 end
 
-@safetestset "Test Transformation Strain - Displacement Convergence" begin
-    include("test_transformation_strain_displacement_convergence.jl")
-    include("test_incoherent_transformation_strain_displacement_convergence.jl")
-end
+# @safetestset "Test Transformation Strain - Displacement Convergence" begin
+#     include("test_transformation_strain_displacement_convergence.jl")
+#     include("test_incoherent_transformation_strain_displacement_convergence.jl")
+# end
 
-@safetestset "Test Transformation Strain - Stress Convergence" begin
-    include("test_transformation_strain_stress_convergence.jl")
-    include("test_incoherent_transformation_strain_stress_convergence.jl")
-end
+# @safetestset "Test Transformation Strain - Stress Convergence" begin
+#     include("test_transformation_strain_stress_convergence.jl")
+#     include("test_incoherent_transformation_strain_stress_convergence.jl")
+# end
 
-@safetestset "Test Transformation Strain - Displacement + Traction BC convergence" begin
-    include("test_transformation_strain_displacement_traction_bc_convergence.jl")
-    include("test_incoherent_transformation_strain_displacement_traction_bc_convergence.jl")
-end
+# @safetestset "Test Transformation Strain - Displacement + Traction BC convergence" begin
+#     include("test_transformation_strain_displacement_traction_bc_convergence.jl")
+#     include("test_incoherent_transformation_strain_displacement_traction_bc_convergence.jl")
+# end
 
-@safetestset "Test Transformation Strain - Mixed BC convergence" begin
-    include("test_transformation_strain_mixed_bc_convergence.jl")
-    include("test_incoherent_transformation_strain_mixed_bc_convergence.jl")
-end
+# @safetestset "Test Transformation Strain - Mixed BC convergence" begin
+#     include("test_transformation_strain_mixed_bc_convergence.jl")
+#     include("test_incoherent_transformation_strain_mixed_bc_convergence.jl")
+# end
 
 @safetestset "Test Levelset Reinitialization" begin
     include("test_levelset_reinitialize.jl")

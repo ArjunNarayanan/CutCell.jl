@@ -49,27 +49,47 @@ function assemble_interface_condition!(
         negativenodeids = nodal_connectivity(cutmesh, -1, cellid)
         positivenodeids = nodal_connectivity(cutmesh, +1, cellid)
 
-        pptop = -0.5 * vec(traction_operator(interfacecondition, +1, +1, cellid))
-        pntop = -0.5 * vec(traction_operator(interfacecondition, +1, -1, cellid))
-        nptop = -0.5 * vec(traction_operator(interfacecondition, -1, +1, cellid))
-        nntop = -0.5 * vec(traction_operator(interfacecondition, -1, -1, cellid))
+        pptop =
+            -0.5 * vec(traction_operator(interfacecondition, +1, +1, cellid))
+        pntop =
+            -0.5 * vec(traction_operator(interfacecondition, +1, -1, cellid))
+        nptop =
+            -0.5 * vec(traction_operator(interfacecondition, -1, +1, cellid))
+        nntop =
+            -0.5 * vec(traction_operator(interfacecondition, -1, -1, cellid))
 
         pptopT =
             -0.5 *
             eta *
-            vec(transpose(traction_operator(interfacecondition, +1, +1, cellid)))
+            vec(
+                transpose(
+                    traction_operator(interfacecondition, +1, +1, cellid),
+                ),
+            )
         pntopT =
             -0.5 *
             eta *
-            vec(transpose(traction_operator(interfacecondition, +1, -1, cellid)))
+            vec(
+                transpose(
+                    traction_operator(interfacecondition, +1, -1, cellid),
+                ),
+            )
         nptopT =
             -0.5 *
             eta *
-            vec(transpose(traction_operator(interfacecondition, -1, +1, cellid)))
+            vec(
+                transpose(
+                    traction_operator(interfacecondition, -1, +1, cellid),
+                ),
+            )
         nntopT =
             -0.5 *
             eta *
-            vec(transpose(traction_operator(interfacecondition, -1, -1, cellid)))
+            vec(
+                transpose(
+                    traction_operator(interfacecondition, -1, -1, cellid),
+                ),
+            )
 
         assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -pptop)
         assemble_cell_matrix!(sysmatrix, positivenodeids, dofspernode, -pptopT)
@@ -131,7 +151,29 @@ function assemble_interface_condition!(
     end
 end
 
-function assemble_body_force_linear_form!(systemrhs, rhsfunc, basis, cellquads, cutmesh)
+function assemble_interelement_condition!(
+    sysmatrix,
+    basis,
+    facequads,
+    stiffness,
+    cutmesh;
+    eta = 1,
+)
+
+    @assert eta == 1 || eta == 0 || eta == -1
+    dim = dimension(cutmesh)
+    cellsign = cell_sign(cutmesh)
+    uniformquads = uniform_face_quadratures(facequads)
+
+end
+
+function assemble_body_force_linear_form!(
+    systemrhs,
+    rhsfunc,
+    basis,
+    cellquads,
+    cutmesh,
+)
 
     ncells = number_of_cells(cutmesh)
     cellsign = cell_sign(cutmesh)
@@ -270,7 +312,12 @@ function assemble_traction_force_component_linear_form!(
     end
 end
 
-function assemble_penalty_displacement_bc!(sysmatrix, sysrhs, dispcondition, cutmesh)
+function assemble_penalty_displacement_bc!(
+    sysmatrix,
+    sysrhs,
+    dispcondition,
+    cutmesh,
+)
 
     ncells = number_of_cells(cutmesh)
     dim = dimension(cutmesh)
@@ -341,7 +388,13 @@ function assemble_coherent_interface_transformation_rhs!(
             rhs =
                 s *
                 0.5 *
-                interface_transformation_rhs(basis, quad, normals, transfstress, cellmap)
+                interface_transformation_rhs(
+                    basis,
+                    quad,
+                    normals,
+                    transfstress,
+                    cellmap,
+                )
             nodeids = nodal_connectivity(cutmesh, s, cellid)
             assemble_cell_rhs!(systemrhs, nodeids, dofspernode, rhs)
         end
@@ -430,8 +483,10 @@ function assemble_stress_linear_form!(
     jac = jacobian(mesh)
     uniformquad = uniform_cell_quadrature(cellquads)
 
-    uniformop =
-        [stress_cell_rhs_operator(basis, uniformquad, stiffness[s], jac) for s in [+1, -1]]
+    uniformop = [
+        stress_cell_rhs_operator(basis, uniformquad, stiffness[s], jac) for
+        s in [+1, -1]
+    ]
 
     for cellid = 1:ncells
         s = cell_sign(mesh, cellid)
@@ -480,7 +535,8 @@ function assemble_transformation_stress_linear_form!(
     detjac = determinant_jacobian(mesh)
 
     uniformquad = uniform_cell_quadrature(cellquads)
-    uniformtransfrhs = constant_linear_form(transfstress, basis, uniformquad, detjac)
+    uniformtransfrhs =
+        constant_linear_form(transfstress, basis, uniformquad, detjac)
 
     for cellid = 1:ncells
         s = cell_sign(mesh, cellid)
@@ -518,11 +574,11 @@ function assemble_penalty_displacement_transformation_rhs!(
 
     dim = dimension(cutmesh)
     refnormals = reference_face_normals()
-    refquads = reference_face_quadrature(facequads)
+    refquads = uniform_face_quadratures(facequads)
 
     uniformrhs = [
-        face_traction_transformation_rhs(basis, q, n, transfstress, s)
-        for (q, n, s) in zip(refquads, refnormals, facedetjac)
+        face_traction_transformation_rhs(basis, q, n, transfstress, s) for
+        (q, n, s) in zip(refquads, refnormals, facedetjac)
     ]
 
     for cellid in cellids
@@ -571,10 +627,17 @@ function assemble_penalty_displacement_component_transformation_rhs!(
 
     dim = dimension(cutmesh)
     refnormals = reference_face_normals()
-    refquads = reference_face_quadrature(facequads)
+    refquads = uniform_face_quadratures(facequads)
 
     uniformrhs = [
-        face_traction_component_transformation_rhs(basis, q, component, n, transfstress, s) for (q, n, s) in zip(refquads, refnormals, facedetjac)
+        face_traction_component_transformation_rhs(
+            basis,
+            q,
+            component,
+            n,
+            transfstress,
+            s,
+        ) for (q, n, s) in zip(refquads, refnormals, facedetjac)
     ]
 
     for cellid in cellids
