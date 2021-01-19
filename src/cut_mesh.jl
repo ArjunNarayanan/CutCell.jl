@@ -1,12 +1,12 @@
 struct CutMesh
-    mesh::Mesh
+    mesh
     cellsign::Vector{Int}
     activecells::Matrix{Bool}
     cutmeshnodeids::Matrix{Int}
     ncells::Int
     numnodes::Int
     nelmts::Int
-    function CutMesh(mesh::Mesh, cellsign::Vector{Int}, cutmeshnodeids::Matrix{Int})
+    function CutMesh(mesh, cellsign::Vector{Int}, cutmeshnodeids::Matrix{Int})
         ncells = number_of_cells(mesh)
         nummeshnodes = number_of_nodes(mesh)
         @assert length(cellsign) == ncells
@@ -51,7 +51,7 @@ end
 
 function nodal_connectivity(cutmesh::CutMesh, s, cellid)
     row = cell_sign_to_row(s)
-    ncells = cutmesh.mesh.ncells
+    ncells = cutmesh.ncells
     @assert 1 <= cellid <= ncells
     cs = cell_sign(cutmesh, cellid)
     @assert cs == s || cs == 0
@@ -141,7 +141,7 @@ function inverse_jacobian(cutmesh::CutMesh)
 end
 
 function face_determinant_jacobian(cutmesh::CutMesh)
-    return face_determinant_jacobian(cutmesh.mesh)
+    return face_determinant_jacobian(cell_map(cutmesh))
 end
 
 function is_interior_cell(cutmesh::CutMesh)
@@ -150,6 +150,10 @@ end
 
 function cell_connectivity(cutmesh::CutMesh)
     return cell_connectivity(cutmesh.mesh)
+end
+
+function cell_connectivity(cutmesh::CutMesh,faceid,cellid)
+    return cell_connectivity(cutmesh.mesh,faceid,cellid)
 end
 
 function nodal_coordinates(cutmesh::CutMesh)

@@ -151,20 +151,134 @@ function assemble_interface_condition!(
     end
 end
 
+function assemble_face_interelement_condition!(
+    sysmatrix,
+    nodeids1,
+    nodeids2,
+    dofspernode,
+    tractionop,
+    massop,
+)
+    assemble_cell_matrix!(sysmatrix, nodeids1, dofspernode, +tractionop.nn)
+    assemble_cell_matrix!(sysmatrix, nodeids1, dofspernode, +tractionop.nnT)
+    assemble_couple_cell_matrix!(
+        sysmatrix,
+        nodeids1,
+        nodeids2,
+        dofspernode,
+        +tractionop.np,
+    )
+    assemble_couple_cell_matrix!(
+        sysmatrix,
+        nodeids1,
+        nodeids2,
+        dofspernode,
+        -tractionop.pnT,
+    )
+
+    assemble_cell_matrix!(sysmatrix, nodeids2, dofspernode, -tractionop.pp)
+    assemble_cell_matrix!(sysmatrix, nodeids2, dofspernode, -tractionop.ppT)
+    assemble_couple_cell_matrix!(
+        sysmatrix,
+        nodeids2,
+        nodeids1,
+        dofspernode,
+        -tractionop.pn,
+    )
+    assemble_couple_cell_matrix!(
+        sysmatrix,
+        nodeids2,
+        nodeids1,
+        dofspernode,
+        +tractionop.npT,
+    )
+end
+
 function assemble_interelement_condition!(
     sysmatrix,
     basis,
     facequads,
     stiffness,
-    cutmesh;
+    cutmesh,
+    penalty;
     eta = 1,
 )
 
     @assert eta == 1 || eta == 0 || eta == -1
-    dim = dimension(cutmesh)
-    cellsign = cell_sign(cutmesh)
     uniformquads = uniform_face_quadratures(facequads)
+    normals = reference_face_normals()
+    facedetjac = face_determinant_jacobian(cutmesh)
+    jac = jacobian(cutmesh)
+    nfaces = length(normals)
+    dim = dimension(cutmesh)
 
+    faceids = 1:nfaces
+    nbrfaceids = [opposite_face(faceid) for faceid in faceids]
+
+    uniformtop1 = [
+        interelement_traction_operators(
+            basis,
+            uniformquads[faceid],
+            uniformquads[nbrfaceids[faceid]],
+            normals[faceid],
+            stiffness[+1],
+            facedetjac[faceid],
+            jac,
+            eta,
+        ) for faceid in faceids
+    ]
+    uniformtop2 = [
+        interelement_traction_operators(
+            basis,
+            uniformquads[faceid],
+            uniformquads[nbrfaceids[faceid]],
+            normals[faceid],
+            stiffness[-1],
+            facedetjac[faceid],
+            jac,
+            eta,
+        ) for faceid in faceids
+    ]
+
+    uniformtop = [uniformtop1, uniformtop2]
+    uniformmassop = [
+        interelement_mass_operators(
+            basis,
+            uniformquads[faceid],
+            uniformquads[nbrfaceids[faceid]],
+            penalty * facedetjac[faceid],
+        ) for faceid in faceids
+    ]
+
+    ncells = number_of_cells(cutmesh)
+
+    for cellid = 1:ncells
+        s = cell_sign(cutmesh, cellid)
+        @assert s == +1 || s == -1 || s == 0
+        if s == +1 || s == -1
+            nodeids1 = nodal_connectivity(cutmesh, s, cellid)
+            row = cell_sign_to_row(s)
+
+            for faceid in faceids
+                nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
+                if cellid < nbrcellid
+                    nodeids2 = nodal_connectivity(cutmesh, s, nbrcellid)
+
+                    assemble_face_interelement_condition!(
+                        sysmatrix,
+                        nodeids1,
+                        nodeids2,
+                        dim,
+                        uniformtop[row][faceid],
+                        uniformmassop[faceid],
+                    )
+                end
+            end
+
+        else
+            error("Cut Cell Assembly not implemented yet")
+        end
+    end
 end
 
 function assemble_body_force_linear_form!(

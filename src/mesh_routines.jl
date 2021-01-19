@@ -238,6 +238,10 @@ function cell_connectivity(mesh::Mesh)
     return mesh.cellconnectivity
 end
 
+function cell_connectivity(mesh::Mesh,faceid,cellid)
+    return mesh.cellconnectivity[faceid,celli]
+end
+
 function bottom_boundary_node_ids(mesh)
     nfmside = nodes_per_mesh_side(mesh)
     return range(1, step = nfmside[2], length = nfmside[1])

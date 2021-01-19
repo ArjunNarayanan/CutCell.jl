@@ -98,6 +98,10 @@ function cell_connectivity(mesh::DGMesh)
     return mesh.cellconnectivity
 end
 
+function cell_connectivity(mesh::DGMesh,faceid::Int,cellid::Int)
+    return mesh.cellconnectivity[faceid,cellid]
+end
+
 function number_of_degrees_of_freedom(mesh::DGMesh)
     dim = dimension(mesh)
     numnodes = number_of_nodes(mesh)
