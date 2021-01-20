@@ -8,9 +8,9 @@ end
     include("test_elasticity.jl")
 end
 
-@safetestset "Test Mesh Routines" begin
-    include("test_mesh_routines.jl")
-end
+# @safetestset "Test Mesh Routines" begin
+#     include("test_mesh_routines.jl")
+# end
 
 @safetestset "Test Weak Form" begin
     include("test_weak_form.jl")
@@ -20,17 +20,17 @@ end
     include("test_assembly.jl")
 end
 
-@safetestset "Test Full Displacement BC Convergence" begin
-    include("test_full_displacement_convergence.jl")
-end
+# @safetestset "Test Full Displacement BC Convergence" begin
+#     include("test_full_displacement_convergence.jl")
+# end
 
-@safetestset "Test Uniform Tension" begin
-    include("test_traction_bc.jl")
-end
+# @safetestset "Test Uniform Tension" begin
+#     include("test_traction_bc.jl")
+# end
 
-@safetestset "Test Displacement + Traction BC Convergence" begin
-    include("test_displacement_traction_convergence.jl")
-end
+# @safetestset "Test Displacement + Traction BC Convergence" begin
+#     include("test_displacement_traction_convergence.jl")
+# end
 
 @safetestset "Test CutMesh Initialization" begin
     include("test_cut_mesh.jl")
@@ -86,6 +86,10 @@ end
     include("test_cut_simple_tension_interelement_conditions.jl")
 end
 
+@safetestset "Test DG Convergence" begin
+    include("test_dg_convergence.jl")
+end
+
 # @safetestset "Test Cut Mesh Convergence" begin
 #     include("test_cut_convergence.jl")
 # end
@@ -94,9 +98,17 @@ end
 #     include("test_displacement_component_bc_convergence.jl")
 # end
 
+@safetestset "Test DG Penalty Displacement Component BC Convergence" begin
+    include("test_dg_displacement_component_bc_convergence.jl")
+end
+
 # @safetestset "Test Cut Mesh Stress Convergence" begin
 #     include("test_cut_stress_convergence.jl")
 # end
+
+@safetestset "Test DG Cut Mesh Stress Convergence" begin
+    include("test_dg_cut_stress_convergence.jl")
+end
 
 # @safetestset "Test Transformation Strain Simple Tension" begin
 #     include("test_transformation_strain_simple_tension.jl")
