@@ -81,6 +81,11 @@ end
     include("test_displacement_component_bc.jl")
 end
 
+@safetestset "Test Simple Tension Interelement Conditions" begin
+    include("test_simple_tension_interelement_conditions.jl")
+    include("test_cut_simple_tension_interelement_conditions.jl")
+end
+
 # @safetestset "Test Cut Mesh Convergence" begin
 #     include("test_cut_convergence.jl")
 # end
@@ -93,9 +98,9 @@ end
 #     include("test_cut_stress_convergence.jl")
 # end
 
-@safetestset "Test Transformation Strain Simple Tension" begin
-    include("test_transformation_strain_simple_tension.jl")
-end
+# @safetestset "Test Transformation Strain Simple Tension" begin
+#     include("test_transformation_strain_simple_tension.jl")
+# end
 
 # @safetestset "Test Transformation Strain - Displacement Convergence" begin
 #     include("test_transformation_strain_displacement_convergence.jl")

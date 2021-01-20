@@ -192,6 +192,23 @@ function assemble_face_interelement_condition!(
         dofspernode,
         +tractionop.npT,
     )
+
+    assemble_cell_matrix!(sysmatrix, nodeids1, dofspernode, massop.nn)
+    assemble_cell_matrix!(sysmatrix, nodeids2, dofspernode, massop.pp)
+    assemble_couple_cell_matrix!(
+        sysmatrix,
+        nodeids1,
+        nodeids2,
+        dofspernode,
+        -massop.np,
+    )
+    assemble_couple_cell_matrix!(
+        sysmatrix,
+        nodeids2,
+        nodeids1,
+        dofspernode,
+        -massop.pn,
+    )
 end
 
 function assemble_interelement_condition!(
@@ -282,9 +299,10 @@ function assemble_interelement_condition!(
                 for faceid in faceids
                     nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
                     if cellid < nbrcellid
-                        nbrcellsign = cell_sign(cutmesh,nbrcellid)
+                        nbrcellsign = cell_sign(cutmesh, nbrcellid)
                         if nbrcellsign == +1 || nbrcellsign == 0
-                            pnodeids2 = nodal_connectivity(cutmesh, +1, nbrcellid)
+                            pnodeids2 =
+                                nodal_connectivity(cutmesh, +1, nbrcellid)
                             tractionop = interelement_traction_operators(
                                 basis,
                                 facequads[+1, faceid, cellid],
@@ -319,9 +337,10 @@ function assemble_interelement_condition!(
                 for faceid in faceids
                     nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
                     if cellid < nbrcellid
-                        nbrcellsign = cell_sign(cutmesh,nbrcellid)
+                        nbrcellsign = cell_sign(cutmesh, nbrcellid)
                         if nbrcellsign == -1 || nbrcellsign == 0
-                            nnodeids2 = nodal_connectivity(cutmesh, -1, nbrcellid)
+                            nnodeids2 =
+                                nodal_connectivity(cutmesh, -1, nbrcellid)
                             tractionop = interelement_traction_operators(
                                 basis,
                                 facequads[-1, faceid, cellid],
