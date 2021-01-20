@@ -156,7 +156,7 @@ function solve_curved_interface(
         penalty,
     )
     displacementbc = CutCell.DisplacementCondition(
-        x -> nonpoly_displacement(alpha, x),
+        x -> displacement(alpha, x),
         basis,
         facequads,
         stiffness,
@@ -184,7 +184,7 @@ function solve_curved_interface(
     )
     CutCell.assemble_body_force_linear_form!(
         sysrhs,
-        x -> nonpoly_body_force(lambda, mu, alpha, x),
+        x -> body_force(lambda, mu, alpha, x),
         basis,
         cellquads,
         cutmesh,
@@ -204,7 +204,7 @@ function solve_curved_interface(
 
     err = mesh_L2_error(
         disp,
-        x -> nonpoly_displacement(alpha, x),
+        x -> displacement(alpha, x),
         basis,
         cellquads,
         cutmesh,
@@ -244,6 +244,55 @@ powers = [2,3,4]
 nelmts = [2^p + 1 for p in powers]
 
 err = [solve_plane_interface(x0, normal, ne, polyorder, numqp, theta) for ne in nelmts]
+u1err = [er[1] for er in err]
+u2err = [er[2] for er in err]
+dx = 1.0 ./ nelmts
+
+u1rate = diff(log.(u1err)) ./ diff(log.(dx))
+u2rate = diff(log.(u2err)) ./ diff(log.(dx))
+
+@test allapprox(u1rate,repeat([3.0],length(u1rate)),0.05)
+@test allapprox(u2rate,repeat([3.0],length(u2rate)),0.05)
+
+
+
+
+
+xc = [1.0, 0.5]
+radius = 0.45
+polyorder = 2
+penaltyfactor = 1e2
+powers = [3,4,5]
+nelmts = [2^p + 1 for p in powers]
+numqp = required_quadrature_order(polyorder) + 2
+nelmts = [2^p + 1 for p in powers]
+
+err = [solve_curved_interface(xc, radius, ne, polyorder, numqp, penaltyfactor) for ne in nelmts]
+u1err = [er[1] for er in err]
+u2err = [er[2] for er in err]
+dx = 1.0 ./ nelmts
+
+u1rate = diff(log.(u1err)) ./ diff(log.(dx))
+u2rate = diff(log.(u2err)) ./ diff(log.(dx))
+
+@test allapprox(u1rate,repeat([3.0],length(u1rate)),0.05)
+@test allapprox(u2rate,repeat([3.0],length(u2rate)),0.05)
+
+
+
+
+
+
+xc = [0.5, 0.5]
+radius = 0.25
+polyorder = 2
+penaltyfactor = 1e2
+powers = [3,4,5]
+nelmts = [2^p + 1 for p in powers]
+numqp = required_quadrature_order(polyorder) + 2
+nelmts = [2^p + 1 for p in powers]
+
+err = [solve_curved_interface(xc, radius, ne, polyorder, numqp, penaltyfactor) for ne in nelmts]
 u1err = [er[1] for er in err]
 u2err = [er[2] for er in err]
 dx = 1.0 ./ nelmts
