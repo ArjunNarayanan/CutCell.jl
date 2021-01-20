@@ -276,7 +276,81 @@ function assemble_interelement_condition!(
             end
 
         else
-            error("Cut Cell Assembly not implemented yet")
+
+            let
+                pnodeids1 = nodal_connectivity(cutmesh, +1, cellid)
+                for faceid in faceids
+                    nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
+                    if cellid < nbrcellid
+                        nbrcellsign = cell_sign(cutmesh,nbrcellid)
+                        if nbrcellsign == +1 || nbrcellsign == 0
+                            pnodeids2 = nodal_connectivity(cutmesh, +1, nbrcellid)
+                            tractionop = interelement_traction_operators(
+                                basis,
+                                facequads[+1, faceid, cellid],
+                                facequads[+1, nbrfaceids[faceid], nbrcellid],
+                                normals[faceid],
+                                stiffness[+1],
+                                facedetjac[faceid],
+                                jac,
+                                eta,
+                            )
+                            massop = interelement_mass_operators(
+                                basis,
+                                facequads[+1, faceid, cellid],
+                                facequads[+1, nbrfaceids[faceid], nbrcellid],
+                                penalty * facedetjac[faceid],
+                            )
+                            assemble_face_interelement_condition!(
+                                sysmatrix,
+                                pnodeids1,
+                                pnodeids2,
+                                dim,
+                                tractionop,
+                                massop,
+                            )
+                        end
+                    end
+                end
+            end
+
+            let
+                nnodeids1 = nodal_connectivity(cutmesh, -1, cellid)
+                for faceid in faceids
+                    nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
+                    if cellid < nbrcellid
+                        nbrcellsign = cell_sign(cutmesh,nbrcellid)
+                        if nbrcellsign == -1 || nbrcellsign == 0
+                            nnodeids2 = nodal_connectivity(cutmesh, -1, nbrcellid)
+                            tractionop = interelement_traction_operators(
+                                basis,
+                                facequads[-1, faceid, cellid],
+                                facequads[-1, nbrfaceids[faceid], nbrcellid],
+                                normals[faceid],
+                                stiffness[-1],
+                                facedetjac[faceid],
+                                jac,
+                                eta,
+                            )
+                            massop = interelement_mass_operators(
+                                basis,
+                                facequads[-1, faceid, cellid],
+                                facequads[-1, nbrfaceids[faceid], nbrcellid],
+                                penalty * facedetjac[faceid],
+                            )
+                            assemble_face_interelement_condition!(
+                                sysmatrix,
+                                nnodeids1,
+                                nnodeids2,
+                                dim,
+                                tractionop,
+                                massop,
+                            )
+                        end
+                    end
+                end
+            end
+
         end
     end
 end

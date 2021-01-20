@@ -14,7 +14,7 @@ interfacenormal = [1.0, 0.0]
 
 lambda, mu = 1.0, 2.0
 stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
-penalty = 1.0
+penalty = 10.0
 dx = 0.1
 e11 = dx / 4.0
 e22 = -lambda / (lambda + 2mu) * e11
