@@ -374,6 +374,44 @@ function assemble_interelement_condition!(
     end
 end
 
+function assemble_interelement_transformation_rhs!(
+    sysrhs,
+    transfstress,
+    basis,
+    facequads,
+    cutmesh,
+)
+
+    uniformquads = uniform_face_quadratures(facequads)
+    normals = reference_face_normals()
+    facedetjac = face_determinant_jacobian(cutmesh)
+    jac = jacobian(cutmesh)
+    nfaces = length(normals)
+    dim = dimension(cutmesh)
+
+    faceids = 1:nfaces
+    nbrfaceids = [opposite_face(faceid) for faceid in faceids]
+
+    uniformrhs = [
+        face_traction_transformation_rhs(
+            basis,
+            uniformquads[faceid],
+            normals[faceid],
+            transfstress,
+            facedetjac[faceid],
+        ),
+    ]
+
+    ncells = CutCell.number_of_cells(cutmesh)
+
+    for cellid in 1:ncells
+        s = cell_sign(cutmesh,cellid)
+
+        @assert s == 1 || s == 0 || s == -1
+        
+    end
+end
+
 function assemble_body_force_linear_form!(
     systemrhs,
     rhsfunc,

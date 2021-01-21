@@ -50,6 +50,10 @@ function DGMesh(x0,widths,nelements,basis)
     return DGMesh(mesh,refpoints)
 end
 
+function widths(mesh::DGMesh)
+    return mesh.meshwidths
+end
+
 function dimension(dgmesh::DGMesh)
     return dgmesh.dim
 end

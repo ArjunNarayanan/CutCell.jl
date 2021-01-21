@@ -81,6 +81,14 @@ function solve_for_displacement(
     sysrhs = CutCell.SystemRHS()
 
     CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+    CutCell.assemble_interelement_condition!(
+        sysmatrix,
+        basis,
+        facequads,
+        stiffness,
+        cutmesh,
+        penalty,
+    )
     CutCell.assemble_interface_condition!(
         sysmatrix,
         interfacecondition,
@@ -109,7 +117,6 @@ function solve_for_displacement(
     return nodaldisplacement
 end
 
-
 function spatial_closest_points(refclosestpoints, refclosestcellids, mesh)
     dim, npts = size(refclosestpoints)
     spclosestpoints = zeros(dim, npts)
@@ -120,7 +127,6 @@ function spatial_closest_points(refclosestpoints, refclosestcellids, mesh)
     return spclosestpoints
 end
 
-
 K1, K2 = 247.0, 192.0    # Pa
 mu1, mu2 = 126.0, 87.0   # Pa
 lambda1 = lame_lambda(K1, mu1)
@@ -128,7 +134,7 @@ lambda2 = lame_lambda(K2, mu2)
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
 theta0 = 0.0
-transfstress = CutCell.plane_strain_transformation_stress(lambda1,mu1,theta0)
+transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 
 width = 1.0
 displacementscale = 0.01 * width
@@ -136,18 +142,18 @@ penaltyfactor = 1e3
 
 polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 3
+nelmts = 10
 delta = 0.05
-interfacepoint = [1/3+delta, 1/3]
+interfacepoint = [1 / 3 + delta, 1 / 3]
 interfaceangle = 45
-interfacenormal = [cosd(interfaceangle),sind(interfaceangle)]
+interfacenormal = [cosd(interfaceangle), sind(interfaceangle)]
 
 dx = width / nelmts
 meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
 penalty = penaltyfactor * meanmoduli
 
 basis = TensorProductBasis(2, polyorder)
-mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
+mesh = CutCell.DGMesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
 levelset = InterpolatingPolynomial(1, basis)
 levelsetcoeffs = CutCell.levelset_coefficients(
     x -> plane_distance_function(x, interfacenormal, interfacepoint),
@@ -173,6 +179,7 @@ nodaldisplacement = solve_for_displacement(
     penalty,
     displacementscale,
 )
+
 
 
 refseedpoints, spatialseedpoints, seedcellids =
@@ -218,16 +225,18 @@ exactdisplacement = hcat(
 # fig, ax = PyPlot.subplots(2,1)
 # ax[1].plot(spycoords, productdisplacement[1, :], label = "product u1")
 # ax[1].plot(spycoords, parentdisplacement[1, :], label = "parent u1")
-# # ax[1].plot(spycoords, exactdisplacement[1, :], "--", label = "exact")
+# ax[1].plot(spycoords, exactdisplacement[1, :], "--", label = "exact")
 # ax[1].grid()
 # ax[1].legend()
 # ax[2].plot(spycoords, productdisplacement[2, :], label = "product u2")
 # ax[2].plot(spycoords, parentdisplacement[2, :], label = "parent u2")
-# # ax[2].plot(spycoords, exactdisplacement[2, :], "--", label = "exact")
+# ax[2].plot(spycoords, exactdisplacement[2, :], "--", label = "exact")
 # ax[2].grid()
 # ax[2].legend()
 # fig.tight_layout()
 # fig
+
+
 
 productstress = CutCell.product_stress_at_reference_points(
     referencepoints,
@@ -247,8 +256,8 @@ parentstress = CutCell.parent_stress_at_reference_points(
     nodaldisplacement,
     cutmesh,
 )
-#
-# exactstress = hcat([stress_field(lambda1,mu1,displacementscale,spatialpoints[:,i]) for i = 1:size(spatialpoints)[2]]...)
+
+exactstress = hcat([stress_field(lambda1,mu1,displacementscale,spatialpoints[:,i]) for i = 1:size(spatialpoints)[2]]...)
 
 
 producttraction = CutCell.traction_force_at_points(productstress,interfacenormals)
@@ -269,59 +278,3 @@ fig.tight_layout()
 folderpath = "examples/potential/plane/"
 fig
 # fig.savefig(folderpath*"inclined-slab-interface-traction-product.png")
-
-
-# using Statistics
-# difftraction = abs.(parenttraction - producttraction)
-#
-# idx = findall(difftraction[1,:] .> 2.0)
-# oscillating_cells = referencecellids[idx]
-#
-# fig, ax = PyPlot.subplots(2, 1)
-# ax[1].plot(spycoords, difftraction[1, :])
-# ax[1].set_title("diff t1")
-# ax[1].legend()
-# ax[1].grid()
-# ax[2].plot(spycoords, difftraction[2, :])
-# ax[2].set_title("diff t2")
-# ax[2].legend()
-# ax[2].grid()
-# fig.tight_layout()
-# fig
-#
-
-
-
-# fig, ax = PyPlot.subplots(3, 1)
-# ax[1].plot(spycoords, productstress[1, :], label = "product")
-# ax[1].plot(spycoords, parentstress[1, :], label = "parent")
-# ax[1].plot(spycoords, exactstress[1,:], "--", label = "exact")
-# ax[1].set_title("S11")
-# ax[1].legend()
-# ax[1].grid()
-# ax[2].plot(spycoords, productstress[2, :], label = "product")
-# ax[2].plot(spycoords, parentstress[2, :], label = "parent")
-# ax[2].plot(spycoords, exactstress[2,:], "--", label = "exact")
-# ax[2].set_title("S22")
-# ax[2].legend()
-# ax[2].grid()
-# ax[3].plot(spycoords, productstress[3, :], label = "product")
-# ax[3].plot(spycoords, parentstress[3, :], label = "parent")
-# ax[3].plot(spycoords, exactstress[3,:], "--", label = "exact")
-# ax[3].set_title("S12")
-# ax[3].legend()
-# ax[3].grid()
-# # ax[3].set_ylim(2,2.5)
-# fig.tight_layout()
-# fig
-
-# productpressure = CutCell.pressure_at_points(productstress)
-# parentpressure = CutCell.pressure_at_points(parentstress)
-#
-# fig,ax = PyPlot.subplots()
-# ax.plot(spycoords,productpressure,label="product")
-# ax.plot(spycoords,parentpressure,label="parent")
-# ax.legend()
-# ax.grid()
-# ax.set_title("Pressure on interface")
-# fig

@@ -110,9 +110,9 @@ end
     include("test_dg_cut_stress_convergence.jl")
 end
 
-# @safetestset "Test Transformation Strain Simple Tension" begin
-#     include("test_transformation_strain_simple_tension.jl")
-# end
+@safetestset "Test Transformation Strain Simple Tension" begin
+    include("test_transformation_strain_simple_tension.jl")
+end
 
 # @safetestset "Test Transformation Strain - Displacement Convergence" begin
 #     include("test_transformation_strain_displacement_convergence.jl")

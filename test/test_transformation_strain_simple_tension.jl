@@ -26,7 +26,7 @@ polyorder = 1
 numqp = required_quadrature_order(polyorder) + 2
 
 basis = TensorProductBasis(2, polyorder)
-mesh = CutCell.Mesh([0.0, 0.0], [L, W], [nelmts, nelmts], basis)
+mesh = CutCell.DGMesh([0.0, 0.0], [L, W], [nelmts, nelmts], basis)
 levelset = InterpolatingPolynomial(1, basis)
 levelsetcoeffs = ones(CutCell.number_of_nodes(mesh))
 
