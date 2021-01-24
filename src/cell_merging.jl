@@ -106,6 +106,10 @@ struct MergeCutMesh
     end
 end
 
+function widths(mergecutmesh::MergeCutMesh)
+    return widths(mergecutmesh.cutmesh)
+end
+
 function number_of_cells(mergecutmesh::MergeCutMesh)
     return number_of_cells(mergecutmesh.cutmesh)
 end
@@ -123,8 +127,7 @@ function dimension(mergecutmesh::MergeCutMesh)
 end
 
 function cell_map(mergecutmesh::MergeCutMesh, s, cellid)
-    row = cell_sign_to_row(s)
-    mergecellid = mergecutmesh.mergedwithcell[row, cellid]
+    mergecellid = solution_cell_id(mergecutmesh,s,cellid)
     return cell_map(mergecutmesh.cutmesh, mergecellid)
 end
 
@@ -134,6 +137,12 @@ end
 
 function is_interior_cell(mergecutmesh::MergeCutMesh)
     return is_interior_cell(mergecutmesh.cutmesh)
+end
+
+function solution_cell_id(mergecutmesh::MergeCutMesh,s,cellid)
+    row = cell_sign_to_row(s)
+    mergecellid = mergecutmesh.mergedwithcell[row,cellid]
+    return mergecellid
 end
 
 function number_of_nodes(mergecutmesh::MergeCutMesh)
@@ -181,6 +190,10 @@ end
 
 function cell_connectivity(mergecutmesh::MergeCutMesh)
     return cell_connectivity(mergecutmesh.cutmesh)
+end
+
+function cell_connectivity(mergecutmesh::MergeCutMesh,faceid::Int,cellid::Int)
+    return cell_connectivity(mergecutmesh.cutmesh)[faceid,cellid]
 end
 
 function active_cells(mergecutmesh::MergeCutMesh)
@@ -320,6 +333,10 @@ struct MergedMesh
     end
 end
 
+function widths(mergedmesh::MergedMesh)
+    return widths(mergedmesh.mergecutmesh)
+end
+
 function number_of_cells(mergedmesh::MergedMesh)
     return number_of_cells(mergedmesh.mergecutmesh)
 end
@@ -369,10 +386,26 @@ function cell_connectivity(mergedmesh::MergedMesh)
     return cell_connectivity(mergedmesh.mergecutmesh)
 end
 
+function cell_connectivity(mergedmesh::MergedMesh,faceid::Int,cellid::Int)
+    return cell_connectivity(mergedmesh.mergecutmesh,faceid,cellid)
+end
+
+function face_determinant_jacobian(mergedmesh::MergedMesh)
+    return face_determinant_jacobian(cell_map(mergedmesh,1))
+end
+
+function jacobian(mergedmesh::MergedMesh)
+    return jacobian(cell_map(mergedmesh,1))
+end
+
 function number_of_degrees_of_freedom(mergedmesh::MergedMesh)
     dim = dimension(mergedmesh)
     numnodes = number_of_nodes(mergedmesh)
     return dim * numnodes
+end
+
+function solution_cell_id(mergedmesh::MergedMesh,s,cellid)
+    return solution_cell_id(mergedmesh.mergecutmesh,s,cellid)
 end
 
 function active_node_labels(mergecutmesh::MergeCutMesh)

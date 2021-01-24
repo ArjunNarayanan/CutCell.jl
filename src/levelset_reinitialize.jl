@@ -149,26 +149,49 @@ function seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
     cellsign = cell_sign(cutmesh)
     cellids = findall(cellsign .== 0)
 
-    totalnumqps = sum([length(interfacequads[1, cellid]) for cellid in cellids])
+    totalnumqps1 = sum([length(interfacequads[+1, cellid]) for cellid in cellids])
+    totalnumqps2 = sum([length(interfacequads[-1, cellid]) for cellid in cellids])
 
-    refseedpoints = zeros(2, totalnumqps)
-    spatialseedpoints = zeros(2, totalnumqps)
-    seedcellids = zeros(Int, totalnumqps)
+    @assert totalnumqps1 == totalnumqps2
+    totalnumqps = totalnumqps1
+
+    refseedpoints = zeros(2, 2, totalnumqps)
+    spatialseedpoints = zeros(2, 2, totalnumqps)
+    seedcellids = zeros(Int, 2, totalnumqps)
 
     start = 1
     for cellid in cellids
-        cellmap = cell_map(cutmesh, cellid)
-        refpoints = interfacequads[1, cellid].points
-        spatialpoints = cellmap(refpoints)
-        numqps = size(refpoints)[2]
-
+        numqps = length(interfacequads[1,cellid])
         stop = start + numqps - 1
+        for s in [+1,-1]
+            cellmap = cell_map(cutmesh,s,cellid)
+            refpoints = interfacequads[s,cellid].points
+            spatialpoints = cellmap(refpoints)
 
-        refseedpoints[:, start:stop] = refpoints
-        spatialseedpoints[:, start:stop] = spatialpoints
-        seedcellids[start:stop] = repeat([cellid], numqps)
+            row = cell_sign_to_row(s)
 
+            refseedpoints[row,:,start:stop] = refpoints
+            spatialseedpoints[row,:,start:stop] = spatialpoints
+
+            solcellid = solution_cell_id(cutmesh,s,cellid)
+            seedcellids[row,start:stop] = repeat([solcellid],numqps)
+        end
         start = stop + 1
+        # pcellmap = cell_map(cutmesh, cellid)
+        #
+        # prefpoints = interfacequads[+1, cellid].points
+        # nrefpoints = interfacequads[-1, cellid].points
+        #
+        # spatialpoints = cellmap(refpoints)
+        # numqps = size(refpoints)[2]
+        #
+        # stop = start + numqps - 1
+        #
+        # refseedpoints[:, start:stop] = refpoints
+        # spatialseedpoints[:, start:stop] = spatialpoints
+        # seedcellids[start:stop] = repeat([cellid], numqps)
+        #
+        # start = stop + 1
     end
     return refseedpoints, spatialseedpoints, seedcellids
 end

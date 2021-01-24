@@ -138,9 +138,9 @@ transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 
 width = 1.0
 displacementscale = 0.01 * width
-penaltyfactor = 1e3
+penaltyfactor = 1e4
 
-polyorder = 1
+polyorder = 3
 numqp = required_quadrature_order(polyorder) + 2
 nelmts = 3
 delta = 0.05
@@ -167,12 +167,18 @@ interfacequads =
     CutCell.InterfaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 facequads = CutCell.FaceQuadratures(levelset, levelsetcoeffs, cutmesh, numqp)
 
+mergecutmesh = CutCell.MergeCutMesh(cutmesh)
+mergemapper = CutCell.MergeMapper()
+CutCell.merge_cells_in_mesh!(mergecutmesh,cellquads,interfacequads,facequads,mergemapper)
+mergedmesh = CutCell.MergedMesh(mergecutmesh)
+
+
 nodaldisplacement = solve_for_displacement(
     basis,
     cellquads,
     interfacequads,
     facequads,
-    cutmesh,
+    mergedmesh,
     levelset,
     levelsetcoeffs,
     stiffness,
@@ -183,36 +189,41 @@ nodaldisplacement = solve_for_displacement(
 
 
 refseedpoints, spatialseedpoints, seedcellids =
-    CutCell.seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
-interfacenormals = CutCell.collect_interface_normals(interfacequads,cutmesh)
+    CutCell.seed_zero_levelset_with_interfacequads(interfacequads, mergedmesh)
+interfacenormals = CutCell.collect_interface_normals(interfacequads,mergedmesh)
 
-spatialpoints = spatialseedpoints
+sp1 = spatialseedpoints[1,:,:]
+sp2 = spatialseedpoints[2,:,:]
+@assert all(sp1 .≈ sp2)
+
+spatialpoints = spatialseedpoints[1,:,:]
 referencepoints = refseedpoints
 referencecellids = seedcellids
 
 sortidx = sortperm(spatialpoints[2, :])
 spatialpoints = spatialpoints[:, sortidx]
-referencepoints = referencepoints[:, sortidx]
-referencecellids = referencecellids[sortidx]
-spycoords = spatialpoints[2, :]
+referencepoints = referencepoints[:, :, sortidx]
+referencecellids = referencecellids[:,sortidx]
 interfacenormals = interfacenormals[:,sortidx]
+spycoords = spatialpoints[2, :]
+
 
 productdisplacement = CutCell.displacement_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[1,:,:],
+    referencecellids[1,:],
     +1,
     basis,
     nodaldisplacement,
-    cutmesh,
+    mergedmesh,
 )
 
 parentdisplacement = CutCell.displacement_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[2,:,:],
+    referencecellids[2,:],
     -1,
     basis,
     nodaldisplacement,
-    cutmesh,
+    mergedmesh,
 )
 
 exactdisplacement = hcat(
@@ -239,22 +250,22 @@ exactdisplacement = hcat(
 
 
 productstress = CutCell.product_stress_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[1,:,:],
+    referencecellids[1,:],
     basis,
     stiffness,
     transfstress,
     theta0,
     nodaldisplacement,
-    cutmesh,
+    mergedmesh,
 )
 parentstress = CutCell.parent_stress_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[2,:,:],
+    referencecellids[2,:],
     basis,
     stiffness,
     nodaldisplacement,
-    cutmesh,
+    mergedmesh,
 )
 
 exactstress = hcat([stress_field(lambda1,mu1,displacementscale,spatialpoints[:,i]) for i = 1:size(spatialpoints)[2]]...)

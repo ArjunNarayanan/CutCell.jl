@@ -278,9 +278,11 @@ function assemble_interelement_condition!(
 
             for faceid in faceids
                 nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
-                if cellid < nbrcellid
-                    nodeids2 = nodal_connectivity(cutmesh, s, nbrcellid)
+                if cellid < nbrcellid &&
+                   solution_cell_id(cutmesh, s, nbrcellid) !=
+                   solution_cell_id(cutmesh, s, cellid)
 
+                    nodeids2 = nodal_connectivity(cutmesh, s, nbrcellid)
                     assemble_face_interelement_condition!(
                         sysmatrix,
                         nodeids1,
@@ -298,7 +300,10 @@ function assemble_interelement_condition!(
                 pnodeids1 = nodal_connectivity(cutmesh, +1, cellid)
                 for faceid in faceids
                     nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
-                    if cellid < nbrcellid
+                    if cellid < nbrcellid &&
+                       solution_cell_id(cutmesh, +1, nbrcellid) !=
+                       solution_cell_id(cutmesh, +1, cellid)
+
                         nbrcellsign = cell_sign(cutmesh, nbrcellid)
                         if nbrcellsign == +1 || nbrcellsign == 0
                             pnodeids2 =
@@ -336,7 +341,11 @@ function assemble_interelement_condition!(
                 nnodeids1 = nodal_connectivity(cutmesh, -1, cellid)
                 for faceid in faceids
                     nbrcellid = cell_connectivity(cutmesh, faceid, cellid)
-                    if cellid < nbrcellid
+                    if cellid < nbrcellid &&
+                       solution_cell_id(cutmesh, -1, nbrcellid) !=
+                       solution_cell_id(cutmesh, -1, cellid)
+
+
                         nbrcellsign = cell_sign(cutmesh, nbrcellid)
                         if nbrcellsign == -1 || nbrcellsign == 0
                             nnodeids2 =
@@ -404,11 +413,11 @@ function assemble_interelement_transformation_rhs!(
 
     ncells = CutCell.number_of_cells(cutmesh)
 
-    for cellid in 1:ncells
-        s = cell_sign(cutmesh,cellid)
+    for cellid = 1:ncells
+        s = cell_sign(cutmesh, cellid)
 
         @assert s == 1 || s == 0 || s == -1
-        
+
     end
 end
 
