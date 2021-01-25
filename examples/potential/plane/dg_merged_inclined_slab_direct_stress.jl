@@ -138,12 +138,12 @@ transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 
 width = 1.0
 displacementscale = 0.01 * width
-penaltyfactor = 1e4
+penaltyfactor = 5e2
 
 polyorder = 3
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 3
-delta = 0.05
+nelmts = 12
+delta = 0.01
 interfacepoint = [1 / 3 + delta, 1 / 3]
 interfaceangle = 45
 interfacenormal = [cosd(interfaceangle), sind(interfaceangle)]
@@ -288,4 +288,4 @@ ax[2].grid()
 fig.tight_layout()
 folderpath = "examples/potential/plane/"
 fig
-# fig.savefig(folderpath*"inclined-slab-interface-traction-product.png")
+# fig.savefig(folderpath*"dg-interface-traction-6x6.png")
