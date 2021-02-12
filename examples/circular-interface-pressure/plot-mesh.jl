@@ -87,11 +87,11 @@ ax.tricontour(
     levels = [0.0],
 )
 plot_elements!(ax, mesh)
-ax.set_xlim(0,1)
-ax.set_ylim(0,1)
-# ax.set_xlim(0.65, 0.75)
-# ax.set_ylim(0.7, 0.8)
+# ax.set_xlim(0,1)
+# ax.set_ylim(0,1)
+ax.set_xlim(0.6, 0.7)
+ax.set_ylim(0.6, 0.7)
 ax.set_aspect("equal")
 fig
 folderpath = "examples/circular-interface-pressure/"
-fig.savefig(folderpath * "coarse-mesh.png")
+fig.savefig(folderpath * "zoom-coarse-mesh.png")

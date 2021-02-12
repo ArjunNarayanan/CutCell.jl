@@ -172,10 +172,35 @@ function seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
             refseedpoints[row,:,start:stop] = refpoints
             spatialseedpoints[row,:,start:stop] = spatialpoints
 
-            solcellid = solution_cell_id(cutmesh,s,cellid)
-            seedcellids[row,start:stop] = repeat([solcellid],numqps)
+            seedcellids[row,start:stop] = repeat([cellid],numqps)
         end
         start = stop + 1
+    end
+    return refseedpoints, spatialseedpoints, seedcellids
+end
+
+function seed_cell_zero_levelset_with_interfacequads(interfacequads,mesh,cellid)
+    pquad = interfacequads[+1,cellid]
+    nquad = interfacequads[-1,cellid]
+
+    numqp = length(pquad)
+    @assert length(nquad) == numqp
+
+    refseedpoints = zeros(2,2,numqp)
+    spatialseedpoints = zeros(2,2,numqp)
+    seedcellids = zeros(Int,2,numqp)
+
+    for s in [+1,-1]
+        cellmap = cell_map(mesh,s,cellid)
+        refpoints = interfacequads[s,cellid].points
+        spatialpoints = cellmap(refpoints)
+
+        row = cell_sign_to_row(s)
+
+        refseedpoints[row,:,:] = refpoints
+        spatialseedpoints[row,:,:] = cellmap(refpoints)
+
+        seedcellids[row,:] = repeat([cellid],numqp)
     end
     return refseedpoints, spatialseedpoints, seedcellids
 end

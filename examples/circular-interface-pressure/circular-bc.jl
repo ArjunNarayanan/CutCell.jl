@@ -293,6 +293,17 @@ p0 = -0.0
 width = 1.0
 delta = 1e-2width
 
+polyorder = 2
+numqp = required_quadrature_order(polyorder) + 2
+nelmts = 3
+penaltyfactor = 1e2
+
+transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
+
+dx = width / nelmts
+meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
+penalty = penaltyfactor / dx * meanmoduli
+
 interfacecenter = [width / 2, width / 2]
 inradius = dx/sqrt(2) + delta
 outradius = 2.0
@@ -311,17 +322,6 @@ analyticalsolution = AnalyticalSolution(
 
 folderpath = "examples/circular-interface-pressure/"
 filename = "unequal-moduli-pure-transformation"
-
-polyorder = 2
-numqp = required_quadrature_order(polyorder) + 2
-nelmts = 3
-penaltyfactor = 1e2
-
-transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
-
-dx = width / nelmts
-meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
-penalty = penaltyfactor / dx * meanmoduli
 
 basis = TensorProductBasis(2, polyorder)
 mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)
@@ -358,7 +358,13 @@ normalizedL2error = L2error ./ exactsolutionL2norm
 
 refseedpoints, spatialseedpoints, seedcellids =
     CutCell.seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
+# checkcellid = 9
+# refseedpoints, spatialseedpoints, seedcellids =
+#     CutCell.seed_cell_zero_levelset_with_interfacequads(interfacequads, cutmesh, checkcellid)
+
+
 normals = CutCell.collect_interface_normals(interfacequads, cutmesh)
+# normals = CutCell.interface_normals(interfacequads,checkcellid)
 
 spatialpoints = spatialseedpoints[1, :, :]
 referencepoints = refseedpoints
@@ -421,78 +427,80 @@ ax.legend()
 ax.set_xlabel("angular position (deg)")
 ax.set_ylabel("Normalized error in displacement magnitude")
 ax.set_title("CG: Displacement Error")
-# ax.set_ylim(0,8e-4)
+ax.set_ylim(0,0.15)
+ax.set_xlim(0,90)
 ax.grid()
 fig
-# fig.savefig(folderpath*filename*"-displacement-error.png")
+fig.savefig(folderpath*filename*"-displacement-error.png")
 
-# productstress = CutCell.product_stress_at_reference_points(
-#     referencepoints[1, :, :],
-#     referencecellids[1, :],
-#     basis,
-#     stiffness,
-#     transfstress,
-#     theta0,
-#     nodaldisplacement,
-#     cutmesh,
-# )
-# parentstress = CutCell.parent_stress_at_reference_points(
-#     referencepoints[2, :, :],
-#     referencecellids[2, :],
-#     basis,
-#     stiffness,
-#     nodaldisplacement,
-#     cutmesh,
-# )
-#
-# exactproductstress =
-#     mapslices(x -> shell_stress(analyticalsolution, x), spatialpoints, dims = 1)
-# exactparentstress =
-#     mapslices(x -> core_stress(analyticalsolution), spatialpoints, dims = 1)
-#
-#
-# producttraction = CutCell.traction_force_at_points(productstress, normals)
-# parenttraction = CutCell.traction_force_at_points(parentstress, normals)
-#
-# exactproducttraction = CutCell.traction_force_at_points(exactproductstress, normals)
-# exactparenttraction = CutCell.traction_force_at_points(exactparentstress, normals)
-#
-#
-# # fig, ax = PyPlot.subplots(2, 1)
-# # ax[1].plot(angularposition, producttraction[1, :], label = "product")
-# # ax[1].plot(angularposition, parenttraction[1, :], label = "parent")
-# # ax[1].plot(angularposition, exactproducttraction[1, :], "--", label = "exact product")
-# # ax[1].plot(angularposition, exactparenttraction[1, :], "--", label = "exact parent")
-# # ax[1].set_title("t1")
-# # ax[1].legend()
-# # ax[1].grid()
-# # ax[2].plot(angularposition, producttraction[2, :], label = "product")
-# # ax[2].plot(angularposition, parenttraction[2, :], label = "parent")
-# # ax[2].plot(angularposition, exactproducttraction[2, :], "--", label = "exact product")
-# # ax[2].plot(angularposition, exactparenttraction[2, :], "--", label = "exact parent")
-# # ax[2].set_title("t2")
-# # ax[2].legend()
-# # ax[2].grid()
-# # fig.tight_layout()
-# # fig
-#
-# producttractionmagnitude = vec(mapslices(norm,producttraction,dims=1))
-# parenttractionmagnitude = vec(mapslices(norm,parenttraction,dims=1))
-#
-# exactproducttractionmagnitude = vec(mapslices(norm,exactproducttraction,dims=1))
-# exactparenttractionmagnitude = vec(mapslices(norm,exactparenttraction,dims=1))
-#
-# producttractionerror = abs.(producttractionmagnitude - exactproducttractionmagnitude) ./ exactproducttractionmagnitude
-# parenttractionerror = abs.(parenttractionmagnitude - exactparenttractionmagnitude) ./ exactparenttractionmagnitude
-#
-# # fig,ax = PyPlot.subplots()
-# # ax.plot(angularposition,parenttractionerror,label="parent")
-# # ax.plot(angularposition,producttractionerror,label="product")
-# # ax.legend()
-# # ax.grid()
-# # ax.set_xlabel("angular position (deg)")
-# # ax.set_ylabel("Normalized error in traction magnitude")
-# # ax.set_title("CG Traction Error")
-# # ax.set_ylim(0,0.80)
-# # fig
-# # fig.savefig(folderpath*filename*"-traction-error.png")
+productstress = CutCell.product_stress_at_reference_points(
+    referencepoints[1, :, :],
+    referencecellids[1, :],
+    basis,
+    stiffness,
+    transfstress,
+    theta0,
+    nodaldisplacement,
+    cutmesh,
+)
+parentstress = CutCell.parent_stress_at_reference_points(
+    referencepoints[2, :, :],
+    referencecellids[2, :],
+    basis,
+    stiffness,
+    nodaldisplacement,
+    cutmesh,
+)
+
+exactproductstress =
+    mapslices(x -> shell_stress(analyticalsolution, x), spatialpoints, dims = 1)
+exactparentstress =
+    mapslices(x -> core_stress(analyticalsolution), spatialpoints, dims = 1)
+
+
+producttraction = CutCell.traction_force_at_points(productstress, normals)
+parenttraction = CutCell.traction_force_at_points(parentstress, normals)
+
+exactproducttraction = CutCell.traction_force_at_points(exactproductstress, normals)
+exactparenttraction = CutCell.traction_force_at_points(exactparentstress, normals)
+
+
+# fig, ax = PyPlot.subplots(2, 1)
+# ax[1].plot(angularposition, producttraction[1, :], label = "product")
+# ax[1].plot(angularposition, parenttraction[1, :], label = "parent")
+# ax[1].plot(angularposition, exactproducttraction[1, :], "--", label = "exact product")
+# ax[1].plot(angularposition, exactparenttraction[1, :], "--", label = "exact parent")
+# ax[1].set_title("t1")
+# ax[1].legend()
+# ax[1].grid()
+# ax[2].plot(angularposition, producttraction[2, :], label = "product")
+# ax[2].plot(angularposition, parenttraction[2, :], label = "parent")
+# ax[2].plot(angularposition, exactproducttraction[2, :], "--", label = "exact product")
+# ax[2].plot(angularposition, exactparenttraction[2, :], "--", label = "exact parent")
+# ax[2].set_title("t2")
+# ax[2].legend()
+# ax[2].grid()
+# fig.tight_layout()
+# fig
+
+producttractionmagnitude = vec(mapslices(norm,producttraction,dims=1))
+parenttractionmagnitude = vec(mapslices(norm,parenttraction,dims=1))
+
+exactproducttractionmagnitude = vec(mapslices(norm,exactproducttraction,dims=1))
+exactparenttractionmagnitude = vec(mapslices(norm,exactparenttraction,dims=1))
+
+producttractionerror = abs.(producttractionmagnitude - exactproducttractionmagnitude) ./ exactproducttractionmagnitude
+parenttractionerror = abs.(parenttractionmagnitude - exactparenttractionmagnitude) ./ exactparenttractionmagnitude
+
+fig,ax = PyPlot.subplots()
+ax.plot(angularposition,parenttractionerror,label="parent")
+ax.plot(angularposition,producttractionerror,label="product")
+ax.legend()
+ax.grid()
+ax.set_xlabel("angular position (deg)")
+ax.set_ylabel("Normalized error in traction magnitude")
+ax.set_title("CG Traction Error")
+ax.set_ylim(0,10)
+ax.set_xlim(0,90)
+fig
+fig.savefig(folderpath*filename*"-traction-error.png")
