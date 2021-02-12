@@ -131,20 +131,20 @@ theta0 = 0.0
 transfstress = CutCell.plane_strain_transformation_stress(lambda1,mu1,theta0)
 
 width = 1.0
-displacementscale = 0.01 * width
-penaltyfactor = 1e3
+displacementscale = 0.1
+penaltyfactor = 1e2
 
-polyorder = 3
+polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 12
+nelmts = 17
 delta = 0.01
-interfacepoint = [1/3+delta, 1/3]
-interfaceangle = 45
+interfacepoint = [0.8, 0.0]
+interfaceangle = 35.0
 interfacenormal = [cosd(interfaceangle),sind(interfaceangle)]
 
 dx = width / nelmts
 meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
-penalty = penaltyfactor * meanmoduli
+penalty = penaltyfactor/dx * meanmoduli
 
 basis = TensorProductBasis(2, polyorder)
 mesh = CutCell.Mesh([0.0, 0.0], [width, width], [nelmts, nelmts], basis)

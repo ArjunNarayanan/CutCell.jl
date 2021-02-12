@@ -86,6 +86,13 @@ function solve_for_displacement(
         interfacecondition,
         cutmesh,
     )
+    CutCell.assemble_body_force_linear_form!(
+        sysrhs,
+        x -> body_force(lambda, mu, alpha, x),
+        basis,
+        cellquads,
+        cutmesh,
+    )
     CutCell.assemble_penalty_displacement_bc!(
         sysmatrix,
         sysrhs,
@@ -140,23 +147,18 @@ lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
-rho1 = 1.0
-rho2 = 1.0
-V1 = inv(rho1)
-V2 = inv(rho2)
-
 theta0 = 0.0
 transfstress = CutCell.plane_strain_transformation_stress(lambda1, mu1, theta0)
 
 width = 1.0
-displacementscale = 0.01 * width
-penaltyfactor = 1e1
+displacementscale = 0.1
+penaltyfactor = 1e2
 
-polyorder = 3
+polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 9
+nelmts = 17
 center = [width / 2, width / 2]
-inradius = width / 4
+inradius = width / 3
 
 dx = width / nelmts
 meanmoduli = 0.5 * (lambda1 + lambda2 + mu1 + mu2)
@@ -193,7 +195,7 @@ refseedpoints, spatialseedpoints, seedcellids =
     CutCell.seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
 normals = CutCell.collect_interface_normals(interfacequads, cutmesh)
 
-spatialpoints = spatialseedpoints
+spatialpoints = spatialseedpoints[1, :, :]
 referencepoints = refseedpoints
 referencecellids = seedcellids
 
@@ -202,23 +204,23 @@ angularposition = angular_position(relspatialpoints)
 sortidx = sortperm(angularposition)
 
 angularposition = angularposition[sortidx]
-referencepoints = referencepoints[:, sortidx]
+referencepoints = referencepoints[:, :, sortidx]
 spatialpoints = spatialpoints[:, sortidx]
-referencecellids = referencecellids[sortidx]
+referencecellids = referencecellids[:, sortidx]
 normals = normals[:, sortidx]
 
 
 productdisplacement = CutCell.displacement_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[1, :, :],
+    referencecellids[1, :],
     +1,
     basis,
     nodaldisplacement,
     cutmesh,
 )
 parentdisplacement = CutCell.displacement_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[2, :, :],
+    referencecellids[2, :],
     -1,
     basis,
     nodaldisplacement,
@@ -238,10 +240,12 @@ exactdisplacement = hcat(
 # fig, ax = PyPlot.subplots(2, 1)
 # ax[1].plot(angularposition, productdisplacement[1, :], label = "product u1")
 # ax[1].plot(angularposition, parentdisplacement[1, :], label = "parent u1")
+# ax[1].plot(angularposition, exactdisplacement[1, :], "--", label = "exact u1")
 # ax[1].grid()
 # ax[1].legend()
 # ax[2].plot(angularposition, productdisplacement[2, :], label = "product u2")
 # ax[2].plot(angularposition, parentdisplacement[2, :], label = "parent u2")
+# ax[2].plot(angularposition, exactdisplacement[2, :], "--", label = "exact u2")
 # ax[2].grid()
 # ax[2].legend()
 # fig.tight_layout()
@@ -252,8 +256,8 @@ exactdisplacement = hcat(
 
 
 productstress = CutCell.product_stress_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[1, :, :],
+    referencecellids[1, :],
     basis,
     stiffness,
     transfstress,
@@ -262,42 +266,51 @@ productstress = CutCell.product_stress_at_reference_points(
     cutmesh,
 )
 parentstress = CutCell.parent_stress_at_reference_points(
-    referencepoints,
-    referencecellids,
+    referencepoints[2, :, :],
+    referencecellids[2, :],
     basis,
     stiffness,
     nodaldisplacement,
     cutmesh,
 )
-
-producttraction = traction_force_at_points(productstress,normals)
-parenttraction = traction_force_at_points(parentstress,normals)
-
-# fig, ax = PyPlot.subplots(2, 1)
-# ax[1].plot(angularposition, producttraction[1, :], label = "product")
-# ax[1].plot(angularposition, parenttraction[1, :], label = "parent")
-# ax[1].set_title("t1")
-# ax[1].legend()
-# ax[1].grid()
-# ax[2].plot(angularposition, producttraction[2, :], label = "product")
-# ax[2].plot(angularposition, parenttraction[2, :], label = "parent")
-# ax[2].set_title("t2")
-# ax[2].legend()
-# ax[2].grid()
-# fig.tight_layout()
-# fig
-
-productpressure = CutCell.pressure_at_points(productstress)
-parentpressure = CutCell.pressure_at_points(parentstress)
+exactstress = mapslices(
+    x -> stress_field(lambda1, mu1, displacementscale, x),
+    spatialpoints,
+    dims = 1,
+)
 
 
-fig,ax = PyPlot.subplots()
-ax.plot(angularposition,productpressure,label="product")
-ax.plot(angularposition,parentpressure,label="parent")
-ax.legend()
-ax.grid()
-ax.set_title("Pressure on interface")
+producttraction = traction_force_at_points(productstress, normals)
+parenttraction = traction_force_at_points(parentstress, normals)
+exacttraction = traction_force_at_points(exactstress, normals)
+
+fig, ax = PyPlot.subplots(2, 1)
+ax[1].plot(angularposition, producttraction[1, :], label = "product")
+ax[1].plot(angularposition, parenttraction[1, :], label = "parent")
+ax[1].plot(angularposition, exacttraction[1, :], "--", label = "exact")
+ax[1].set_title("t1")
+ax[1].legend()
+ax[1].grid()
+ax[2].plot(angularposition, producttraction[2, :], label = "product")
+ax[2].plot(angularposition, parenttraction[2, :], label = "parent")
+ax[2].plot(angularposition, exacttraction[2, :], "--", label = "exact")
+ax[2].set_title("t2")
+ax[2].legend()
+ax[2].grid()
+fig.tight_layout()
 fig
+
+# productpressure = CutCell.pressure_at_points(productstress)
+# parentpressure = CutCell.pressure_at_points(parentstress)
+#
+#
+# fig,ax = PyPlot.subplots()
+# ax.plot(angularposition,productpressure,label="product")
+# ax.plot(angularposition,parentpressure,label="parent")
+# ax.legend()
+# ax.grid()
+# ax.set_title("Pressure on interface")
+# fig
 
 
 # productdevstress = CutCell.deviatoric_stress_at_points(productstress,productpressure)

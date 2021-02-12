@@ -6,7 +6,6 @@ function hessian_matrix(poly, x)
     ]
 end
 
-
 function saye_newton_iterate(
     xguess,
     xq,
@@ -177,21 +176,6 @@ function seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
             seedcellids[row,start:stop] = repeat([solcellid],numqps)
         end
         start = stop + 1
-        # pcellmap = cell_map(cutmesh, cellid)
-        #
-        # prefpoints = interfacequads[+1, cellid].points
-        # nrefpoints = interfacequads[-1, cellid].points
-        #
-        # spatialpoints = cellmap(refpoints)
-        # numqps = size(refpoints)[2]
-        #
-        # stop = start + numqps - 1
-        #
-        # refseedpoints[:, start:stop] = refpoints
-        # spatialseedpoints[:, start:stop] = spatialpoints
-        # seedcellids[start:stop] = repeat([cellid], numqps)
-        #
-        # start = stop + 1
     end
     return refseedpoints, spatialseedpoints, seedcellids
 end

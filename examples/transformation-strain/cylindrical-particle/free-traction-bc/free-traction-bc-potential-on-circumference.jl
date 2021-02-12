@@ -1,9 +1,10 @@
+using PyPlot
 using LinearAlgebra
 using PolynomialBasis
 using ImplicitDomainQuadrature
 using Revise
 using CutCell
-include("../../../test/useful_routines.jl")
+include("../../../../test/useful_routines.jl")
 
 function bulk_modulus(l, m)
     return l + 2m / 3
@@ -27,7 +28,7 @@ function solve_for_displacement(
 )
 
     bilinearforms = CutCell.BilinearForms(basis, cellquads, stiffness, cutmesh)
-    interfacecondition = CutCell.incoherent_interface_condition(
+    interfacecondition = CutCell.coherent_interface_condition(
         basis,
         interfacequads,
         stiffness,
@@ -47,7 +48,7 @@ function solve_for_displacement(
         cellquads,
         cutmesh,
     )
-    CutCell.assemble_incoherent_interface_transformation_rhs!(
+    CutCell.assemble_coherent_interface_transformation_rhs!(
         sysrhs,
         transfstress,
         basis,
@@ -104,14 +105,14 @@ function angular_position(points)
     return rad2deg.(angle.(cpoints))
 end
 
-K1, K2 = 247.0e9, 192.0e9    # Pa
-mu1, mu2 = 126.0e9, 87.0e9   # Pa
+K1, K2 = 247.0, 192.0    # Pa
+mu1, mu2 = 126.0, 87.0   # Pa
 lambda1 = lame_lambda(K1, mu1)
 lambda2 = lame_lambda(K2, mu2)
 stiffness = CutCell.HookeStiffness(lambda1, mu1, lambda2, mu2)
 
-rho1 = 3.93e3   # Kg/m^3
-rho2 = 3.68e3   # Kg/m^3
+rho1 = 1.0   # Kg/m^3
+rho2 = 1.0   # Kg/m^3
 
 V1 = inv(rho1)
 V2 = inv(rho2)
@@ -120,14 +121,14 @@ theta0 = -0.067
 molarmass = 0.147   # Kg/mol
 diffG0 = ΔG/molarmass # J/Kg
 
-width = 1.0e-3
-penaltyfactor = 1e2
+width = 1.0
+penaltyfactor = 1e3
 
-polyorder = 3
+polyorder = 2
 numqp = required_quadrature_order(polyorder) + 2
-nelmts = 33
+nelmts = 17
 center = [width / 2, width / 2]
-inradius = width / 4
+inradius = width / 3
 outradius = width
 
 transfstrain = CutCell.plane_transformation_strain(theta0)
@@ -164,44 +165,55 @@ nodaldisplacement = solve_for_displacement(
 
 refseedpoints, spatialseedpoints, seedcellids =
     CutCell.seed_zero_levelset_with_interfacequads(interfacequads, cutmesh)
-nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
+normals = CutCell.collect_interface_normals(interfacequads, cutmesh)
 
-tol = 1e-8
-boundingradius = 3.0
-refclosestpoints, refclosestcellids, refgradients =
-    CutCell.closest_reference_points_on_zero_levelset(
-        nodalcoordinates,
-        refseedpoints,
-        spatialseedpoints,
-        seedcellids,
-        levelset,
-        levelsetcoeffs,
-        mesh,
-        tol,
-        boundingradius,
-    )
-spclosestpoints = spatial_closest_points(refclosestpoints,refclosestcellids,cutmesh)
+spatialpoints = spatialseedpoints[1, :, :]
+referencepoints = refseedpoints
+referencecellids = seedcellids
 
-relspatialpoints = spclosestpoints .- center
+relspatialpoints = spatialpoints .- center
 angularposition = angular_position(relspatialpoints)
 sortidx = sortperm(angularposition)
 angularposition = angularposition[sortidx]
 
-refclosestpoints = refclosestpoints[:,sortidx]
-refclosestcellids = refclosestcellids[sortidx]
-refgradients = refgradients[:,sortidx]
+referencepoints = referencepoints[:, :, sortidx]
+referencecellids = referencecellids[:, sortidx]
+spatialpoints = spatialpoints[:, sortidx]
+normals = normals[:, sortidx]
 
-invjac = CutCell.inverse_jacobian(cutmesh)
-normals = diagm(invjac) * refgradients
-CutCell.normalize_normals!(normals)
+productdisplacement = CutCell.displacement_at_reference_points(
+    referencepoints[1, :, :],
+    referencecellids[1, :],
+    +1,
+    basis,
+    nodaldisplacement,
+    cutmesh,
+)
+parentdisplacement = CutCell.displacement_at_reference_points(
+    referencepoints[2, :, :],
+    referencecellids[2, :],
+    -1,
+    basis,
+    nodaldisplacement,
+    cutmesh,
+)
+
+# fig, ax = PyPlot.subplots(2, 1)
+# ax[1].plot(angularposition, productdisplacement[1, :], label = "product u1")
+# ax[1].plot(angularposition, parentdisplacement[1, :], label = "parent u1")
+# ax[1].grid()
+# ax[1].legend()
+# ax[2].plot(angularposition, productdisplacement[2, :], label = "product u2")
+# ax[2].plot(angularposition, parentdisplacement[2, :], label = "parent u2")
+# ax[2].grid()
+# ax[2].legend()
+# fig.tight_layout()
+# fig
 
 
-
-
-
-product_stress_at_cp = CutCell.product_stress_at_reference_points(
-    refclosestpoints,
-    refclosestcellids,
+productstress = CutCell.product_stress_at_reference_points(
+    referencepoints[1,:,:],
+    referencecellids[1,:],
     basis,
     stiffness,
     transfstress,
@@ -209,28 +221,46 @@ product_stress_at_cp = CutCell.product_stress_at_reference_points(
     nodaldisplacement,
     cutmesh,
 )
-parent_stress_at_cp = CutCell.parent_stress_at_reference_points(
-    refclosestpoints,
-    refclosestcellids,
+parentstress = CutCell.parent_stress_at_reference_points(
+    referencepoints[2, :, :],
+    referencecellids[2, :],
     basis,
     stiffness,
     nodaldisplacement,
     cutmesh,
 )
 
+producttraction = CutCell.traction_force_at_points(productstress, normals)
+parenttraction = CutCell.traction_force_at_points(parentstress, normals)
+
+# fig, ax = PyPlot.subplots(2, 1)
+# ax[1].plot(angularposition, producttraction[1, :], label = "product")
+# ax[1].plot(angularposition, parenttraction[1, :], label = "parent")
+# ax[1].set_title("t1")
+# ax[1].legend()
+# ax[1].grid()
+# ax[2].plot(angularposition, producttraction[2, :], label = "product")
+# ax[2].plot(angularposition, parenttraction[2, :], label = "parent")
+# ax[2].set_title("t2")
+# ax[2].legend()
+# ax[2].grid()
+# fig.tight_layout()
+# fig
 
 
-productpressure = CutCell.pressure_at_points(product_stress_at_cp)
-parentpressure = CutCell.pressure_at_points(parent_stress_at_cp)
 
-productdevstress = CutCell.deviatoric_stress_at_points(product_stress_at_cp,productpressure)
-parentdevstress = CutCell.deviatoric_stress_at_points(parent_stress_at_cp,parentpressure)
 
-productdevnorm = stress_inner_product_over_points(productdevstress)
-parentdevnorm = stress_inner_product_over_points(parentdevstress)
+productpressure = CutCell.pressure_at_points(productstress)
+parentpressure = CutCell.pressure_at_points(parentstress)
 
-productnormaldevstress = normal_stress_component_over_points(productdevstress,normals)
-parentnormaldevstress = normal_stress_component_over_points(parentdevstress,normals)
+productdevstress = CutCell.deviatoric_stress_at_points(productstress,productpressure)
+parentdevstress = CutCell.deviatoric_stress_at_points(parentstress,parentpressure)
+
+productdevnorm = CutCell.stress_inner_product_over_points(productdevstress)
+parentdevnorm = CutCell.stress_inner_product_over_points(parentdevstress)
+
+productnormaldevstress = CutCell.normal_stress_component_over_points(productdevstress,normals)
+parentnormaldevstress = CutCell.normal_stress_component_over_points(parentdevstress,normals)
 
 productspecificvolume = V1*(1.0 .- productpressure/K1)
 parentspecificvolume = V2*(1.0 .- parentpressure/K2)
@@ -251,44 +281,45 @@ parentpotential = parentp1+parentp2+parentp3+parentp4
 potentialdifference = diffG0 .+ productpotential - parentpotential
 
 
-fig,ax = PyPlot.subplots()
-ax.plot(angularposition,potentialdifference)
-ax.grid()
-ax.set_xlabel("Angular position (deg)")
-ax.set_ylabel("Potential difference (J/Kg)")
-ax.set_title("Potential difference along interface circumference")
-fig.tight_layout()
-fig.savefig("potential-difference.png")
-
-
-fig,ax = PyPlot.subplots()
-ax.plot(angularposition,parentp1,label="term1")
-ax.plot(angularposition,parentp2,label="term2")
-ax.plot(angularposition,parentp3,label="term3")
-ax.plot(angularposition,parentp4,label="term4")
-ax.plot(angularposition,parentpotential,label="potential")
-ax.set_xlabel("Angular position (deg)")
-ax.set_ylabel("Energy density (J/Kg)")
-ax.set_title("Potential on parent side of interface")
-ax.set_ylim(-1e6,2e6)
-ax.grid()
-ax.legend()
-fig.tight_layout()
-fig.savefig("parent-potential.png")
-
-
-
-fig,ax = PyPlot.subplots()
-ax.plot(angularposition,productp1,label="term1")
-ax.plot(angularposition,productp2,label="term2")
-ax.plot(angularposition,productp3,label="term3")
-ax.plot(angularposition,productp4,label="term4")
-ax.plot(angularposition,productpotential,label="potential")
-ax.set_xlabel("Angular position (deg)")
-ax.set_ylabel("Energy density (J/Kg)")
-ax.set_ylim(-1e6,2e6)
-ax.set_title("Potential on product side of interface")
-ax.grid()
-ax.legend()
-fig.tight_layout()
-fig.savefig("product-potential.png")
+# fig,ax = PyPlot.subplots()
+# ax.plot(angularposition,potentialdifference)
+# ax.grid()
+# ax.set_xlabel("Angular position (deg)")
+# ax.set_ylabel("Potential difference (J/Kg)")
+# ax.set_title("Potential difference along interface circumference")
+# fig.tight_layout()
+# fig
+# fig.savefig("potential-difference.png")
+#
+#
+# fig,ax = PyPlot.subplots()
+# ax.plot(angularposition,parentp1,label="term1")
+# ax.plot(angularposition,parentp2,label="term2")
+# ax.plot(angularposition,parentp3,label="term3")
+# ax.plot(angularposition,parentp4,label="term4")
+# ax.plot(angularposition,parentpotential,label="potential")
+# ax.set_xlabel("Angular position (deg)")
+# ax.set_ylabel("Energy density (J/Kg)")
+# ax.set_title("Potential on parent side of interface")
+# ax.set_ylim(-1e6,2e6)
+# ax.grid()
+# ax.legend()
+# fig.tight_layout()
+# fig.savefig("parent-potential.png")
+#
+#
+#
+# fig,ax = PyPlot.subplots()
+# ax.plot(angularposition,productp1,label="term1")
+# ax.plot(angularposition,productp2,label="term2")
+# ax.plot(angularposition,productp3,label="term3")
+# ax.plot(angularposition,productp4,label="term4")
+# ax.plot(angularposition,productpotential,label="potential")
+# ax.set_xlabel("Angular position (deg)")
+# ax.set_ylabel("Energy density (J/Kg)")
+# ax.set_ylim(-1e6,2e6)
+# ax.set_title("Potential on product side of interface")
+# ax.grid()
+# ax.legend()
+# fig.tight_layout()
+# fig.savefig("product-potential.png")

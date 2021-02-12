@@ -332,36 +332,36 @@ u2rate = convergence_rate(dx,u2err)
 
 
 
-center = [width, width]
-inradius = width / 2
-outradius = 2width
-powers = [3,4,5]
-nelmts = [2^p + 1 for p in powers]
-
-err = [
-    displacement_error(
-        width,
-        center,
-        inradius,
-        outradius,
-        stiffness,
-        theta0,
-        ne,
-        polyorder,
-        numqp,
-        penaltyfactor,
-    ) for ne in nelmts
-]
-
-dx = 1.0 ./ nelmts
-u1err = [er[1] for er in err]
-u2err = [er[2] for er in err]
-
-u1rate = convergence_rate(dx,u1err)
-u2rate = convergence_rate(dx,u2err)
-
-@test allapprox(u1rate,repeat([3.0],length(u1rate)),0.1)
-@test allapprox(u2rate,repeat([3.0],length(u2rate)),0.1)
+# center = [width, width]
+# inradius = width / 2
+# outradius = 2width
+# powers = [3,4,5]
+# nelmts = [2^p + 1 for p in powers]
+#
+# err = [
+#     displacement_error(
+#         width,
+#         center,
+#         inradius,
+#         outradius,
+#         stiffness,
+#         theta0,
+#         ne,
+#         polyorder,
+#         numqp,
+#         penaltyfactor,
+#     ) for ne in nelmts
+# ]
+#
+# dx = 1.0 ./ nelmts
+# u1err = [er[1] for er in err]
+# u2err = [er[2] for er in err]
+#
+# u1rate = convergence_rate(dx,u1err)
+# u2rate = convergence_rate(dx,u2err)
+#
+# @test allapprox(u1rate,repeat([3.0],length(u1rate)),0.1)
+# @test allapprox(u2rate,repeat([3.0],length(u2rate)),0.1)
 
 
 

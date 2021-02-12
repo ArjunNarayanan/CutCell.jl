@@ -54,15 +54,16 @@ CutCell.assemble_interelement_condition!(sysmatrix,basis,facequads,stiffness,mer
 CutCell.assemble_interface_condition!(sysmatrix, interfacecondition, mergedmesh)
 
 matrix = CutCell.make_sparse(sysmatrix, mergedmesh)
-rhs = CutCell.rhs(sysrhs, mergedmesh)
-
-CutCell.apply_dirichlet_bc!(matrix, rhs, [5,6], 1, 0.0, 2)
-CutCell.apply_dirichlet_bc!(matrix, rhs, [5], 2, 0.0, 2)
-CutCell.apply_dirichlet_bc!(matrix, rhs, [3,4], 1, dx, 2)
-
-sol = matrix \ rhs
-disp = reshape(sol, 2, :)
-
-testdisp = [dx/2  dx/2  dx  dx  0.  0.  dx/2  dx/2
-            0.    dy    0.  dy  0.  dy  0.    dy]
-@test allapprox(disp,testdisp,1e2eps())
+K = Array(matrix)
+# rhs = CutCell.rhs(sysrhs, mergedmesh)
+#
+# CutCell.apply_dirichlet_bc!(matrix, rhs, [5,6], 1, 0.0, 2)
+# CutCell.apply_dirichlet_bc!(matrix, rhs, [5], 2, 0.0, 2)
+# CutCell.apply_dirichlet_bc!(matrix, rhs, [3,4], 1, dx, 2)
+#
+# sol = matrix \ rhs
+# disp = reshape(sol, 2, :)
+#
+# testdisp = [dx/2  dx/2  dx  dx  0.  0.  dx/2  dx/2
+#             0.    dy    0.  dy  0.  dy  0.    dy]
+# @test allapprox(disp,testdisp,1e2eps())

@@ -7,20 +7,20 @@ include("useful_routines.jl")
 
 x0 = [0.0, 0.0]
 widths = [4.0, 1.0]
-nelements = [2, 2]
+nelements = [2, 1]
 
 interfacepoint = [-1.0, 0.0]
 interfacenormal = [1.0, 0.0]
 
 lambda, mu = 1.0, 2.0
 stiffness = CutCell.HookeStiffness(lambda, mu, lambda, mu)
-penalty = 10.0
+penalty = 1.0
 dx = 0.1
 e11 = dx / 4.0
 e22 = -lambda / (lambda + 2mu) * e11
 dy = e22
 
-polyorder = 2
+polyorder = 1
 numqp = required_quadrature_order(polyorder)
 
 basis = TensorProductBasis(2, polyorder)
@@ -73,7 +73,7 @@ rightbc = CutCell.DisplacementComponentCondition(
 sysmatrix = CutCell.SystemMatrix()
 sysrhs = CutCell.SystemRHS()
 
-CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
+# CutCell.assemble_bilinear_form!(sysmatrix, bilinearforms, cutmesh)
 CutCell.assemble_interelement_condition!(
     sysmatrix,
     basis,
@@ -82,19 +82,43 @@ CutCell.assemble_interelement_condition!(
     cutmesh,
     penalty,
 )
-CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,leftbc,cutmesh)
-CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,bottombc,cutmesh)
-CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,rightbc,cutmesh)
+# CutCell.assemble_penalty_displacement_bc!(sysmatrix, sysrhs, leftbc, cutmesh)
+# CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,bottombc,cutmesh)
+# CutCell.assemble_penalty_displacement_bc!(sysmatrix,sysrhs,rightbc,cutmesh)
+
+# normals = CutCell.reference_face_normals()
+# detjac = CutCell.face_determinant_jacobian(cutmesh)
+# cellmap = CutCell.cell_map(cutmesh, 1)
+#
+# bf = CutCell.bilinear_form(basis,cellquads[1,1],stiffness[1],cellmap)
+# top = CutCell.face_traction_component_operator(
+#     basis,
+#     facequads[1, 4, 1],
+#     [1.0, 0.0],
+#     normals[4],
+#     stiffness[1],
+#     facedetjac[4],
+#     cellmap,
+# )
+# mop =
+#     penalty * CutCell.component_mass_matrix(
+#         basis,
+#         facequads[1, 4, 1],
+#         [1.0, 0.0],
+#         facedetjac[4],
+#     )
 
 op = CutCell.make_sparse(sysmatrix, cutmesh)
 rhs = CutCell.rhs(sysrhs, cutmesh)
 
-sol = op \ rhs
-disp = reshape(sol, 2, :)
+K = Array(op)
 
-nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
-testdisp = copy(nodalcoordinates)
-testdisp[1, :] .*= e11
-testdisp[2, :] .*= e22
-
-@test allapprox(disp, testdisp, 1e2eps())
+# sol = op \ rhs
+# disp = reshape(sol, 2, :)
+#
+# nodalcoordinates = CutCell.nodal_coordinates(cutmesh)
+# testdisp = copy(nodalcoordinates)
+# testdisp[1, :] .*= e11
+# testdisp[2, :] .*= e22
+#
+# @test allapprox(disp, testdisp, 1e2eps())

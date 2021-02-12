@@ -226,29 +226,29 @@ function convergence_rate(v, dx)
     diff(log.(v)) ./ diff(log.(dx))
 end
 
-x0 = [0.5, 0.0]
-normal = [1.0, 0.0]
-polyorder = 1
-numqp = required_quadrature_order(polyorder) + 2
-penaltyfactor = 1e2
-powers = [3, 4, 5]
-nelmts = [2^p + 1 for p in powers]
-dx = 1.0 ./ nelmts
-
-
-err = [
-    solve_elasticity(
-        x -> plane_distance_function(x, normal, x0),
-        ne,
-        polyorder,
-        numqp,
-        penaltyfactor,
-    ) for ne in nelmts
-]
-serr = [[er[i] for er in err] for i = 1:3]
-
-rates = [convergence_rate(v, dx) for v in serr]
-@test all([allapprox(rates[i],repeat([1.0],length(rates[i])),0.1) for i = 1:3])
+# x0 = [0.5, 0.0]
+# normal = [1.0, 0.0]
+# polyorder = 1
+# numqp = required_quadrature_order(polyorder) + 2
+# penaltyfactor = 1e2
+# powers = [3, 4, 5]
+# nelmts = [2^p + 1 for p in powers]
+# dx = 1.0 ./ nelmts
+#
+#
+# err = [
+#     solve_elasticity(
+#         x -> plane_distance_function(x, normal, x0),
+#         ne,
+#         polyorder,
+#         numqp,
+#         penaltyfactor,
+#     ) for ne in nelmts
+# ]
+# serr = [[er[i] for er in err] for i = 1:3]
+#
+# rates = [convergence_rate(v, dx) for v in serr]
+# @test all([allapprox(rates[i],repeat([1.0],length(rates[i])),0.1) for i = 1:3])
 
 
 # powers = [3,4,5]
@@ -276,6 +276,7 @@ dx = 1.0 ./ nelmts
 xc = [1.0, 0.5]
 radius = 0.45
 polyorder = 2
+penaltyfactor = 1e2
 numqp = required_quadrature_order(polyorder) + 2
 err = [
     solve_elasticity(

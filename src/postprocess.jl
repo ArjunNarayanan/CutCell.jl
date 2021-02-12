@@ -37,7 +37,7 @@ end
 
 function normal_stress_component(stressvector, normal)
     tn = traction_force(stressvector,normal)
-    return dot(stressvector,normal)
+    return dot(tn,normal)
 end
 
 function normal_stress_component_over_points(stresses,normals)
