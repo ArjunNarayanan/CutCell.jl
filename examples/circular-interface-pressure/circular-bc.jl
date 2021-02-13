@@ -431,7 +431,7 @@ ax.set_ylim(0,0.15)
 ax.set_xlim(0,90)
 ax.grid()
 fig
-fig.savefig(folderpath*filename*"-displacement-error.png")
+# fig.savefig(folderpath*filename*"-displacement-error.png")
 
 productstress = CutCell.product_stress_at_reference_points(
     referencepoints[1, :, :],
@@ -503,4 +503,4 @@ ax.set_title("CG Traction Error")
 ax.set_ylim(0,10)
 ax.set_xlim(0,90)
 fig
-fig.savefig(folderpath*filename*"-traction-error.png")
+# fig.savefig(folderpath*filename*"-traction-error.png")
